@@ -1,0 +1,30 @@
+# Flutter
+**/build/
+.dart_tool/
+.packages
+.pub-cache/
+/.idea/
+/.vscode/
+
+# Secrets
+.env
+
+# Generated files
+*.g.dart
+*.mocks.dart
+
+# Misc
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android
+**/local.properties
+**/android/*/local.properties
+
+# macOS
+**/.DS_Store
+
+# Keystore
+*.jks
+*.keystore

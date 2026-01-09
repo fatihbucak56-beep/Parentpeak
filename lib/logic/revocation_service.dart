@@ -1,6 +1,7 @@
 import 'dart:async';
 
-/// Mock RevocationService for the demo. Simulates network calls.
+/// Simple demo stub used by the demo app. Production implementation is
+/// provided by `RevocationServiceImpl` in `revocation_service_impl.dart`.
 class RevocationService {
   final String baseUrl;
   final Duration delay;

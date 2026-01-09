@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 import '../models/trusted_device.dart';
 import 'revoke_confirmation_dialog.dart';
 
@@ -29,7 +30,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
 
   Future<void> _confirmAndRevoke(TrustedDevice device) async {
     if (device.isPriorityApprover) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dieses Gerät kann nicht entfernt werden.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.cannotRemovePriority)));
       return;
     }
 
@@ -52,9 +53,9 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
             );
           }
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gerät erfolgreich entfernt.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.deviceRemoved)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fehler beim Entfernen des Geräts.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.deviceRemoveError)));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler: $e')));
@@ -66,7 +67,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Vertrauenswürdige Geräte')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.trustedDevicesTitle)),
       body: ListView.builder(
         itemCount: _devices.length,
         itemBuilder: (context, index) {
@@ -76,14 +77,15 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
             key: Key(device.deviceUuid),
             leading: Icon(isRevoked ? Icons.lock_outline : Icons.check_circle_outline, color: isRevoked ? Theme.of(context).colorScheme.error : Colors.green),
             title: Text(device.deviceName, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: isRevoked && device.revokedAt != null ? Text('Entfernt am: ${_formatDate(context, device.revokedAt!)}') : null,
+            subtitle: isRevoked && device.revokedAt != null ? Text(AppLocalizations.of(context)!.removedAt(_formatDate(context, device.revokedAt!))) : null,
             trailing: isRevoked
                 ? null
                 : _busy.contains(device.deviceUuid)
                     ? const SizedBox(width: 88, height: 36, child: Center(child: CircularProgressIndicator()))
                     : ElevatedButton(
+                        key: Key('revoke-${device.deviceUuid}'),
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                        child: const Text('Gerät entfernen'),
+                        child: Text(AppLocalizations.of(context)!.removeDevice),
                         onPressed: () => _confirmAndRevoke(device),
                       ),
           );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 
 class RevokeConfirmationDialog extends StatefulWidget {
   final String deviceName;
@@ -23,7 +24,7 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
   void _checkInput(String input) {
     setState(() {
       _isConfirmed = input.trim() == widget.deviceName;
-      _errorText = _isConfirmed ? null : 'Der eingegebene Name stimmt nicht überein.';
+      _errorText = _isConfirmed ? null : 'Der eingegebene Name stimmt nicht �berein.';
     });
   }
 
@@ -39,13 +40,11 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
   Widget build(BuildContext context) {
     final errorText = _errorText;
     return AlertDialog(
-      title: Text('Gerät entfernen und Daten löschen?'),
+      title: Text(AppLocalizations.of(context)!.removeDeviceDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Sie entfernen das Gerät "${widget.deviceName}". Bitte geben Sie den Gerätenamen zur Bestätigung ein:',
-          ),
+          Text(AppLocalizations.of(context)!.removeDeviceDialogMessage(widget.deviceName)),
           const SizedBox(height: 12),
           TextField(
             controller: _controller,
@@ -54,8 +53,8 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
             onChanged: _checkInput,
             onSubmitted: _onSubmitted,
             decoration: InputDecoration(
-              labelText: 'Gerätename eingeben',
-              helperText: 'Geben Sie den Gerätenamen exakt ein',
+              labelText: AppLocalizations.of(context)!.deviceNameLabel,
+              helperText: AppLocalizations.of(context)!.deviceNameHelper,
               errorText: errorText,
               border: const OutlineInputBorder(),
             ),
@@ -63,11 +62,12 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Abbrechen')),
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(AppLocalizations.of(context)!.cancel)),
         ElevatedButton(
+          key: const Key('confirm-revoke'),
           onPressed: _isConfirmed ? _confirm : null,
           style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-          child: const Text('Gerät entfernen'),
+          child: Text(AppLocalizations.of(context)!.removeDevice),
         ),
       ],
     );

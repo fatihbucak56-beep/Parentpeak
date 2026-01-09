@@ -24,7 +24,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Gerätename eingeben'), findsOneWidget);
+    expect(find.text('GerÃ¤tename eingeben'), findsOneWidget);
 
     // Confirm button should be disabled initially
     final confirmButton = find.byKey(const Key('confirm-revoke'));
@@ -33,7 +33,7 @@ void main() {
     // Enter wrong name
     await tester.enterText(find.byType(TextField), 'Wrong');
     await tester.pumpAndSettle();
-    expect(find.text('Der eingegebene Name stimmt nicht überein.'), findsOneWidget);
+    expect(find.text('Der eingegebene Name stimmt nicht Ã¼berein.'), findsOneWidget);
 
     // Enter correct name
     await tester.enterText(find.byType(TextField), 'MyDevice');

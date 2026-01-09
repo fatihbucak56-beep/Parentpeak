@@ -24,7 +24,7 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
   void _checkInput(String input) {
     setState(() {
       _isConfirmed = input.trim() == widget.deviceName;
-      _errorText = _isConfirmed ? null : 'Der eingegebene Name stimmt nicht �berein.';
+      _errorText = _isConfirmed ? null : 'Der eingegebene Name stimmt nicht überein.';
     });
   }
 

@@ -22,3 +22,4 @@ Inhalt dieses Demos:
 
 Nächste Schritte:
 - Wenn du möchtest, erstelle ich einen PR in deinem Repo oder sende dir ein ZIP mit diesem Demo‑Projekt.
+# Demo-Branch: cleanup/security-and-demo

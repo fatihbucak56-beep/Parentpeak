@@ -23,3 +23,16 @@ Inhalt dieses Demos:
 Nächste Schritte:
 - Wenn du möchtest, erstelle ich einen PR in deinem Repo oder sende dir ein ZIP mit diesem Demo‑Projekt.
 # Demo-Branch: cleanup/security-and-demo
+
+\nParentpeak MVP-Erweiterung\n--------------------------\n
+Hinzugefügt in dieser Sitzung:
+- Pädagogik‑Chat (Platzhalter) mit Eingabefeld und Senden‑Button
+- Familienkalender (Platzhalter) mit einfacher Terminliste und "Termin hinzufügen"
+- Geräteverwaltung bleibt als dritter Tab
+ 
+
+Starten (Android per USB empfohlen):
+1. `flutter pub get`
+2. `flutter run -d <deviceId>` (z. B. `RFCY30GWBEB`)
+
+Lokalisierung: en, de

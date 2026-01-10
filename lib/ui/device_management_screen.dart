@@ -66,28 +66,131 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context)!.trustedDevicesTitle)),
+      backgroundColor: Colors.grey[50],
       body: ListView.builder(
+        padding: const EdgeInsets.all(16),
         itemCount: _devices.length,
         itemBuilder: (context, index) {
           final device = _devices[index];
           final isRevoked = device.status == DeviceStatus.revoked;
-          return ListTile(
-            key: Key(device.deviceUuid),
-            leading: Icon(isRevoked ? Icons.lock_outline : Icons.check_circle_outline, color: isRevoked ? Theme.of(context).colorScheme.error : Colors.green),
-            title: Text(device.deviceName, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: isRevoked && device.revokedAt != null ? Text(AppLocalizations.of(context)!.removedAt(_formatDate(context, device.revokedAt!))) : null,
-            trailing: isRevoked
-                ? null
-                : _busy.contains(device.deviceUuid)
-                    ? const SizedBox(width: 88, height: 36, child: Center(child: CircularProgressIndicator()))
-                    : ElevatedButton(
-                        key: Key('revoke-${device.deviceUuid}'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                        child: Text(AppLocalizations.of(context)!.removeDevice),
-                        onPressed: () => _confirmAndRevoke(device),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Card(
+              key: Key(device.deviceUuid),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey[200]!, width: 1),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isRevoked 
+                          ? theme.colorScheme.errorContainer 
+                          : theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: Icon(
+                        isRevoked ? Icons.block_rounded : Icons.phone_android_rounded,
+                        color: isRevoked ? theme.colorScheme.error : theme.colorScheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  device.deviceName,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isRevoked 
+                                    ? theme.colorScheme.errorContainer 
+                                    : Colors.green[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isRevoked ? Icons.block : Icons.check_circle,
+                                      size: 12,
+                                      color: isRevoked ? theme.colorScheme.error : Colors.green[700],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isRevoked ? 'Entfernt' : 'Aktiv',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: isRevoked ? theme.colorScheme.error : Colors.green[700],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (isRevoked && device.revokedAt != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              AppLocalizations.of(context)!.removedAt(_formatDate(context, device.revokedAt!)),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                          if (!isRevoked) ...[
+                            const SizedBox(height: 8),
+                            if (_busy.contains(device.deviceUuid))
+                              const SizedBox(
+                                height: 32,
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            else
+                              FilledButton.tonal(
+                                key: Key('revoke-${device.deviceUuid}'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.errorContainer,
+                                  foregroundColor: theme.colorScheme.error,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                ),
+                                onPressed: () => _confirmAndRevoke(device),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.delete_outline, size: 16),
+                                    const SizedBox(width: 8),
+                                    Text(AppLocalizations.of(context)!.removeDevice),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         },
       ),

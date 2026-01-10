@@ -1,0 +1,15 @@
+{
+  "@@locale": "en",
+  "appTitle": "Parentpeak",
+  "trustedDevicesTitle": "Trusted Devices",
+  "removeDeviceDialogTitle": "Remove device and delete data?",
+  "removeDeviceDialogMessage": "You are about to remove \"{deviceName}\" from your Trusted Circle. This will delete local data and keys on the target device permanently. Please type the device name to confirm:",
+  "deviceNameLabel": "Enter device name",
+  "deviceNameHelper": "Enter the exact device name",
+  "cancel": "Cancel",
+  "removeDevice": "Remove device",
+  "deviceRemoved": "Device removed successfully.",
+  "deviceRemoveError": "Failed to remove device.",
+  "cannotRemovePriority": "This device cannot be removed.",
+  "removedAt": "Removed at: {date}"
+}

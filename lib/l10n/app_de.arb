@@ -1,0 +1,15 @@
+{
+  "@@locale": "de",
+  "appTitle": "Parentpeak",
+  "trustedDevicesTitle": "Vertrauenswürdige Geräte",
+  "removeDeviceDialogTitle": "Gerät entfernen und Daten löschen?",
+  "removeDeviceDialogMessage": "Sie entfernen das Gerät \"{deviceName}\" aus Ihrem Trusted Circle. Dies löscht alle lokal gespeicherten Daten und Schlüssel auf dem Zielgerät unwiderruflich. Bitte geben Sie den Gerätenamen zur Bestätigung ein:",
+  "deviceNameLabel": "Gerätename eingeben",
+  "deviceNameHelper": "Geben Sie den Gerätenamen exakt ein",
+  "cancel": "Abbrechen",
+  "removeDevice": "Gerät entfernen",
+  "deviceRemoved": "Gerät erfolgreich entfernt.",
+  "deviceRemoveError": "Fehler beim Entfernen des Geräts.",
+  "cannotRemovePriority": "Dieses Gerät kann nicht entfernt werden.",
+  "removedAt": "Entfernt am: {date}"
+}

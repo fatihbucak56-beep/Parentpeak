@@ -12,6 +12,14 @@ Starten:
 2. `.env` aus `.env.example` anlegen und `ABACUS_API_KEY` ersetzen (oder Platzhalter belassen für Demo)
 3. `flutter run` um die App zu starten
 
+Wichtige .env Variablen:
+- `GEMINI_API_KEY`: API Key fuer den Paedagogik-Chat
+- `BACKEND_BASE_URL`: Basis-URL deines Backends (z. B. `https://api.example.com`)
+- `BACKEND_API_TOKEN`: Bearer Token fuer geschuetzte Endpunkte
+- `BACKEND_FAMILY_ID`: Familienkontext fuer Requests (z. B. `demo-family-001`)
+- `BACKEND_API_VERSION`: Version des Request-Schemas (Standard: `v1`)
+- `BACKEND_TODOS_PATH`, `BACKEND_SHOPPING_PATH`, `BACKEND_CALENDAR_EVENTS_PATH`: optionale Endpoint-Overrides
+
 Screenshots:
 - Starte die App im Emulator und nutze `flutter screenshot` oder `adb exec-out screencap -p > screen.png` um Bilder zu erzeugen.
 

@@ -12,7 +12,8 @@ class CalendarScreen extends StatefulWidget {
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixin<CalendarScreen> {
+class _CalendarScreenState extends State<CalendarScreen>
+    with LanguageChangeMixin<CalendarScreen> {
   final List<_CalendarEvent> _events = [];
   final CalendarBackendService _calendarService =
       BackendServiceFactory.createCalendarService();
@@ -20,8 +21,18 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
   String? _syncError;
   String _filterPerson = 'Alle';
   final List<int> _reminderOptions = [0, 10, 30, 60];
-  final List<String> _recurrenceOptions = ['Einmalig', 'Täglich', 'Wöchentlich', 'Monatlich'];
-  final List<String> _recurrenceEndOptions = ['Kein Ende', '5 Termine', '10 Termine', 'Datum wählen'];
+  final List<String> _recurrenceOptions = [
+    'Einmalig',
+    'Täglich',
+    'Wöchentlich',
+    'Monatlich'
+  ];
+  final List<String> _recurrenceEndOptions = [
+    'Kein Ende',
+    '5 Termine',
+    '10 Termine',
+    'Datum wählen'
+  ];
   String _recurrenceEndMode = 'Kein Ende';
   DateTime? _recurrenceEndDate;
   int _recurrenceCount = 5;
@@ -40,9 +51,11 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
   void initState() {
     super.initState();
     _focusedDay = DateTime.now();
-    _selectedDay = DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day);
+    _selectedDay =
+        DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day);
     _loadEvents();
   }
+
   Future<void> _loadEvents() async {
     final saved = await _calendarService.fetchEvents();
     if (!mounted) return;
@@ -63,7 +76,6 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
       _syncError = _calendarService.lastSyncError;
     });
   }
-
 
   @override
   void dispose() {
@@ -206,7 +218,8 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
     String recurrence = 'Einmalig';
     int reminder = 30;
     String endMode = _recurrenceEndMode;
-    DateTime? endDate = _recurrenceEndDate ?? _selectedDay.add(const Duration(days: 30));
+    DateTime? endDate =
+        _recurrenceEndDate ?? _selectedDay.add(const Duration(days: 30));
     int endCount = _recurrenceCount;
 
     await showModalBottomSheet(
@@ -230,7 +243,8 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                   children: [
                     const Text(
                       'Neuer Termin',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                     ),
                     const Spacer(),
                     IconButton(
@@ -323,8 +337,10 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       final picked = await showDatePicker(
                         context: ctx,
                         initialDate: endDate ?? _selectedDay,
-                        firstDate: DateTime.now().subtract(const Duration(days: 1)),
-                        lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                        firstDate:
+                            DateTime.now().subtract(const Duration(days: 1)),
+                        lastDate:
+                            DateTime.now().add(const Duration(days: 365 * 2)),
                       );
                       if (picked != null) {
                         endDate = picked;
@@ -363,14 +379,18 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       final base = _CalendarEvent(
                         title: _titleController.text.trim(),
                         start: startDate,
-                        end: endDate.isAfter(startDate) ? endDate : startDate.add(const Duration(hours: 1)),
+                        end: endDate.isAfter(startDate)
+                            ? endDate
+                            : startDate.add(const Duration(hours: 1)),
                         person: person,
                         location: 'Familienkalender',
                         recurrence: recurrence,
                         reminderMinutes: reminder,
                         recurrenceEndMode: endMode,
-                        recurrenceEndDate: endMode == 'Datum wählen' ? endDate : null,
-                        recurrenceCount: endMode.contains('Termine') ? endCount : null,
+                        recurrenceEndDate:
+                            endMode == 'Datum wählen' ? endDate : null,
+                        recurrenceCount:
+                            endMode.contains('Termine') ? endCount : null,
                       );
                       final expanded = _expandRecurrence(base);
                       setState(() {
@@ -385,7 +405,8 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       // Erinnerungen planen
                       for (final e in expanded) {
                         if (e.reminderMinutes > 0) {
-                          final when = e.start.subtract(Duration(minutes: e.reminderMinutes));
+                          final when = e.start
+                              .subtract(Duration(minutes: e.reminderMinutes));
                           NotificationService.instance.scheduleReminder(
                             when,
                             e.title,
@@ -425,7 +446,10 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       children: [
                         const Text(
                           'Familienkalender',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF2D3748)),
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF2D3748)),
                         ),
                         const Spacer(),
                         IconButton(
@@ -457,7 +481,8 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       ),
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -531,7 +556,10 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       ],
                     ),
                     const SizedBox(height: 12),
-                    ..._eventsForSelectedDay.map((e) => _EventCard(event: e, color: _personColors[e.person] ?? theme.colorScheme.primary)),
+                    ..._eventsForSelectedDay.map((e) => _EventCard(
+                        event: e,
+                        color: _personColors[e.person] ??
+                            theme.colorScheme.primary)),
                     if (_eventsForSelectedDay.isEmpty)
                       Container(
                         width: double.infinity,
@@ -552,7 +580,10 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                           children: [
                             Text(
                               'Keine Termine an diesem Tag',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF2D3748)),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  color: Color(0xFF2D3748)),
                             ),
                             SizedBox(height: 6),
                             Text(
@@ -580,7 +611,9 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
 
   Widget _buildFilterChip(String label) {
     final selected = _filterPerson == label;
-    final color = label == 'Alle' ? const Color(0xFF2D3748) : _personColors[label] ?? const Color(0xFF4CAF50);
+    final color = label == 'Alle'
+        ? const Color(0xFF2D3748)
+        : _personColors[label] ?? const Color(0xFF4CAF50);
     return ChoiceChip(
       selected: selected,
       label: Text(label),
@@ -713,9 +746,12 @@ class _MonthGrid extends StatelessWidget {
                       const SizedBox(height: 4),
                       if (eventCount > 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.white.withOpacity(0.2) : const Color(0xFF4CAF50).withOpacity(0.12),
+                            color: isSelected
+                                ? Colors.white.withOpacity(0.2)
+                                : const Color(0xFF4CAF50).withOpacity(0.12),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -723,7 +759,9 @@ class _MonthGrid extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isSelected ? Colors.white : const Color(0xFF2D3748),
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF2D3748),
                             ),
                           ),
                         ),
@@ -787,7 +825,8 @@ class _EventCard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: color.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(12),
@@ -837,25 +876,31 @@ class _EventCard extends StatelessWidget {
                             color: const Color(0xFF718096),
                             icon: Icons.alarm_rounded,
                           ),
-                        if (event.recurrenceEndMode.contains('Termine') && event.recurrenceCount != null)
+                        if (event.recurrenceEndMode.contains('Termine') &&
+                            event.recurrenceCount != null)
                           _Badge(
-                            label: 'Endet nach ${event.recurrenceCount} Terminen',
+                            label:
+                                'Endet nach ${event.recurrenceCount} Terminen',
                             color: const Color(0xFF718096),
                             icon: Icons.flag_rounded,
                           ),
-                        if (event.recurrenceEndMode == 'Datum wählen' && event.recurrenceEndDate != null)
+                        if (event.recurrenceEndMode == 'Datum wählen' &&
+                            event.recurrenceEndDate != null)
                           _Badge(
-                            label: 'Endet ${DateFormat.yMMMd('de').format(event.recurrenceEndDate!)}',
+                            label:
+                                'Endet ${DateFormat.yMMMd('de').format(event.recurrenceEndDate!)}',
                             color: const Color(0xFF718096),
                             icon: Icons.event_available_rounded,
                           ),
                       ],
                     ),
-                    if (event.location != null && event.location!.isNotEmpty) ...[
+                    if (event.location != null &&
+                        event.location!.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.place_outlined, size: 16, color: Color(0xFF718096)),
+                          const Icon(Icons.place_outlined,
+                              size: 16, color: Color(0xFF718096)),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -971,8 +1016,10 @@ class _CalendarEvent {
   factory _CalendarEvent.fromJson(Map<String, dynamic> json) {
     return _CalendarEvent(
       title: json['title']?.toString() ?? '',
-      start: DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now(),
-      end: DateTime.tryParse(json['end']?.toString() ?? '') ?? DateTime.now().add(const Duration(hours: 1)),
+      start:
+          DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now(),
+      end: DateTime.tryParse(json['end']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(hours: 1)),
       person: json['person']?.toString() ?? 'Eltern',
       location: json['location']?.toString(),
       allDay: json['allDay'] == true,
@@ -1004,7 +1051,8 @@ class _CalendarEvent {
 }
 
 class _TimeButton extends StatefulWidget {
-  const _TimeButton({required this.label, required this.initial, required this.onPicked});
+  const _TimeButton(
+      {required this.label, required this.initial, required this.onPicked});
 
   final String label;
   final TimeOfDay initial;
@@ -1031,7 +1079,8 @@ class _TimeButtonState extends State<_TimeButton> {
         return Theme(
           data: Theme.of(context).copyWith(
             timePickerTheme: const TimePickerThemeData(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(24))),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(24))),
             ),
           ),
           child: child!,
@@ -1061,7 +1110,8 @@ class _TimeButtonState extends State<_TimeButton> {
           ),
           Text(
             _value.format(context),
-            style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF2D3748)),
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, color: Color(0xFF2D3748)),
           ),
         ],
       ),

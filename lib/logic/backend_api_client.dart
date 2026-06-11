@@ -7,8 +7,7 @@ class BackendApiClient {
     required this.baseUrl,
     this.authToken,
     http.Client? httpClient,
-  })
-      : _httpClient = httpClient ?? http.Client();
+  }) : _httpClient = httpClient ?? http.Client();
 
   final String baseUrl;
   final String? authToken;

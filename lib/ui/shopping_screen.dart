@@ -46,11 +46,26 @@ class _ShoppingScreenState extends State<ShoppingScreen>
 
     if (items.isEmpty) {
       final seeded = [
-        {'name': _itemTranslation('milk'), 'category': _categoryTranslation('food')},
-        {'name': _itemTranslation('bread'), 'category': _categoryTranslation('food')},
-        {'name': _itemTranslation('apples'), 'category': _categoryTranslation('fruits_vegetables')},
-        {'name': _itemTranslation('diapers'), 'category': _categoryTranslation('baby')},
-        {'name': _itemTranslation('toothpaste'), 'category': _categoryTranslation('drugstore')},
+        {
+          'name': _itemTranslation('milk'),
+          'category': _categoryTranslation('food')
+        },
+        {
+          'name': _itemTranslation('bread'),
+          'category': _categoryTranslation('food')
+        },
+        {
+          'name': _itemTranslation('apples'),
+          'category': _categoryTranslation('fruits_vegetables')
+        },
+        {
+          'name': _itemTranslation('diapers'),
+          'category': _categoryTranslation('baby')
+        },
+        {
+          'name': _itemTranslation('toothpaste'),
+          'category': _categoryTranslation('drugstore')
+        },
       ];
 
       for (final item in seeded) {

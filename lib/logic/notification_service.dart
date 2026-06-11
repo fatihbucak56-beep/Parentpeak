@@ -6,7 +6,8 @@ class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
   Future<void> initialize() async {
@@ -28,7 +29,8 @@ class NotificationService {
     );
     await _plugin.initialize(settings: settings);
 
-    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
     await android?.createNotificationChannel(const AndroidNotificationChannel(
       'parentpeak_events',
@@ -40,7 +42,8 @@ class NotificationService {
     _initialized = true;
   }
 
-  Future<void> scheduleReminder(DateTime when, String title, String body) async {
+  Future<void> scheduleReminder(
+      DateTime when, String title, String body) async {
     final now = DateTime.now();
     if (when.isBefore(now)) return; // keine Vergangenheit planen
     final tzWhen = tz.TZDateTime.from(when, tz.local);

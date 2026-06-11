@@ -61,8 +61,10 @@ class FamilyCalendarEvent {
     return FamilyCalendarEvent(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
-      start: DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now(),
-      end: DateTime.tryParse(json['end']?.toString() ?? '') ?? DateTime.now().add(const Duration(hours: 1)),
+      start:
+          DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now(),
+      end: DateTime.tryParse(json['end']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(hours: 1)),
       person: json['person']?.toString() ?? 'Eltern',
       location: json['location']?.toString(),
       allDay: json['allDay'] == true,

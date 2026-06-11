@@ -227,7 +227,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                 child: _buildSectionHeader(
                   title: 'Alle Funktionen',
-                  subtitle: 'Jede Funktion ist als eigene Tap-Kachel erreichbar',
+                  subtitle:
+                      'Jede Funktion ist als eigene Tap-Kachel erreichbar',
                 ),
               ),
             ),
@@ -295,7 +296,8 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Colors.white.withOpacity(0.18),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.family_restroom_rounded, color: Colors.white, size: 34),
+            child: const Icon(Icons.family_restroom_rounded,
+                color: Colors.white, size: 34),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -333,14 +335,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSectionHeader({required String title, required String subtitle}) {
+  Widget _buildSectionHeader(
+      {required String title, required String subtitle}) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          style:
+              theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
@@ -414,7 +418,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Align(
                 alignment: Alignment.bottomRight,
-                child: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                child: Icon(Icons.arrow_forward_ios_rounded,
+                    size: 14, color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -422,5 +427,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
 }

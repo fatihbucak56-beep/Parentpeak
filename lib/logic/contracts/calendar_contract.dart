@@ -6,33 +6,44 @@ class CalendarContract {
   static String get eventsPath => APIConfig.getBackendCalendarEventsPath();
 
   static List<Map<String, dynamic>> parseList(dynamic payload) {
-    final raw = extractListFromPayload(payload, const ['events', 'items', 'data', 'results']);
+    final raw = extractListFromPayload(
+        payload, const ['events', 'items', 'data', 'results']);
     return raw.map(normalize).toList();
   }
 
   static Map<String, dynamic> normalize(Map<String, dynamic> raw) {
     final now = DateTime.now();
-    final start = _pickDate(raw, const ['start', 'startAt', 'start_time']) ?? now;
-    final end = _pickDate(raw, const ['end', 'endAt', 'end_time']) ?? now.add(const Duration(hours: 1));
+    final start =
+        _pickDate(raw, const ['start', 'startAt', 'start_time']) ?? now;
+    final end = _pickDate(raw, const ['end', 'endAt', 'end_time']) ??
+        now.add(const Duration(hours: 1));
 
     return {
-      'id': pickString(raw, const ['id', '_id', 'uuid'], now.microsecondsSinceEpoch.toString()),
+      'id': pickString(raw, const ['id', '_id', 'uuid'],
+          now.microsecondsSinceEpoch.toString()),
       'title': pickString(raw, const ['title', 'name', 'subject'], ''),
       'start': start.toIso8601String(),
       'end': end.toIso8601String(),
-      'person': pickString(raw, const ['person', 'personName', 'owner', 'assignee'], 'Eltern'),
+      'person': pickString(
+          raw, const ['person', 'personName', 'owner', 'assignee'], 'Eltern'),
       'location': pickString(raw, const ['location', 'place', 'address'], ''),
       'allDay': pickBool(raw, const ['allDay', 'all_day'], false),
       'recurrence': pickString(raw, const ['recurrence', 'repeat'], 'Einmalig'),
-      'reminderMinutes': _pickInt(raw, const ['reminderMinutes', 'reminder_minutes'], 0),
-      'recurrenceEndMode': pickString(raw, const ['recurrenceEndMode', 'repeat_end_mode'], 'Kein Ende'),
-      'recurrenceEndDate': _pickDate(raw, const ['recurrenceEndDate', 'repeat_end_date'])?.toIso8601String(),
-      'recurrenceCount': _pickNullableInt(raw, const ['recurrenceCount', 'repeat_count']),
+      'reminderMinutes':
+          _pickInt(raw, const ['reminderMinutes', 'reminder_minutes'], 0),
+      'recurrenceEndMode': pickString(
+          raw, const ['recurrenceEndMode', 'repeat_end_mode'], 'Kein Ende'),
+      'recurrenceEndDate':
+          _pickDate(raw, const ['recurrenceEndDate', 'repeat_end_date'])
+              ?.toIso8601String(),
+      'recurrenceCount':
+          _pickNullableInt(raw, const ['recurrenceCount', 'repeat_count']),
     };
   }
 
   static Map<String, dynamic>? parseSingleItem(dynamic payload) {
-    final item = extractItemFromPayload(payload, const ['item', 'event', 'data', 'result']);
+    final item = extractItemFromPayload(
+        payload, const ['item', 'event', 'data', 'result']);
     if (item == null) return null;
     return normalize(item);
   }
@@ -67,7 +78,8 @@ class CalendarContract {
     return null;
   }
 
-  static int _pickInt(Map<String, dynamic> source, List<String> keys, int fallback) {
+  static int _pickInt(
+      Map<String, dynamic> source, List<String> keys, int fallback) {
     for (final key in keys) {
       final value = source[key];
       if (value is num) return value.toInt();

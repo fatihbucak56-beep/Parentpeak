@@ -14,7 +14,13 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
   late bool _isDarkMode;
   String _currentLanguage = 'de';
   final List<String> _familyMembers = ['Mom', 'Dad', 'Emma', 'Liam'];
-  final List<String> _interests = ['#Family', '#Sport', '#Education', '#Leisure', '#Health'];
+  final List<String> _interests = [
+    '#Family',
+    '#Sport',
+    '#Education',
+    '#Leisure',
+    '#Health'
+  ];
   late final List<Map<String, String>> _languages;
 
   @override
@@ -25,16 +31,56 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     _currentLanguage = languageService.currentLanguage;
     languageService.addListener(_onLanguageChanged);
     themeService.addListener(_onThemeChanged);
-    
+
     _languages = [
-      {'code': 'de', 'name': 'Deutsch', 'flag': '🇩🇪', 'nativeName': 'Deutsch'},
-      {'code': 'en', 'name': 'English', 'flag': '🇬🇧', 'nativeName': 'English'},
-      {'code': 'fr', 'name': 'Français', 'flag': '🇫🇷', 'nativeName': 'Français'},
-      {'code': 'es', 'name': 'Español', 'flag': '🇪🇸', 'nativeName': 'Español'},
-      {'code': 'it', 'name': 'Italiano', 'flag': '🇮🇹', 'nativeName': 'Italiano'},
-      {'code': 'nl', 'name': 'Nederlands', 'flag': '🇳🇱', 'nativeName': 'Nederlands'},
-      {'code': 'pt', 'name': 'Português', 'flag': '🇵🇹', 'nativeName': 'Português'},
-      {'code': 'ar', 'name': 'العربية', 'flag': '🇸🇦', 'nativeName': 'العربية'},
+      {
+        'code': 'de',
+        'name': 'Deutsch',
+        'flag': '🇩🇪',
+        'nativeName': 'Deutsch'
+      },
+      {
+        'code': 'en',
+        'name': 'English',
+        'flag': '🇬🇧',
+        'nativeName': 'English'
+      },
+      {
+        'code': 'fr',
+        'name': 'Français',
+        'flag': '🇫🇷',
+        'nativeName': 'Français'
+      },
+      {
+        'code': 'es',
+        'name': 'Español',
+        'flag': '🇪🇸',
+        'nativeName': 'Español'
+      },
+      {
+        'code': 'it',
+        'name': 'Italiano',
+        'flag': '🇮🇹',
+        'nativeName': 'Italiano'
+      },
+      {
+        'code': 'nl',
+        'name': 'Nederlands',
+        'flag': '🇳🇱',
+        'nativeName': 'Nederlands'
+      },
+      {
+        'code': 'pt',
+        'name': 'Português',
+        'flag': '🇵🇹',
+        'nativeName': 'Português'
+      },
+      {
+        'code': 'ar',
+        'name': 'العربية',
+        'flag': '🇸🇦',
+        'nativeName': 'العربية'
+      },
       {'code': 'fa', 'name': 'فارسی', 'flag': '🇮🇷', 'nativeName': 'فارسی'},
       {'code': 'ku', 'name': 'Kurdî', 'flag': '🔶', 'nativeName': 'Kurdî'},
       {'code': 'ckb', 'name': 'کوردی', 'flag': '🔶', 'nativeName': 'کوردی'},
@@ -42,7 +88,12 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
       {'code': 'ja', 'name': '日本語', 'flag': '🇯🇵', 'nativeName': '日本語'},
       {'code': 'ko', 'name': '한국어', 'flag': '🇰🇷', 'nativeName': '한국어'},
       {'code': 'tr', 'name': 'Türkçe', 'flag': '🇹🇷', 'nativeName': 'Türkçe'},
-      {'code': 'ru', 'name': 'Русский', 'flag': '🇷🇺', 'nativeName': 'Русский'},
+      {
+        'code': 'ru',
+        'name': 'Русский',
+        'flag': '🇷🇺',
+        'nativeName': 'Русский'
+      },
     ];
   }
 
@@ -89,8 +140,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               child: Text(
                 _t('language'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
             ),
             Divider(height: 1, color: Colors.grey[300]),
@@ -107,7 +158,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   if (code == 'ku' || code == 'ckb') {
                     flagWidget = AlaRenginFlag(width: 32, height: 20);
                   } else {
-                    flagWidget = Text(lang['flag'] ?? '🌐', style: const TextStyle(fontSize: 28));
+                    flagWidget = Text(lang['flag'] ?? '🌐',
+                        style: const TextStyle(fontSize: 28));
                   }
 
                   return ListTile(
@@ -115,16 +167,19 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     title: Text(
                       lang['nativeName'] ?? '',
                       style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                         fontSize: 16,
                       ),
                     ),
                     subtitle: Text(lang['name'] ?? ''),
                     trailing: isSelected
-                        ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
+                        ? Icon(Icons.check_circle,
+                            color: Theme.of(context).colorScheme.primary)
                         : null,
                     selected: isSelected,
-                    selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    selectedTileColor:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.1),
                     onTap: () async {
                       // Nutze den globalen languageService und warte auf das Ergebnis
                       await languageService.setLanguage(code);
@@ -162,7 +217,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () {
               Navigator.pop(context);
@@ -229,14 +285,15 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.family_restroom, size: 64, color: Colors.white),
+                const Icon(Icons.family_restroom,
+                    size: 64, color: Colors.white),
                 const SizedBox(height: 12),
                 Text(
                   _t('family_profile_title'),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -255,8 +312,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           Text(
             _t('family_members'),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -347,13 +404,14 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 color: primary.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.card_membership, color: Color(0xFFBDB2FF)),
+              child:
+                  const Icon(Icons.card_membership, color: Color(0xFFBDB2FF)),
             ),
             title: Text(
               _t('premium_subscription'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             subtitle: Text(_t('subscription_active')),
             trailing: TextButton(
@@ -425,42 +483,52 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             child: Column(
               children: [
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   leading: Builder(
                     builder: (context) {
-                      final currentLang = _languages.firstWhere((l) => l['code'] == _currentLanguage);
+                      final currentLang = _languages
+                          .firstWhere((l) => l['code'] == _currentLanguage);
                       final code = currentLang['code']!;
-                      
+
                       // Special handling for Kurdish languages to show Ala rengin flag
                       if (code == 'ku' || code == 'ckb') {
                         return AlaRenginFlag(width: 24, height: 15);
                       } else {
                         final flagValue = currentLang['flag']!;
-                        return Text(flagValue, style: const TextStyle(fontSize: 20));
+                        return Text(flagValue,
+                            style: const TextStyle(fontSize: 20));
                       }
                     },
                   ),
                   title: Text(_t('language')),
-                  subtitle: Text(_languages.firstWhere((l) => l['code'] == _currentLanguage)['nativeName'] ?? ''),
+                  subtitle: Text(_languages.firstWhere(
+                          (l) => l['code'] == _currentLanguage)['nativeName'] ??
+                      ''),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 18),
                   onTap: _showLanguageSelector,
                 ),
                 Divider(height: 1, color: primary.withOpacity(0.1)),
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  secondary: const Icon(Icons.dark_mode, color: Color(0xFFBDB2FF)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  secondary:
+                      const Icon(Icons.dark_mode, color: Color(0xFFBDB2FF)),
                   title: Text(_t('dark_mode')),
                   value: _isDarkMode,
                   onChanged: (value) async {
                     setState(() => _isDarkMode = value);
                     await themeService.setDarkMode(value);
-                    DemoApp.setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+                    DemoApp.setThemeMode(
+                        value ? ThemeMode.dark : ThemeMode.light);
                   },
                 ),
                 Divider(height: 1, color: primary.withOpacity(0.1)),
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  secondary: const Icon(Icons.notifications, color: Color(0xFFBDB2FF)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  secondary:
+                      const Icon(Icons.notifications, color: Color(0xFFBDB2FF)),
                   title: Text(_t('notifications')),
                   value: true,
                   onChanged: (value) {
@@ -471,8 +539,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 ),
                 Divider(height: 1, color: primary.withOpacity(0.1)),
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  leading: const Icon(Icons.privacy_tip, color: Color(0xFFBDB2FF)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  leading:
+                      const Icon(Icons.privacy_tip, color: Color(0xFFBDB2FF)),
                   title: Text(_t('privacy')),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 18),
                   onTap: () {
@@ -513,7 +583,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             child: Column(
               children: [
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   leading: const Icon(Icons.star, color: Color(0xFFBDB2FF)),
                   title: Text(_t('engagement')),
                   subtitle: Text(_t('engagement_subtitle')),
@@ -526,8 +597,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 ),
                 Divider(height: 1, color: primaryColor.withOpacity(0.1)),
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  leading: const Icon(Icons.description, color: Color(0xFFBDB2FF)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  leading:
+                      const Icon(Icons.description, color: Color(0xFFBDB2FF)),
                   title: Text(_t('legal')),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 18),
                   onTap: () {
@@ -538,9 +611,11 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 ),
                 Divider(height: 1, color: primaryColor.withOpacity(0.1)),
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   leading: const Icon(Icons.logout, color: Colors.orange),
-                  title: Text(_t('logout'), style: const TextStyle(color: Colors.orange)),
+                  title: Text(_t('logout'),
+                      style: const TextStyle(color: Colors.orange)),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 18),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -550,10 +625,14 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 ),
                 Divider(height: 1, color: primaryColor.withOpacity(0.1)),
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  title: Text(_t('delete_account'), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.red),
+                  title: Text(_t('delete_account'),
+                      style: const TextStyle(
+                          color: Colors.red, fontWeight: FontWeight.bold)),
+                  trailing: const Icon(Icons.arrow_forward_ios,
+                      size: 18, color: Colors.red),
                   onTap: _showDeleteAccountConfirmation,
                 ),
               ],

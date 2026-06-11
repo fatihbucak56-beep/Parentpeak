@@ -3,7 +3,7 @@ import 'package:trusted_circle_demo/config/api_config.dart';
 
 class GeminiAIService {
   static const String modelName = 'gemini-2.0-flash';
-  
+
   late final GenerativeModel _model;
   String? _apiKey;
 
@@ -14,10 +14,8 @@ class GeminiAIService {
 
   void _initializeModel() {
     if (_apiKey == null || _apiKey!.isEmpty) {
-      throw Exception(
-        'Gemini API-Key nicht gesetzt. '
-        'Bitte setze GEMINI_API_KEY als Umgebungsvariable oder übergebe ihn dem Constructor.'
-      );
+      throw Exception('Gemini API-Key nicht gesetzt. '
+          'Bitte setze GEMINI_API_KEY als Umgebungsvariable oder übergebe ihn dem Constructor.');
     }
 
     _model = GenerativeModel(
@@ -32,7 +30,7 @@ class GeminiAIService {
     try {
       print('DEBUG: Sende Nachricht mit Modell: $modelName');
       print('DEBUG: API-Key Länge: ${_apiKey?.length}');
-      
+
       final content = [
         Content.text(userMessage),
       ];
@@ -98,11 +96,11 @@ class GeminiAIService {
     try {
       // Convert messages to Content objects
       final contentList = <Content>[];
-      
+
       for (final msg in messages) {
         final isUser = msg['role'] == 'user';
         final roleValue = isUser ? 'user' : 'model';
-        
+
         contentList.add(
           Content(roleValue, [TextPart(msg['content'] ?? '')]),
         );

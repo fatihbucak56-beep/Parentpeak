@@ -6,12 +6,15 @@ class TodoContract {
   static String get todosPath => APIConfig.getBackendTodosPath();
 
   static String todoByIdPath(String id) {
-    final base = todosPath.endsWith('/') ? todosPath.substring(0, todosPath.length - 1) : todosPath;
+    final base = todosPath.endsWith('/')
+        ? todosPath.substring(0, todosPath.length - 1)
+        : todosPath;
     return '$base/$id';
   }
 
   static List<Map<String, dynamic>> parseList(dynamic payload) {
-    final raw = extractListFromPayload(payload, const ['items', 'todos', 'data', 'results']);
+    final raw = extractListFromPayload(
+        payload, const ['items', 'todos', 'data', 'results']);
     return raw.map(normalize).toList();
   }
 
@@ -21,13 +24,16 @@ class TodoContract {
       'id': pickString(raw, const ['id', '_id', 'uuid'], nowId),
       'title': pickString(raw, const ['title', 'name', 'text'], ''),
       'done': pickBool(raw, const ['done', 'completed', 'isDone'], false),
-      'assignee': pickString(raw, const ['assignee', 'assigneeName', 'owner', 'person'], 'Familie'),
-      'category': pickString(raw, const ['category', 'type', 'group'], 'Allgemein'),
+      'assignee': pickString(raw,
+          const ['assignee', 'assigneeName', 'owner', 'person'], 'Familie'),
+      'category':
+          pickString(raw, const ['category', 'type', 'group'], 'Allgemein'),
     };
   }
 
   static Map<String, dynamic>? parseSingleItem(dynamic payload) {
-    final item = extractItemFromPayload(payload, const ['item', 'todo', 'data', 'result']);
+    final item = extractItemFromPayload(
+        payload, const ['item', 'todo', 'data', 'result']);
     if (item == null) return null;
     return normalize(item);
   }

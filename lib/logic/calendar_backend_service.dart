@@ -41,7 +41,8 @@ class CalendarBackendService {
           CalendarContract.buildCreatePayload(event),
         );
       } catch (e) {
-        lastSyncError = 'Kalender-Event konnte nicht auf Server gespeichert werden: $e';
+        lastSyncError =
+            'Kalender-Event konnte nicht auf Server gespeichert werden: $e';
       }
     }
   }

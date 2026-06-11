@@ -6,12 +6,15 @@ class ShoppingContract {
   static String get shoppingPath => APIConfig.getBackendShoppingPath();
 
   static String itemByIdPath(String id) {
-    final base = shoppingPath.endsWith('/') ? shoppingPath.substring(0, shoppingPath.length - 1) : shoppingPath;
+    final base = shoppingPath.endsWith('/')
+        ? shoppingPath.substring(0, shoppingPath.length - 1)
+        : shoppingPath;
     return '$base/$id';
   }
 
   static List<Map<String, dynamic>> parseList(dynamic payload) {
-    final raw = extractListFromPayload(payload, const ['items', 'shopping', 'data', 'results']);
+    final raw = extractListFromPayload(
+        payload, const ['items', 'shopping', 'data', 'results']);
     return raw.map(normalize).toList();
   }
 
@@ -21,12 +24,14 @@ class ShoppingContract {
       'id': pickString(raw, const ['id', '_id', 'uuid'], nowId),
       'name': pickString(raw, const ['name', 'title', 'label'], ''),
       'checked': pickBool(raw, const ['checked', 'done', 'purchased'], false),
-      'category': pickString(raw, const ['category', 'group', 'type'], 'Allgemein'),
+      'category':
+          pickString(raw, const ['category', 'group', 'type'], 'Allgemein'),
     };
   }
 
   static Map<String, dynamic>? parseSingleItem(dynamic payload) {
-    final item = extractItemFromPayload(payload, const ['item', 'shopping', 'data', 'result']);
+    final item = extractItemFromPayload(
+        payload, const ['item', 'shopping', 'data', 'result']);
     if (item == null) return null;
     return normalize(item);
   }

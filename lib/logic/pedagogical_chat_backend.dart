@@ -97,7 +97,8 @@ class PedagogicalChatBackend {
     return false;
   }
 
-  List<Map<String, String>> _prepareHistory(List<Map<String, dynamic>> history) {
+  List<Map<String, String>> _prepareHistory(
+      List<Map<String, dynamic>> history) {
     final prepared = <Map<String, String>>[];
     for (final item in history) {
       final role = item['role']?.toString();

@@ -80,7 +80,8 @@ Map<String, dynamic>? extractItemFromPayload(
   return null;
 }
 
-String pickString(Map<String, dynamic> source, List<String> keys, String fallback) {
+String pickString(
+    Map<String, dynamic> source, List<String> keys, String fallback) {
   for (final key in keys) {
     final value = source[key];
     if (value != null && value.toString().trim().isNotEmpty) {

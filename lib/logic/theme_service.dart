@@ -19,7 +19,8 @@ class ThemeService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isDarkMode = prefs.getBool(_darkModeKey) ?? false;
-      print('✅ ThemeService.initialize(): isDarkMode=$_isDarkMode (from prefs: ${prefs.getBool(_darkModeKey)})');
+      print(
+          '✅ ThemeService.initialize(): isDarkMode=$_isDarkMode (from prefs: ${prefs.getBool(_darkModeKey)})');
     } catch (e) {
       print('❌ Error initializing theme: $e');
       _isDarkMode = false;
@@ -87,10 +88,22 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       textTheme: const TextTheme(
-        displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
-        displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
-        titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
-        titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
+        displayLarge: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2D3748)),
+        displayMedium: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2D3748)),
+        titleLarge: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2D3748)),
+        titleMedium: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2D3748)),
         bodyLarge: TextStyle(fontSize: 16, color: Color(0xFF4A5568)),
         bodyMedium: TextStyle(fontSize: 14, color: Color(0xFF4A5568)),
       ),
@@ -109,13 +122,15 @@ class ThemeService extends ChangeNotifier {
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFF00BFA5), width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
@@ -167,10 +182,14 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       textTheme: const TextTheme(
-        displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-        displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-        titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: Colors.white),
-        titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+        displayLarge: TextStyle(
+            fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+        displayMedium: TextStyle(
+            fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+        titleLarge: TextStyle(
+            fontSize: 22, fontWeight: FontWeight.w600, color: Colors.white),
+        titleMedium: TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
         bodyLarge: TextStyle(fontSize: 16, color: Color(0xFFB0B0B0)),
         bodyMedium: TextStyle(fontSize: 14, color: Color(0xFFB0B0B0)),
       ),
@@ -189,13 +208,15 @@ class ThemeService extends ChangeNotifier {
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFF00BFA5), width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),

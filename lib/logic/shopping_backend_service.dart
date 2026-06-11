@@ -50,14 +50,15 @@ class ShoppingBackendService {
           name: name,
           category: category,
         );
-        final payload =
-            await apiClient!.postJsonAny(ShoppingContract.shoppingPath, requestBody);
+        final payload = await apiClient!
+            .postJsonAny(ShoppingContract.shoppingPath, requestBody);
         final normalized = ShoppingContract.parseSingleItem(payload);
         if (normalized != null) {
           item['id'] = normalized['id'];
         }
       } catch (e) {
-        lastSyncError = 'Shopping-Item konnte nicht auf Server gespeichert werden: $e';
+        lastSyncError =
+            'Shopping-Item konnte nicht auf Server gespeichert werden: $e';
       }
     }
 
@@ -81,7 +82,8 @@ class ShoppingBackendService {
           ShoppingContract.buildUpdatePayload(checked: checked),
         );
       } catch (e) {
-        lastSyncError = 'Shopping-Status konnte nicht synchronisiert werden: $e';
+        lastSyncError =
+            'Shopping-Status konnte nicht synchronisiert werden: $e';
       }
     }
   }
@@ -95,7 +97,8 @@ class ShoppingBackendService {
       try {
         await apiClient!.delete(ShoppingContract.itemByIdPath(id));
       } catch (e) {
-        lastSyncError = 'Shopping-Item konnte nicht auf Server gelöscht werden: $e';
+        lastSyncError =
+            'Shopping-Item konnte nicht auf Server gelöscht werden: $e';
       }
     }
   }

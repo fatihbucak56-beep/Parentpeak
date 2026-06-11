@@ -67,8 +67,10 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
     themeService.initialize().then((_) {
       if (mounted) {
         setState(() {
-          _currentThemeMode = themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light;
-          print('✅ Theme initialized: isDarkMode=${themeService.isDarkMode}, _currentThemeMode=$_currentThemeMode');
+          _currentThemeMode =
+              themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+          print(
+              '✅ Theme initialized: isDarkMode=${themeService.isDarkMode}, _currentThemeMode=$_currentThemeMode');
         });
       }
     });
@@ -87,7 +89,8 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
       print('   isDarkMode=${themeService.isDarkMode}');
       print('   OLD _currentThemeMode=$_currentThemeMode');
       setState(() {
-        _currentThemeMode = themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+        _currentThemeMode =
+            themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light;
         print('   NEW _currentThemeMode=$_currentThemeMode');
       });
     }
@@ -95,7 +98,8 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
 
   void _onLanguageChanged() {
     if (mounted) {
-      print('🔄 _onLanguageChanged() called: currentLanguage=${languageService.currentLanguage}');
+      print(
+          '🔄 _onLanguageChanged() called: currentLanguage=${languageService.currentLanguage}');
       setState(() {
         // Erzwinge einen Rebuild wenn die Sprache wechselt
       });
@@ -116,13 +120,27 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
     // For demo purpose only: write a fake token so the production-style revocation
     // implementation can read it from secure storage. DO NOT use real tokens here.
     storage.write(key: 'ABACUS_API_TOKEN', value: 'demo-token');
-    final service = RevocationServiceImpl(baseUrl: 'https://api.example.com', secureStorage: storage);
+    final service = RevocationServiceImpl(
+        baseUrl: 'https://api.example.com', secureStorage: storage);
 
     final mockDevices = [
-      TrustedDevice(deviceUuid: 'uuid-1', deviceName: 'Mamas iPhone', status: DeviceStatus.active),
-      TrustedDevice(deviceUuid: 'uuid-2', deviceName: 'Papas Pixel', status: DeviceStatus.active),
-      TrustedDevice(deviceUuid: 'fail-uuid', deviceName: 'Test Fail Device', status: DeviceStatus.active),
-      TrustedDevice(deviceUuid: 'uuid-removed', deviceName: 'Altes iPad', status: DeviceStatus.revoked, revokedAt: DateTime.now().subtract(const Duration(days: 3))),
+      TrustedDevice(
+          deviceUuid: 'uuid-1',
+          deviceName: 'Mamas iPhone',
+          status: DeviceStatus.active),
+      TrustedDevice(
+          deviceUuid: 'uuid-2',
+          deviceName: 'Papas Pixel',
+          status: DeviceStatus.active),
+      TrustedDevice(
+          deviceUuid: 'fail-uuid',
+          deviceName: 'Test Fail Device',
+          status: DeviceStatus.active),
+      TrustedDevice(
+          deviceUuid: 'uuid-removed',
+          deviceName: 'Altes iPad',
+          status: DeviceStatus.revoked,
+          revokedAt: DateTime.now().subtract(const Duration(days: 3))),
     ];
 
     return MaterialApp(
@@ -157,7 +175,8 @@ class ParentpeakAppShell extends StatefulWidget {
   final List<TrustedDevice> devices;
   final Future<bool> Function(String deviceUuid, String deviceName) onRevoke;
 
-  const ParentpeakAppShell({super.key, required this.devices, required this.onRevoke});
+  const ParentpeakAppShell(
+      {super.key, required this.devices, required this.onRevoke});
 
   @override
   State<ParentpeakAppShell> createState() => _ParentpeakAppShellState();
@@ -180,7 +199,8 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
 
   void _onLanguageChanged() {
     if (mounted) {
-      print('🌍 Sprache geändert in ParentpeakAppShell - erzwinge Rebuild aller Screens');
+      print(
+          '🌍 Sprache geändert in ParentpeakAppShell - erzwinge Rebuild aller Screens');
       setState(() {
         // Erzwinge einen Rebuild aller Tabs
       });
@@ -190,14 +210,18 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     final tabs = <Widget>[
       LanguageAwareWidget(
         key: ValueKey('home-${languageService.currentLanguage}'),
         child: HomeScreen(devices: widget.devices, onRevoke: widget.onRevoke),
       ),
-      LanguageAwareWidget(key: ValueKey('chat-${languageService.currentLanguage}'), child: const ChatScreen()),
-      LanguageAwareWidget(key: ValueKey('family-${languageService.currentLanguage}'), child: FamilyProfileScreen()),
+      LanguageAwareWidget(
+          key: ValueKey('chat-${languageService.currentLanguage}'),
+          child: const ChatScreen()),
+      LanguageAwareWidget(
+          key: ValueKey('family-${languageService.currentLanguage}'),
+          child: FamilyProfileScreen()),
     ];
 
     return Scaffold(

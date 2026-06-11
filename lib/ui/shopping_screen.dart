@@ -1,0 +1,282 @@
+import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/l10n/app_localizations.dart';
+import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
+import 'package:trusted_circle_demo/main.dart';
+import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+
+class ShoppingScreen extends StatefulWidget {
+  const ShoppingScreen({super.key});
+
+  @override
+  State<ShoppingScreen> createState() => _ShoppingScreenState();
+}
+
+class _ShoppingScreenState extends State<ShoppingScreen>
+    with LanguageChangeMixin<ShoppingScreen> {
+  final List<Map<String, dynamic>> _items = [
+    {
+      'name': _itemTranslation('milk'),
+      'checked': false,
+      'category': _categoryTranslation('food'),
+    },
+    {
+      'name': _itemTranslation('bread'),
+      'checked': false,
+      'category': _categoryTranslation('food'),
+    },
+    {
+      'name': _itemTranslation('apples'),
+      'checked': true,
+      'category': _categoryTranslation('fruits_vegetables'),
+    },
+    {
+      'name': _itemTranslation('diapers'),
+      'checked': false,
+      'category': _categoryTranslation('baby'),
+    },
+    {
+      'name': _itemTranslation('toothpaste'),
+      'checked': false,
+      'category': _categoryTranslation('drugstore'),
+    },
+  ];
+
+  final TextEditingController _controller = TextEditingController();
+
+  static String _itemTranslation(String key) {
+    return AppStringsManager.getString(languageService.currentLanguage, key);
+  }
+
+  static String _categoryTranslation(String key) {
+    return AppStringsManager.getString(languageService.currentLanguage, key);
+  }
+
+  String _t(String key) {
+    return AppStringsManager.getString(languageService.currentLanguage, key);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _addItem() {
+    if (_controller.text.trim().isEmpty) return;
+    setState(() {
+      _items.insert(0, {
+        'name': _controller.text.trim(),
+        'checked': false,
+        'category': _t('category_general'),
+      });
+      _controller.clear();
+    });
+  }
+
+  void _deleteItem(int index) {
+    final item = _items[index];
+    setState(() => _items.removeAt(index));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item['name']} ${_t('deleted')}'),
+        action: SnackBarAction(
+          label: _t('undo'),
+          onPressed: () => setState(() => _items.insert(index, item)),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final unchecked =
+        _items.where((item) => !(item['checked'] as bool)).toList();
+    final checked = _items.where((item) => item['checked'] as bool).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_t('shopping')),
+        elevation: 0,
+        centerTitle: false,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Input Card
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: InputDecoration(
+                        hintText: _t('add_item_hint'),
+                        border: InputBorder.none,
+                        prefixIcon: Icon(
+                          Icons.shopping_cart_outlined,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      onSubmitted: (_) => _addItem(),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _addItem,
+                    icon: const Icon(Icons.add),
+                    label: const Text(''),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.all(12),
+                      shape: const CircleBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // To-Buy Section
+          if (unchecked.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.playlist_add_check,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_t('to_buy')} (${unchecked.length})',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...unchecked.asMap().entries.map((e) => _buildItem(
+                  e.value,
+                  theme,
+                  e.key,
+                )),
+            const SizedBox(height: 16),
+          ],
+
+          // Checked Section
+          if (checked.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.done_all,
+                    color: Colors.green[400],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_t('in_cart')} (${checked.length})',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...checked.asMap().entries.map((e) => _buildItem(
+                  e.value,
+                  theme,
+                  unchecked.length + e.key,
+                )),
+          ],
+
+          if (_items.isEmpty) ...[
+            const SizedBox(height: 40),
+            Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _t('no_items'),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItem(
+    Map<String, dynamic> item,
+    ThemeData theme,
+    int index,
+  ) {
+    final isChecked = item['checked'] as bool;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: isChecked ? 0 : 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: isChecked
+              ? BorderSide(color: Colors.grey[300]!, width: 1)
+              : BorderSide.none,
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Checkbox(
+            value: isChecked,
+            onChanged: (val) {
+              setState(() => item['checked'] = val ?? false);
+            },
+            shape: const RoundedRectangleBorder(),
+          ),
+          title: Text(
+            item['name'] as String,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              decoration: isChecked ? TextDecoration.lineThrough : null,
+              color: isChecked ? Colors.grey : null,
+            ),
+          ),
+          subtitle: Text(
+            item['category'] as String,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.grey[600],
+            ),
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.grey),
+            onPressed: () => _deleteItem(index),
+          ),
+        ),
+      ),
+    );
+  }
+}

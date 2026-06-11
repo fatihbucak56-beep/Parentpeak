@@ -1,0 +1,95 @@
+enum EventCategory { sports, outdoor, education, arts, socialGathering, other }
+
+enum AgeGroup { infant, toddler, preschool, elementary, teenager, mixed }
+
+enum ParticipationStatus { pending, approved, declined, cancelled }
+
+enum EventStatus { active, completed, cancelled }
+
+class MeetupEvent {
+  final String id;
+  final String hosterId;
+  final String title;
+  final String description;
+  final EventCategory category;
+  final List<AgeGroup> ageGroups;
+  final String location;
+  final double latitude;
+  final double longitude;
+  final DateTime eventDate;
+  final DateTime createdAt;
+  final DateTime? paymentDate;
+  final int maxParticipants;
+  final int currentParticipants;
+  final String photoUrl;
+  final EventStatus status;
+  final double? price; // Preis für die Veröffentlichung
+
+  MeetupEvent({
+    required this.id,
+    required this.hosterId,
+    required this.title,
+    required this.description,
+    required this.category,
+    required this.ageGroups,
+    required this.location,
+    required this.latitude,
+    required this.longitude,
+    required this.eventDate,
+    required this.createdAt,
+    this.paymentDate,
+    required this.maxParticipants,
+    this.currentParticipants = 0,
+    required this.photoUrl,
+    this.status = EventStatus.active,
+    this.price,
+  });
+
+  bool get isFull => currentParticipants >= maxParticipants;
+  bool get isPaid => paymentDate != null;
+  int get spotsAvailable => maxParticipants - currentParticipants;
+
+  factory MeetupEvent.fromJson(Map<String, dynamic> json) => MeetupEvent(
+        id: json['id'] as String,
+        hosterId: json['hosterId'] as String,
+        title: json['title'] as String,
+        description: json['description'] as String,
+        category: EventCategory.values.byName(json['category'] as String),
+        ageGroups: (json['ageGroups'] as List<dynamic>)
+            .map((e) => AgeGroup.values.byName(e as String))
+            .toList(),
+        location: json['location'] as String,
+        latitude: json['latitude'] as double,
+        longitude: json['longitude'] as double,
+        eventDate: DateTime.parse(json['eventDate'] as String),
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        paymentDate: json['paymentDate'] != null
+            ? DateTime.parse(json['paymentDate'] as String)
+            : null,
+        maxParticipants: json['maxParticipants'] as int,
+        currentParticipants: json['currentParticipants'] as int? ?? 0,
+        photoUrl: json['photoUrl'] as String,
+        status: EventStatus.values.byName(json['status'] as String),
+        price: json['price'] as double?,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'hosterId': hosterId,
+        'title': title,
+        'description': description,
+        'category': category.name,
+        'ageGroups': ageGroups.map((e) => e.name).toList(),
+        'location': location,
+        'latitude': latitude,
+        'longitude': longitude,
+        'eventDate': eventDate.toIso8601String(),
+        'createdAt': createdAt.toIso8601String(),
+        'paymentDate': paymentDate?.toIso8601String(),
+        'maxParticipants': maxParticipants,
+        'currentParticipants': currentParticipants,
+        'photoUrl': photoUrl,
+        'status': status.name,
+        'price': price,
+      };
+}

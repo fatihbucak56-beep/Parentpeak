@@ -18,7 +18,7 @@ Wichtige .env Variablen:
 - `BACKEND_API_TOKEN`: Bearer Token fuer geschuetzte Endpunkte
 - `BACKEND_FAMILY_ID`: Familienkontext fuer Requests (z. B. `demo-family-001`)
 - `BACKEND_API_VERSION`: Version des Request-Schemas (Standard: `v1`)
-- `BACKEND_TODOS_PATH`, `BACKEND_SHOPPING_PATH`, `BACKEND_CALENDAR_EVENTS_PATH`: optionale Endpoint-Overrides
+- `BACKEND_TODOS_PATH`, `BACKEND_SHOPPING_PATH`, `BACKEND_CALENDAR_EVENTS_PATH`, `BACKEND_HEALTH_PATH`: optionale Endpoint-Overrides
 
 Screenshots:
 - Starte die App im Emulator und nutze `flutter screenshot` oder `adb exec-out screencap -p > screen.png` um Bilder zu erzeugen.

@@ -1,7 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Konfiguration für externe APIs
-/// 
+///
 /// Die .env Datei wird in main.dart vor runApp() geladen:
 /// await dotenv.load();
 
@@ -11,20 +11,21 @@ class APIConfig {
 
   // Backend API configuration
   static const String backendBaseUrlFallback = '';
-  
+
   /// Hole den Gemini API-Key aus der .env Datei oder Fallback
   /// Falls nicht gefunden, wird null zurückgegeben
   static String? getGeminiApiKey() {
     try {
       final apiKey = dotenv.env['GEMINI_API_KEY'];
-      print('DEBUG: GEMINI_API_KEY geladen: ${apiKey != null ? 'JA (${apiKey.substring(0, 5)}...)' : 'NEIN'}');
+      print(
+          'DEBUG: GEMINI_API_KEY geladen: ${apiKey != null ? 'JA (${apiKey.substring(0, 5)}...)' : 'NEIN'}');
       if (apiKey != null && apiKey.isNotEmpty) {
         return apiKey;
       }
     } catch (e) {
       print('Fehler beim Laden von GEMINI_API_KEY: $e');
     }
-    
+
     // Fallback: Neue API-Key mit Billing
     const fallbackKey = 'AIzaSyDZi8_TBMeQ5lze3XwJtfnNHljlPZaiKW8';
     print('DEBUG: Verwende Fallback API-Key (Gemini 2.0 Flash)');
@@ -80,6 +81,10 @@ class APIConfig {
 
   static String getBackendCalendarEventsPath() {
     return _getEnvOrDefault('BACKEND_CALENDAR_EVENTS_PATH', '/calendar/events');
+  }
+
+  static String getBackendHealthPath() {
+    return _getEnvOrDefault('BACKEND_HEALTH_PATH', '/health');
   }
 
   static String _getEnvOrDefault(String key, String fallback) {

@@ -40,6 +40,7 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
     final checks = <_EndpointCheck>[];
 
     final endpoints = <Map<String, String>>[
+      {'label': 'Health', 'path': APIConfig.getBackendHealthPath()},
       {'label': 'Todos', 'path': APIConfig.getBackendTodosPath()},
       {'label': 'Shopping', 'path': APIConfig.getBackendShoppingPath()},
       {'label': 'Kalender', 'path': APIConfig.getBackendCalendarEventsPath()},
@@ -48,21 +49,26 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
     for (final endpoint in endpoints) {
       final label = endpoint['label']!;
       final path = endpoint['path']!;
+      final watch = Stopwatch()..start();
       try {
         final payload = await apiClient.getJson(path);
+        watch.stop();
         final shape = _payloadShape(payload);
         checks.add(_EndpointCheck(
           label: label,
           path: path,
           ok: true,
           detail: 'Erreichbar ($shape)',
+          latencyMs: watch.elapsedMilliseconds,
         ));
       } catch (e) {
+        watch.stop();
         checks.add(_EndpointCheck(
           label: label,
           path: path,
           ok: false,
           detail: e.toString(),
+          latencyMs: watch.elapsedMilliseconds,
         ));
       }
     }
@@ -102,7 +108,14 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
     }
 
     final success = _checks.where((c) => c.ok).length;
-    return '$success/${_checks.length} Endpunkte erreichbar';
+    final successfulChecks = _checks.where((c) => c.ok).toList();
+    if (successfulChecks.isEmpty) {
+      return '$success/${_checks.length} Endpunkte erreichbar';
+    }
+    final totalMs =
+        successfulChecks.fold<int>(0, (sum, c) => sum + c.latencyMs);
+    final avg = (totalMs / successfulChecks.length).round();
+    return '$success/${_checks.length} Endpunkte erreichbar • Ø $avg ms';
   }
 
   @override
@@ -136,13 +149,16 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _kv('Base URL', (_baseUrl ?? '').isEmpty ? 'nicht gesetzt' : _baseUrl!),
+                  _kv('Base URL',
+                      (_baseUrl ?? '').isEmpty ? 'nicht gesetzt' : _baseUrl!),
                   const SizedBox(height: 8),
                   _kv('API Token', _tokenState()),
                   const SizedBox(height: 8),
                   _kv('Family ID', APIConfig.getBackendFamilyId()),
                   const SizedBox(height: 8),
                   _kv('Schema Version', APIConfig.getBackendApiVersion()),
+                  const SizedBox(height: 8),
+                  _kv('Health Path', APIConfig.getBackendHealthPath()),
                 ],
               ),
             ),
@@ -151,7 +167,8 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
           Card(
             color: _summaryColor(theme).withOpacity(0.1),
             child: ListTile(
-              leading: Icon(Icons.cloud_done_rounded, color: _summaryColor(theme)),
+              leading:
+                  Icon(Icons.cloud_done_rounded, color: _summaryColor(theme)),
               title: Text(
                 _summaryText(),
                 style: TextStyle(
@@ -169,7 +186,8 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
               child: Center(child: CircularProgressIndicator()),
             ),
           ..._checks.map((check) {
-            final color = check.ok ? Colors.green[700]! : theme.colorScheme.error;
+            final color =
+                check.ok ? Colors.green[700]! : theme.colorScheme.error;
             return Card(
               child: ListTile(
                 leading: Icon(
@@ -177,7 +195,8 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
                   color: color,
                 ),
                 title: Text(check.label),
-                subtitle: Text('${check.path}\n${check.detail}'),
+                subtitle: Text(
+                    '${check.path}\n${check.detail}\nLatenz: ${check.latencyMs} ms'),
                 isThreeLine: true,
               ),
             );
@@ -209,11 +228,13 @@ class _EndpointCheck {
   final String path;
   final bool ok;
   final String detail;
+  final int latencyMs;
 
   const _EndpointCheck({
     required this.label,
     required this.path,
     required this.ok,
     required this.detail,
+    required this.latencyMs,
   });
 }

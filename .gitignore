@@ -30,3 +30,6 @@
 *.keystore
 # Remove bundled local JDK from repo
 lib/ui/oracleJdk-25/
+
+# Local test artifacts
+screenshots/

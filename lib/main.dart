@@ -192,7 +192,10 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
     final theme = Theme.of(context);
     
     final tabs = <Widget>[
-      LanguageAwareWidget(key: ValueKey('home-${languageService.currentLanguage}'), child: const HomeScreen()),
+      LanguageAwareWidget(
+        key: ValueKey('home-${languageService.currentLanguage}'),
+        child: HomeScreen(devices: widget.devices, onRevoke: widget.onRevoke),
+      ),
       LanguageAwareWidget(key: ValueKey('chat-${languageService.currentLanguage}'), child: const ChatScreen()),
       LanguageAwareWidget(key: ValueKey('family-${languageService.currentLanguage}'), child: FamilyProfileScreen()),
     ];

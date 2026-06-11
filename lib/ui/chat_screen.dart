@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
+import 'package:trusted_circle_demo/logic/pedagogical_chat_backend.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -10,7 +11,8 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  late GeminiAIService? _geminiService;
+  GeminiAIService? _geminiService;
+  PedagogicalChatBackend? _chatBackend;
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -28,12 +30,13 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final apiKey = APIConfig.getGeminiApiKey();
       if (apiKey == null || apiKey.isEmpty) {
-        setState(() {
-          _initError = 'Gemini API-Key nicht konfiguriert';
-        });
+        _chatBackend = PedagogicalChatBackend();
+        setState(() => _initError = null);
+        debugPrint('⚠️ Gemini API-Key fehlt, Fallback-Chat wird verwendet');
         return;
       }
       _geminiService = GeminiAIService(apiKey: apiKey);
+      _chatBackend = PedagogicalChatBackend(geminiService: _geminiService);
       setState(() {
         _initError = null;
       });
@@ -54,7 +57,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty || _isStreaming || _geminiService == null) {
+    if (text.trim().isEmpty || _isStreaming || _chatBackend == null) {
       return;
     }
 
@@ -72,7 +75,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final stream = _geminiService!.chatWithStreaming(text);
+      final stream = _chatBackend!.streamReply(
+        history: _messages,
+        userMessage: text,
+      );
 
       await for (final chunk in stream) {
         if (mounted) {
@@ -165,13 +171,13 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Ich bin Dein persönlicher Assistent für Elternfragen und Tipps. Stell mir jede Frage!',
+              'Ich bin dein KI-Beratungschat fur Elternfragen. Ich antworte padagogisch und gewaltfrei nach Rosenberg.',
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
             Text(
-              'Probiere eines dieser Themen:',
+              'Probiere padagogische Themen:',
               style: Theme.of(context).textTheme.labelLarge,
             ),
             const SizedBox(height: 16),
@@ -181,7 +187,7 @@ class _ChatScreenState extends State<ChatScreen> {
               alignment: WrapAlignment.center,
               children: [
                 _buildSuggestionChip('Trotzphase Tipps'),
-                _buildSuggestionChip('Aktivitäten Ideen'),
+                _buildSuggestionChip('Konflikt gewaltfrei losen'),
                 _buildSuggestionChip('Schlaftipps'),
               ],
             ),
@@ -207,7 +213,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Powered by Gemini 2.0 Flash',
+                          'Pädagogik-KI mit Rosenberg-Fokus',
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
                       ),
@@ -215,7 +221,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Schnelle und intelligente Antworten für Deine Fragen',
+                    'Nur padagogische und respektvolle Antworten fur Eltern',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

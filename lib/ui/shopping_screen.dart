@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/shopping_backend_service.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
@@ -12,33 +13,9 @@ class ShoppingScreen extends StatefulWidget {
 
 class _ShoppingScreenState extends State<ShoppingScreen>
     with LanguageChangeMixin<ShoppingScreen> {
-  final List<Map<String, dynamic>> _items = [
-    {
-      'name': _itemTranslation('milk'),
-      'checked': false,
-      'category': _categoryTranslation('food'),
-    },
-    {
-      'name': _itemTranslation('bread'),
-      'checked': false,
-      'category': _categoryTranslation('food'),
-    },
-    {
-      'name': _itemTranslation('apples'),
-      'checked': true,
-      'category': _categoryTranslation('fruits_vegetables'),
-    },
-    {
-      'name': _itemTranslation('diapers'),
-      'checked': false,
-      'category': _categoryTranslation('baby'),
-    },
-    {
-      'name': _itemTranslation('toothpaste'),
-      'checked': false,
-      'category': _categoryTranslation('drugstore'),
-    },
-  ];
+  final ShoppingBackendService _shoppingService = ShoppingBackendService();
+  List<Map<String, dynamic>> _items = [];
+  bool _loading = true;
 
   final TextEditingController _controller = TextEditingController();
 
@@ -55,26 +32,75 @@ class _ShoppingScreenState extends State<ShoppingScreen>
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final items = await _shoppingService.fetchItems();
+    if (!mounted) return;
+
+    if (items.isEmpty) {
+      final seeded = [
+        {'name': _itemTranslation('milk'), 'category': _categoryTranslation('food')},
+        {'name': _itemTranslation('bread'), 'category': _categoryTranslation('food')},
+        {'name': _itemTranslation('apples'), 'category': _categoryTranslation('fruits_vegetables')},
+        {'name': _itemTranslation('diapers'), 'category': _categoryTranslation('baby')},
+        {'name': _itemTranslation('toothpaste'), 'category': _categoryTranslation('drugstore')},
+      ];
+
+      for (final item in seeded) {
+        await _shoppingService.addItem(
+          name: item['name']!,
+          category: item['category']!,
+        );
+      }
+
+      final refreshed = await _shoppingService.fetchItems();
+      if (!mounted) return;
+      setState(() {
+        _items = refreshed;
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _items = items;
+      _loading = false;
+    });
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
-  void _addItem() {
+  Future<void> _addItem() async {
     if (_controller.text.trim().isEmpty) return;
+    final name = _controller.text.trim();
+    _controller.clear();
+
+    final created = await _shoppingService.addItem(
+      name: name,
+      category: _t('category_general'),
+    );
+    if (!mounted) return;
+
     setState(() {
-      _items.insert(0, {
-        'name': _controller.text.trim(),
-        'checked': false,
-        'category': _t('category_general'),
-      });
-      _controller.clear();
+      _items.insert(0, created);
     });
   }
 
-  void _deleteItem(int index) {
+  Future<void> _deleteItem(int index) async {
     final item = _items[index];
+    final id = item['id']?.toString();
     setState(() => _items.removeAt(index));
+    if (id != null && id.isNotEmpty) {
+      await _shoppingService.deleteItem(id);
+    }
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.showSnackBar(
       SnackBar(
@@ -107,6 +133,12 @@ class _ShoppingScreenState extends State<ShoppingScreen>
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+
           // Input Card
           Card(
             elevation: 2,
@@ -257,7 +289,12 @@ class _ShoppingScreenState extends State<ShoppingScreen>
           leading: Checkbox(
             value: isChecked,
             onChanged: (val) {
-              setState(() => item['checked'] = val ?? false);
+              final checked = val ?? false;
+              setState(() => item['checked'] = checked);
+              final id = item['id']?.toString();
+              if (id != null && id.isNotEmpty) {
+                _shoppingService.updateChecked(id, checked);
+              }
             },
             shape: const RoundedRectangleBorder(),
           ),

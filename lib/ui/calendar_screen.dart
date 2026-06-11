@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:trusted_circle_demo/logic/calendar_backend_service.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
 
@@ -12,6 +13,7 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixin<CalendarScreen> {
   final List<_CalendarEvent> _events = [];
+  final CalendarBackendService _calendarService = CalendarBackendService();
   final TextEditingController _titleController = TextEditingController();
   String _filterPerson = 'Alle';
   final List<int> _reminderOptions = [0, 10, 30, 60];
@@ -36,8 +38,28 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
     super.initState();
     _focusedDay = DateTime.now();
     _selectedDay = DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day);
-    _seedDemoEvents();
+    _loadEvents();
   }
+  Future<void> _loadEvents() async {
+    final saved = await _calendarService.fetchEvents();
+    if (!mounted) return;
+
+    if (saved.isEmpty) {
+      _seedDemoEvents();
+      await _calendarService.seedIfEmpty(
+        _events.map((e) => e.toJson()).toList(),
+      );
+      setState(() {});
+      return;
+    }
+
+    setState(() {
+      _events
+        ..clear()
+        ..addAll(saved.map(_CalendarEvent.fromJson));
+    });
+  }
+
 
   @override
   void dispose() {
@@ -350,6 +372,9 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       setState(() {
                         _events.addAll(expanded);
                       });
+                      for (final e in expanded) {
+                        _calendarService.addEvent(e.toJson());
+                      }
                       // Erinnerungen planen
                       for (final e in expanded) {
                         if (e.reminderMinutes > 0) {
@@ -913,6 +938,40 @@ class _CalendarEvent {
       recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
       recurrenceCount: recurrenceCount ?? this.recurrenceCount,
     );
+  }
+
+  factory _CalendarEvent.fromJson(Map<String, dynamic> json) {
+    return _CalendarEvent(
+      title: json['title']?.toString() ?? '',
+      start: DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now(),
+      end: DateTime.tryParse(json['end']?.toString() ?? '') ?? DateTime.now().add(const Duration(hours: 1)),
+      person: json['person']?.toString() ?? 'Eltern',
+      location: json['location']?.toString(),
+      allDay: json['allDay'] == true,
+      recurrence: json['recurrence']?.toString() ?? 'Einmalig',
+      reminderMinutes: (json['reminderMinutes'] as num?)?.toInt() ?? 0,
+      recurrenceEndMode: json['recurrenceEndMode']?.toString() ?? 'Kein Ende',
+      recurrenceEndDate: json['recurrenceEndDate'] != null
+          ? DateTime.tryParse(json['recurrenceEndDate'].toString())
+          : null,
+      recurrenceCount: (json['recurrenceCount'] as num?)?.toInt(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'start': start.toIso8601String(),
+      'end': end.toIso8601String(),
+      'person': person,
+      'location': location,
+      'allDay': allDay,
+      'recurrence': recurrence,
+      'reminderMinutes': reminderMinutes,
+      'recurrenceEndMode': recurrenceEndMode,
+      'recurrenceEndDate': recurrenceEndDate?.toIso8601String(),
+      'recurrenceCount': recurrenceCount,
+    };
   }
 }
 

@@ -1,36 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
-import 'package:trusted_circle_demo/ui/meetup_screen.dart';
+import 'package:trusted_circle_demo/ui/contacts_screen.dart';
+import 'package:trusted_circle_demo/ui/create_event_screen.dart';
+import 'package:trusted_circle_demo/ui/device_management_screen.dart';
+import 'package:trusted_circle_demo/models/meetup_event.dart';
+import 'package:trusted_circle_demo/models/trusted_device.dart';
+import 'package:trusted_circle_demo/ui/location_screen.dart';
 import 'package:trusted_circle_demo/ui/marketplace_screen.dart';
-import 'package:trusted_circle_demo/ui/todo_screen.dart';
+import 'package:trusted_circle_demo/ui/meetup_screen.dart';
+import 'package:trusted_circle_demo/ui/payment_screen.dart';
 import 'package:trusted_circle_demo/ui/photos_screen.dart';
+import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
+import 'package:trusted_circle_demo/ui/shopping_screen.dart';
+import 'package:trusted_circle_demo/ui/todo_screen.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
 
-class _QuickAction {
+class _FeatureAction {
   final String label;
+  final String description;
   final IconData icon;
   final Color color;
+  final WidgetBuilder builder;
 
-  const _QuickAction({required this.label, required this.icon, required this.color});
+  const _FeatureAction({
+    required this.label,
+    required this.description,
+    required this.icon,
+    required this.color,
+    required this.builder,
+  });
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final List<TrustedDevice> devices;
+  final Future<bool> Function(String deviceUuid, String deviceName) onRevoke;
+
+  const HomeScreen({super.key, required this.devices, required this.onRevoke});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<_QuickAction> _quickActions = const [
-    _QuickAction(label: 'Kalender', icon: Icons.calendar_month_rounded, color: Color(0xFF2563EB)),
-    _QuickAction(label: 'To-do', icon: Icons.check_circle_rounded, color: Color(0xFF059669)),
-    _QuickAction(label: 'Familie', icon: Icons.people_alt_rounded, color: Color(0xFF7C3AED)),
-    _QuickAction(label: 'Fotos', icon: Icons.photo_library_rounded, color: Color(0xFFF59E0B)),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -60,6 +74,127 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     final now = DateTime.now();
     final hour = now.hour;
+    final featureActions = <_FeatureAction>[
+      _FeatureAction(
+        label: 'Kalender',
+        description: 'Termine, Events und Familienplan',
+        icon: Icons.calendar_month_rounded,
+        color: const Color(0xFF2563EB),
+        builder: (_) => const CalendarScreen(),
+      ),
+      _FeatureAction(
+        label: 'Chat',
+        description: 'Nachrichten und Familienkommunikation',
+        icon: Icons.chat_bubble_rounded,
+        color: const Color(0xFF7C3AED),
+        builder: (_) => const ChatScreen(),
+      ),
+      _FeatureAction(
+        label: 'Familie',
+        description: 'Profile, Mitglieder und Sprache',
+        icon: Icons.family_restroom_rounded,
+        color: const Color(0xFF0EA5A4),
+        builder: (_) => const FamilyProfileScreen(),
+      ),
+      _FeatureAction(
+        label: 'To-do',
+        description: 'Aufgaben und Erledigungen',
+        icon: Icons.check_circle_rounded,
+        color: const Color(0xFF059669),
+        builder: (_) => const TodoScreen(),
+      ),
+      _FeatureAction(
+        label: 'Fotos',
+        description: 'Bilder und Erinnerungen',
+        icon: Icons.photo_library_rounded,
+        color: const Color(0xFFF59E0B),
+        builder: (_) => const PhotosScreen(),
+      ),
+      _FeatureAction(
+        label: 'Shopping',
+        description: 'Einkaufsliste gemeinsam pflegen',
+        icon: Icons.shopping_cart_rounded,
+        color: const Color(0xFFEC4899),
+        builder: (_) => const ShoppingScreen(),
+      ),
+      _FeatureAction(
+        label: 'Kontakte',
+        description: 'Wichtige Kontakte schnell öffnen',
+        icon: Icons.contact_phone_rounded,
+        color: const Color(0xFFE11D48),
+        builder: (_) => const ContactsScreen(),
+      ),
+      _FeatureAction(
+        label: 'Standort',
+        description: 'Orte und Treffpunkte finden',
+        icon: Icons.location_on_rounded,
+        color: const Color(0xFFF97316),
+        builder: (_) => const LocationScreen(),
+      ),
+      _FeatureAction(
+        label: 'Meetups',
+        description: 'Gemeinsame Aktivitäten und Treffen',
+        icon: Icons.groups_rounded,
+        color: const Color(0xFF10B981),
+        builder: (_) => const MeetupScreen(),
+      ),
+      _FeatureAction(
+        label: 'Marktplatz',
+        description: 'Nachhilfe, Betreuung und Verkaufen',
+        icon: Icons.storefront_rounded,
+        color: const Color(0xFF4F46E5),
+        builder: (_) => const MarketplaceScreen(),
+      ),
+      _FeatureAction(
+        label: 'Geräte',
+        description: 'Vertrauensgeräte verwalten',
+        icon: Icons.phonelink_setup_rounded,
+        color: const Color(0xFF0891B2),
+        builder: (_) => DeviceManagementScreen(
+          devices: widget.devices,
+          onRevoke: widget.onRevoke,
+        ),
+      ),
+      _FeatureAction(
+        label: 'Sicherheit',
+        description: 'Richtlinien und Schutz auf einen Blick',
+        icon: Icons.shield_rounded,
+        color: const Color(0xFF6366F1),
+        builder: (_) => const SafetyGuideScreen(),
+      ),
+      _FeatureAction(
+        label: 'Payment',
+        description: 'Zahlung und Abrechnung',
+        icon: Icons.payments_rounded,
+        color: const Color(0xFF14B8A6),
+        builder: (_) => PaymentScreen(
+          event: MeetupEvent(
+            id: 'home-payment-demo',
+            hosterId: 'host_demo_001',
+            title: 'Parentpeak Familien-Event',
+            description: 'Demo-Zahlung aus der Home-Übersicht',
+            category: EventCategory.socialGathering,
+            ageGroups: const [AgeGroup.mixed],
+            location: 'Berlin, Deutschland',
+            latitude: 52.52,
+            longitude: 13.405,
+            eventDate: DateTime.now().add(const Duration(days: 7)),
+            createdAt: DateTime.now(),
+            maxParticipants: 20,
+            photoUrl: 'https://via.placeholder.com/300x200?text=Parentpeak',
+            price: 2.99,
+          ),
+          amount: 2.99,
+        ),
+      ),
+      _FeatureAction(
+        label: 'Event',
+        description: 'Neues Familien-Event erstellen',
+        icon: Icons.add_circle_rounded,
+        color: const Color(0xFF8B5CF6),
+        builder: (_) => const CreateEventScreen(),
+      ),
+    ];
 
     String greeting = _t('greeting_morning');
     if (hour >= 12 && hour < 18) {
@@ -81,76 +216,39 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildSectionHeader(
-                  title: 'Schnellaktionen',
-                  subtitle: 'Alles Wichtige in einem Tap',
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final action = _quickActions[index];
-                    return _buildQuickActionCard(
-                      context,
-                      label: action.label,
-                      icon: action.icon,
-                      color: action.color,
-                      onTap: () => _openQuickAction(context, action.label),
-                    );
-                  },
-                  childCount: _quickActions.length,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 1.2,
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                 child: _buildSectionHeader(
-                  title: _t('what_today'),
-                  subtitle: _t('all_features'),
+                  title: 'Alle Funktionen',
+                  subtitle: 'Jede Funktion ist als eigene Tap-Kachel erreichbar',
                 ),
               ),
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate.fixed([
-                  _buildPrimaryCard(
-                    context,
-                    title: _t('activities_title'),
-                    subtitle: _t('activities_subtitle'),
-                    icon: Icons.groups_rounded,
-                    color: const Color(0xFF0EA5A4),
-                    onTap: () => Navigator.push(
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final action = featureActions[index];
+                    return _buildFeatureTile(
                       context,
-                      MaterialPageRoute(builder: (_) => const MeetupScreen()),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildPrimaryCard(
-                    context,
-                    title: 'Marktplatz',
-                    subtitle: 'Nachhilfe, Betreuung und Kaufen/Verkaufen',
-                    icon: Icons.storefront_rounded,
-                    color: const Color(0xFF4F46E5),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MarketplaceScreen()),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoCard(theme),
-                ]),
+                      title: action.label,
+                      subtitle: action.description,
+                      icon: action.icon,
+                      color: action.color,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: action.builder),
+                      ),
+                    );
+                  },
+                  childCount: featureActions.length,
+                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.92,
+                ),
               ),
             ),
           ],
@@ -247,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPrimaryCard(
+  Widget _buildFeatureTile(
     BuildContext context, {
     required String title,
     required String subtitle,
@@ -261,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [color.withOpacity(0.16), color.withOpacity(0.06)],
@@ -269,19 +367,22 @@ class _HomeScreenState extends State<HomeScreen> {
               end: Alignment.bottomRight,
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(14),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: color,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: Colors.white, size: 28),
+                child: Icon(icon, color: Colors.white, size: 26),
               ),
-              const SizedBox(width: 16),
               Expanded(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -297,52 +398,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: theme.colorScheme.onSurfaceVariant,
                         height: 1.35,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(Icons.arrow_forward_ios_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActionCard(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.14),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -351,57 +415,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildInfoCard(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.6)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(Icons.verified_user_rounded, color: theme.colorScheme.primary),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Schneller und klarer', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(
-                  'Weniger Ablenkung, mehr Fokus auf Termine, Familie und Chat.',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openQuickAction(BuildContext context, String label) {
-    switch (label) {
-      case 'Kalender':
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarScreen()));
-        return;
-      case 'To-do':
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const TodoScreen()));
-        return;
-      case 'Familie':
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const FamilyProfileScreen()));
-        return;
-      case 'Fotos':
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PhotosScreen()));
-        return;
-    }
-  }
 }

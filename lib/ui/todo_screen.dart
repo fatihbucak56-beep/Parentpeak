@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
+import 'package:trusted_circle_demo/logic/todo_backend_service.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -9,34 +9,26 @@ class TodoScreen extends StatefulWidget {
 }
 
 class _TodoScreenState extends State<TodoScreen> {
-  final List<Map<String, dynamic>> _todos = [
-    {
-      'title': 'Hausaufgaben machen',
-      'done': false,
-      'assignee': 'Leon',
-      'category': 'Schule'
-    },
-    {
-      'title': 'Arzttermin buchen',
-      'done': false,
-      'assignee': 'Mama',
-      'category': 'Gesundheit'
-    },
-    {
-      'title': 'Fußballschuhe kaufen',
-      'done': true,
-      'assignee': 'Papa',
-      'category': 'Sport'
-    },
-    {
-      'title': 'Geburtstag vorbereiten',
-      'done': false,
-      'assignee': 'Familie',
-      'category': 'Ereignis'
-    },
-  ];
+  final TodoBackendService _todoService = TodoBackendService();
+  List<Map<String, dynamic>> _todos = [];
+  bool _loading = true;
 
   final TextEditingController _controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodos();
+  }
+
+  Future<void> _loadTodos() async {
+    final todos = await _todoService.fetchTodos();
+    if (!mounted) return;
+    setState(() {
+      _todos = todos;
+      _loading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -44,17 +36,36 @@ class _TodoScreenState extends State<TodoScreen> {
     super.dispose();
   }
 
-  void _addTodo() {
+  Future<void> _addTodo() async {
     if (_controller.text.trim().isEmpty) return;
+    final title = _controller.text.trim();
+    _controller.clear();
+
+    final created = await _todoService.addTodo(
+      title: title,
+      assignee: 'Familie',
+      category: 'Allgemein',
+    );
+    if (!mounted) return;
+
     setState(() {
-      _todos.insert(0, {
-        'title': _controller.text.trim(),
-        'done': false,
-        'assignee': 'Familie',
-        'category': 'Allgemein',
-      });
-      _controller.clear();
+      _todos.insert(0, created);
     });
+  }
+
+  Future<void> _toggleDone(int index, bool value) async {
+    final id = _todos[index]['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    setState(() => _todos[index]['done'] = value);
+    await _todoService.updateDone(id, value);
+  }
+
+  Future<void> _removeTodo(int index) async {
+    final id = _todos[index]['id']?.toString();
+    setState(() => _todos.removeAt(index));
+    if (id != null && id.isNotEmpty) {
+      await _todoService.deleteTodo(id);
+    }
   }
 
   @override
@@ -109,6 +120,12 @@ class _TodoScreenState extends State<TodoScreen> {
           ),
           const SizedBox(height: 24),
 
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+
           // Todo-Items
           ..._todos.asMap().entries.map((entry) {
             final i = entry.key;
@@ -131,7 +148,7 @@ class _TodoScreenState extends State<TodoScreen> {
                   leading: Checkbox(
                     value: isDone,
                     onChanged: (val) {
-                      setState(() => _todos[i]['done'] = val ?? false);
+                      _toggleDone(i, val ?? false);
                     },
                     shape: const RoundedRectangleBorder(),
                   ),
@@ -173,7 +190,7 @@ class _TodoScreenState extends State<TodoScreen> {
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.grey),
                     onPressed: () {
-                      setState(() => _todos.removeAt(i));
+                      _removeTodo(i);
                     },
                   ),
                 ),

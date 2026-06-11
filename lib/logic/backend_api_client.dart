@@ -1,0 +1,82 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+class BackendApiClient {
+  BackendApiClient({required this.baseUrl, http.Client? httpClient})
+      : _httpClient = httpClient ?? http.Client();
+
+  final String baseUrl;
+  final http.Client _httpClient;
+
+  Uri _uri(String path) {
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$baseUrl$normalizedPath');
+  }
+
+  Future<List<dynamic>> getList(String path) async {
+    final response = await _httpClient
+        .get(_uri(path), headers: {'Content-Type': 'application/json'})
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('GET $path failed: ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is List<dynamic>) {
+      return decoded;
+    }
+    throw Exception('Unexpected list response for $path');
+  }
+
+  Future<Map<String, dynamic>> postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _httpClient
+        .post(
+          _uri(path),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('POST $path failed: ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    throw Exception('Unexpected map response for $path');
+  }
+
+  Future<void> putJson(String path, Map<String, dynamic> body) async {
+    final response = await _httpClient
+        .put(
+          _uri(path),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('PUT $path failed: ${response.statusCode}');
+    }
+  }
+
+  Future<void> delete(String path) async {
+    final response = await _httpClient
+        .delete(
+          _uri(path),
+          headers: {'Content-Type': 'application/json'},
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('DELETE $path failed: ${response.statusCode}');
+    }
+  }
+}

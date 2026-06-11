@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'backend_api_client.dart';
+import 'contracts/todo_contract.dart';
 
 class TodoBackendService {
   TodoBackendService({this.apiClient});
@@ -16,11 +17,8 @@ class TodoBackendService {
     lastSyncError = null;
     if (apiClient != null) {
       try {
-        final remote = await apiClient!.getList('/todos');
-        final todos = remote
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        final payload = await apiClient!.getJson(TodoContract.todosPath);
+        final todos = TodoContract.parseList(payload);
         await _persist(todos);
         return todos;
       } catch (e) {
@@ -57,7 +55,11 @@ class TodoBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.postJson('/todos', todo);
+        final payload = await apiClient!.postJsonAny(TodoContract.todosPath, todo);
+        if (payload is Map) {
+          final normalized = TodoContract.normalize(Map<String, dynamic>.from(payload));
+          todo['id'] = normalized['id'];
+        }
       } catch (e) {
         lastSyncError = 'Todo konnte nicht auf Server gespeichert werden: $e';
       }
@@ -78,7 +80,7 @@ class TodoBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.putJson('/todos/$id', updated);
+        await apiClient!.putJson(TodoContract.todoByIdPath(id), updated);
       } catch (e) {
         lastSyncError = 'Todo-Status konnte nicht synchronisiert werden: $e';
       }
@@ -92,7 +94,7 @@ class TodoBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.delete('/todos/$id');
+        await apiClient!.delete(TodoContract.todoByIdPath(id));
       } catch (e) {
         lastSyncError = 'Todo konnte nicht auf Server gelöscht werden: $e';
       }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'backend_api_client.dart';
+import 'contracts/shopping_contract.dart';
 
 class ShoppingBackendService {
   ShoppingBackendService({this.apiClient});
@@ -16,11 +17,8 @@ class ShoppingBackendService {
     lastSyncError = null;
     if (apiClient != null) {
       try {
-        final remote = await apiClient!.getList('/shopping');
-        final items = remote
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        final payload = await apiClient!.getJson(ShoppingContract.shoppingPath);
+        final items = ShoppingContract.parseList(payload);
         await _persist(items);
         return items;
       } catch (e) {
@@ -48,7 +46,13 @@ class ShoppingBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.postJson('/shopping', item);
+        final payload =
+            await apiClient!.postJsonAny(ShoppingContract.shoppingPath, item);
+        if (payload is Map) {
+          final normalized =
+              ShoppingContract.normalize(Map<String, dynamic>.from(payload));
+          item['id'] = normalized['id'];
+        }
       } catch (e) {
         lastSyncError = 'Shopping-Item konnte nicht auf Server gespeichert werden: $e';
       }
@@ -69,7 +73,7 @@ class ShoppingBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.putJson('/shopping/$id', updated);
+        await apiClient!.putJson(ShoppingContract.itemByIdPath(id), updated);
       } catch (e) {
         lastSyncError = 'Shopping-Status konnte nicht synchronisiert werden: $e';
       }
@@ -83,7 +87,7 @@ class ShoppingBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.delete('/shopping/$id');
+        await apiClient!.delete(ShoppingContract.itemByIdPath(id));
       } catch (e) {
         lastSyncError = 'Shopping-Item konnte nicht auf Server gelöscht werden: $e';
       }

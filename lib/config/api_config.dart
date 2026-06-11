@@ -62,6 +62,28 @@ class APIConfig {
     return baseUrl != null && baseUrl.isNotEmpty;
   }
 
+  static String getBackendTodosPath() {
+    return _getEnvOrDefault('BACKEND_TODOS_PATH', '/todos');
+  }
+
+  static String getBackendShoppingPath() {
+    return _getEnvOrDefault('BACKEND_SHOPPING_PATH', '/shopping');
+  }
+
+  static String getBackendCalendarEventsPath() {
+    return _getEnvOrDefault('BACKEND_CALENDAR_EVENTS_PATH', '/calendar/events');
+  }
+
+  static String _getEnvOrDefault(String key, String fallback) {
+    try {
+      final value = dotenv.env[key]?.trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
   /// System-Instruktion für Eltern-Assistent
   static const String parentAssistantSystemPrompt = '''
   Du bist Parentpeak Pädagogik-Beratung: ein KI-Chatbot nur für Elternfragen.

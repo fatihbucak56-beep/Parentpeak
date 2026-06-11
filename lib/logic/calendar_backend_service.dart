@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'backend_api_client.dart';
+import 'contracts/calendar_contract.dart';
 
 class CalendarBackendService {
   CalendarBackendService({this.apiClient});
@@ -16,11 +17,8 @@ class CalendarBackendService {
     lastSyncError = null;
     if (apiClient != null) {
       try {
-        final remote = await apiClient!.getList('/calendar/events');
-        final events = remote
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        final payload = await apiClient!.getJson(CalendarContract.eventsPath);
+        final events = CalendarContract.parseList(payload);
         await _persist(events);
         return events;
       } catch (e) {
@@ -38,7 +36,7 @@ class CalendarBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.postJson('/calendar/events', event);
+        await apiClient!.postJsonAny(CalendarContract.eventsPath, event);
       } catch (e) {
         lastSyncError = 'Kalender-Event konnte nicht auf Server gespeichert werden: $e';
       }

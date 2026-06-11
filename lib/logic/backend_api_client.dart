@@ -29,7 +29,7 @@ class BackendApiClient {
     return Uri.parse('$baseUrl$normalizedPath');
   }
 
-  Future<List<dynamic>> getList(String path) async {
+  Future<dynamic> getJson(String path) async {
     final response = await _httpClient
         .get(_uri(path), headers: _headers)
         .timeout(const Duration(seconds: 8));
@@ -38,7 +38,11 @@ class BackendApiClient {
       throw Exception('GET $path failed: ${response.statusCode}');
     }
 
-    final decoded = jsonDecode(response.body);
+    return _decodeResponse(response.body);
+  }
+
+  Future<List<dynamic>> getList(String path) async {
+    final decoded = await getJson(path);
     if (decoded is List<dynamic>) {
       return decoded;
     }
@@ -46,6 +50,17 @@ class BackendApiClient {
   }
 
   Future<Map<String, dynamic>> postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final decoded = await postJsonAny(path, body);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    throw Exception('Unexpected map response for $path');
+  }
+
+  Future<dynamic> postJsonAny(
     String path,
     Map<String, dynamic> body,
   ) async {
@@ -61,11 +76,7 @@ class BackendApiClient {
       throw Exception('POST $path failed: ${response.statusCode}');
     }
 
-    final decoded = jsonDecode(response.body);
-    if (decoded is Map<String, dynamic>) {
-      return decoded;
-    }
-    throw Exception('Unexpected map response for $path');
+    return _decodeResponse(response.body);
   }
 
   Future<void> putJson(String path, Map<String, dynamic> body) async {
@@ -92,6 +103,17 @@ class BackendApiClient {
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('DELETE $path failed: ${response.statusCode}');
+    }
+  }
+
+  dynamic _decodeResponse(String rawBody) {
+    if (rawBody.trim().isEmpty) {
+      return <String, dynamic>{};
+    }
+    try {
+      return jsonDecode(rawBody);
+    } catch (_) {
+      return <String, dynamic>{'raw': rawBody};
     }
   }
 }

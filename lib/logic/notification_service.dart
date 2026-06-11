@@ -26,7 +26,7 @@ class NotificationService {
       iOS: iosInit,
       macOS: iosInit,
     );
-    await _plugin.initialize(settings);
+    await _plugin.initialize(settings: settings);
 
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
@@ -55,17 +55,16 @@ class NotificationService {
     const iosDetails = DarwinNotificationDetails();
 
     await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzWhen,
-      const NotificationDetails(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: tzWhen,
+      notificationDetails: const NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
         macOS: iosDetails,
       ),
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   }
 }

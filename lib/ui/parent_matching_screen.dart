@@ -1,6 +1,8 @@
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/ui/match_conversation_screen.dart';
 
 class ParentMatchingScreen extends StatefulWidget {
@@ -11,10 +13,13 @@ class ParentMatchingScreen extends StatefulWidget {
 }
 
 class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
+  static const String _storageKey = 'parent_matching.v1';
+
   final List<_ParentProfile> _allProfiles = _seedProfiles();
   final List<_ParentProfile> _likedProfiles = [];
   final List<_ParentProfile> _matchedProfiles = [];
   final Set<String> _blockedProfileIds = {};
+  final Set<String> _reportedProfileIds = {};
 
   final Set<String> _interestFilter = {};
   final Set<String> _languageFilter = {};
@@ -23,10 +28,122 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   final Set<String> _childAgeFilter = {};
 
   int _currentIndex = 0;
+  bool _isRestoring = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreState();
+  }
+
+  Future<void> _restoreState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw == null || raw.isEmpty) {
+      if (!mounted) return;
+      setState(() => _isRestoring = false);
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        if (!mounted) return;
+        setState(() => _isRestoring = false);
+        return;
+      }
+
+      final likedIds =
+          (decoded['likedIds'] as List?)?.map((e) => e.toString()).toSet() ??
+              <String>{};
+      final matchedIds =
+          (decoded['matchedIds'] as List?)?.map((e) => e.toString()).toSet() ??
+              <String>{};
+      final blockedIds =
+          (decoded['blockedIds'] as List?)?.map((e) => e.toString()).toSet() ??
+              <String>{};
+        final reportedIds =
+          (decoded['reportedIds'] as List?)?.map((e) => e.toString()).toSet() ??
+            <String>{};
+
+      if (!mounted) return;
+      setState(() {
+        _likedProfiles
+          ..clear()
+          ..addAll(_allProfiles.where((p) => likedIds.contains(p.id)));
+        _matchedProfiles
+          ..clear()
+          ..addAll(_allProfiles.where((p) => matchedIds.contains(p.id)));
+        _blockedProfileIds
+          ..clear()
+          ..addAll(blockedIds);
+        _reportedProfileIds
+          ..clear()
+          ..addAll(reportedIds);
+
+        _interestFilter
+          ..clear()
+          ..addAll((decoded['interestFilter'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              <String>{});
+        _languageFilter
+          ..clear()
+          ..addAll((decoded['languageFilter'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              <String>{});
+        _valuesFilter
+          ..clear()
+          ..addAll((decoded['valuesFilter'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              <String>{});
+        _familyFormFilter
+          ..clear()
+          ..addAll((decoded['familyFormFilter'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              <String>{});
+        _childAgeFilter
+          ..clear()
+          ..addAll((decoded['childAgeFilter'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              <String>{});
+
+        _currentIndex = (decoded['currentIndex'] as num?)?.toInt() ?? 0;
+        _isRestoring = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isRestoring = false);
+    }
+  }
+
+  Future<void> _persistState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final payload = {
+      'likedIds': _likedProfiles.map((p) => p.id).toList(),
+      'matchedIds': _matchedProfiles.map((p) => p.id).toList(),
+      'blockedIds': _blockedProfileIds.toList(),
+      'reportedIds': _reportedProfileIds.toList(),
+      'interestFilter': _interestFilter.toList(),
+      'languageFilter': _languageFilter.toList(),
+      'valuesFilter': _valuesFilter.toList(),
+      'familyFormFilter': _familyFormFilter.toList(),
+      'childAgeFilter': _childAgeFilter.toList(),
+      'currentIndex': _currentIndex,
+    };
+    await prefs.setString(_storageKey, jsonEncode(payload));
+  }
 
   List<_ParentProfile> get _filteredProfiles {
     return _allProfiles.where((profile) {
       if (_blockedProfileIds.contains(profile.id)) {
+        return false;
+      }
+      if (_reportedProfileIds.contains(profile.id)) {
         return false;
       }
       if (_interestFilter.isNotEmpty &&
@@ -69,6 +186,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         _currentIndex = 0;
       }
     });
+    _persistState();
   }
 
   int _compatibility(_ParentProfile profile) {
@@ -92,6 +210,39 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     return min(98, max(45, base));
   }
 
+  List<String> _whyMatch(_ParentProfile profile) {
+    const myInterests = {
+      'Bildung',
+      'Spielplatz',
+      'Familienzeit',
+      'Outdoor',
+      'Gesundheit'
+    };
+    const myLanguages = {'Deutsch', 'Englisch'};
+    const myValues = {'Gewaltfrei', 'Respekt', 'Inklusion', 'Empathie'};
+
+    final reasons = <String>[];
+    final sharedInterests =
+        profile.interests.toSet().intersection(myInterests).toList();
+    final sharedLanguages =
+        profile.languages.toSet().intersection(myLanguages).toList();
+    final sharedValues = profile.valuesFocus.toSet().intersection(myValues).toList();
+
+    if (sharedInterests.isNotEmpty) {
+      reasons.add('Gemeinsame Interessen: ${sharedInterests.take(2).join(', ')}');
+    }
+    if (sharedLanguages.isNotEmpty) {
+      reasons.add('Sprache passt: ${sharedLanguages.take(2).join(', ')}');
+    }
+    if (sharedValues.isNotEmpty) {
+      reasons.add('Aehnliche Werte: ${sharedValues.take(2).join(', ')}');
+    }
+    if (reasons.isEmpty) {
+      reasons.add('Passende Familienphase und Offenheit fuer Austausch');
+    }
+    return reasons;
+  }
+
   void _likeCurrent() {
     final profile = _currentProfile;
     if (profile == null) return;
@@ -113,15 +264,24 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     }
 
     _moveNext();
+    _persistState();
   }
 
   void _reportCurrent() {
     final profile = _currentProfile;
     if (profile == null) return;
 
+    setState(() {
+      _reportedProfileIds.add(profile.id);
+      _likedProfiles.removeWhere((p) => p.id == profile.id);
+      _matchedProfiles.removeWhere((p) => p.id == profile.id);
+      _currentIndex = 0;
+    });
+    _persistState();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Profil ${profile.name} wurde gemeldet.'),
+        content: Text('Profil ${profile.name} wurde gemeldet und ausgeblendet.'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -137,6 +297,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       _matchedProfiles.removeWhere((p) => p.id == profile.id);
       _currentIndex = 0;
     });
+    _persistState();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -177,8 +338,15 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                 leading: const Icon(Icons.verified_user_outlined),
                 title: const Text('Aktueller Status'),
                 subtitle: Text(
-                    '${_matchedProfiles.length} Matches, ${_blockedProfileIds.length} blockierte Profile'),
+                    '${_matchedProfiles.length} Matches, ${_blockedProfileIds.length} blockierte Profile, ${_reportedProfileIds.length} gemeldete Profile'),
               ),
+              if (_reportedProfileIds.isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.inventory_2_outlined),
+                  title: const Text('Safety-Queue'),
+                  subtitle: Text(
+                      '${_reportedProfileIds.length} Profile in Pruefung (lokal markiert)'),
+                ),
             ],
           ),
         );
@@ -345,6 +513,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                             setState(() {
                               _currentIndex = 0;
                             });
+                            _persistState();
                             Navigator.pop(context);
                           },
                           child: const Text('Filter anwenden'),
@@ -365,6 +534,12 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final profile = _currentProfile;
+
+    if (_isRestoring) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -408,6 +583,21 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Nur fuer Freundschaft, Playdates und Eltern-Austausch.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
             Expanded(
               child: profile == null
@@ -420,10 +610,12 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                         _familyFormFilter.clear();
                         _childAgeFilter.clear();
                       });
+                      _persistState();
                     })
                   : _ProfileCard(
                       profile: profile,
                       compatibility: _compatibility(profile),
+                      reasons: _whyMatch(profile),
                       onReport: _reportCurrent,
                       onBlock: _blockCurrent,
                     ),
@@ -516,12 +708,14 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
     required this.compatibility,
+    required this.reasons,
     required this.onReport,
     required this.onBlock,
   });
 
   final _ParentProfile profile;
   final int compatibility;
+  final List<String> reasons;
   final VoidCallback onReport;
   final VoidCallback onBlock;
 
@@ -560,11 +754,18 @@ class _ProfileCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${profile.name}, ${profile.age}',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700)),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('${profile.name}, ${profile.age}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                          _VerificationBadge(level: profile.verificationLevel),
+                        ],
+                      ),
                       const SizedBox(height: 4),
                       Text(profile.city,
                           style: TextStyle(
@@ -619,6 +820,8 @@ class _ProfileCard extends StatelessWidget {
                 _TagSection(title: 'Werte', values: profile.valuesFocus),
                 const SizedBox(height: 10),
                 _TagSection(title: 'Kinderalter', values: profile.childAges),
+                const SizedBox(height: 10),
+                _TagSection(title: 'Warum ihr passt', values: reasons),
                 const SizedBox(height: 10),
                 Text('Familienform: ${profile.familyForm}',
                     style: theme.textTheme.bodyMedium
@@ -696,6 +899,7 @@ class _ParentProfile {
     required this.valuesFocus,
     required this.childAges,
     required this.familyForm,
+    this.verificationLevel = _VerificationLevel.basic,
   });
 
   final String id;
@@ -708,6 +912,42 @@ class _ParentProfile {
   final List<String> valuesFocus;
   final List<String> childAges;
   final String familyForm;
+  final _VerificationLevel verificationLevel;
+}
+
+enum _VerificationLevel { basic, checked, recommended }
+
+class _VerificationBadge extends StatelessWidget {
+  const _VerificationBadge({required this.level});
+
+  final _VerificationLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (level) {
+      _VerificationLevel.basic => ('Basis', Colors.white70),
+      _VerificationLevel.checked => ('Geprueft', Color(0xFF93C5FD)),
+      _VerificationLevel.recommended => ('Empfohlen', Color(0xFFFDE68A)),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.8)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_rounded, color: color, size: 15),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+        ],
+      ),
+    );
+  }
 }
 
 List<_ParentProfile> _seedProfiles() {
@@ -723,6 +963,7 @@ List<_ParentProfile> _seedProfiles() {
       valuesFocus: ['Gewaltfrei', 'Empathie', 'Inklusion'],
       childAges: ['3-5', '6-9'],
       familyForm: 'Kernfamilie',
+      verificationLevel: _VerificationLevel.recommended,
     ),
     _ParentProfile(
       id: 'p2',
@@ -735,6 +976,7 @@ List<_ParentProfile> _seedProfiles() {
       valuesFocus: ['Respekt', 'Offenheit', 'Empathie'],
       childAges: ['6-9', '10-13'],
       familyForm: 'Alleinerziehend',
+      verificationLevel: _VerificationLevel.checked,
     ),
     _ParentProfile(
       id: 'p3',
@@ -747,6 +989,7 @@ List<_ParentProfile> _seedProfiles() {
       valuesFocus: ['Gewaltfrei', 'Tradition', 'Respekt'],
       childAges: ['0-2', '3-5'],
       familyForm: 'Patchwork',
+      verificationLevel: _VerificationLevel.basic,
     ),
     _ParentProfile(
       id: 'p4',
@@ -759,6 +1002,7 @@ List<_ParentProfile> _seedProfiles() {
       valuesFocus: ['Inklusion', 'Offenheit', 'Empathie'],
       childAges: ['6-9'],
       familyForm: 'Kernfamilie',
+      verificationLevel: _VerificationLevel.recommended,
     ),
     _ParentProfile(
       id: 'p5',
@@ -771,6 +1015,7 @@ List<_ParentProfile> _seedProfiles() {
       valuesFocus: ['Gewaltfrei', 'Respekt', 'Empathie'],
       childAges: ['3-5', '10-13'],
       familyForm: 'Kernfamilie',
+      verificationLevel: _VerificationLevel.checked,
     ),
   ];
 }

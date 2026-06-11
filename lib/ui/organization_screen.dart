@@ -86,29 +86,39 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
     });
   }
 
-  Future<void> _toggleEntry(int index, bool newValue) async {
+  Future<void> _toggleEntry(Map<String, dynamic> item, bool newValue) async {
     if (_mode == _OrganizationMode.todos) {
-      final id = _todos[index]['id']?.toString();
+      final id = item['id']?.toString();
       if (id == null || id.isEmpty) return;
-      setState(() => _todos[index]['done'] = newValue);
+      final idx = _todos.indexWhere((e) => e['id']?.toString() == id);
+      if (idx == -1) return;
+      setState(() => _todos[idx]['done'] = newValue);
       await _todoService.updateDone(id, newValue);
       if (!mounted) return;
       setState(() => _todoSyncError = _todoService.lastSyncError);
       return;
     }
 
-    final id = _shoppingItems[index]['id']?.toString();
+    final id = item['id']?.toString();
     if (id == null || id.isEmpty) return;
-    setState(() => _shoppingItems[index]['checked'] = newValue);
+    final idx = _shoppingItems.indexWhere((e) => e['id']?.toString() == id);
+    if (idx == -1) return;
+    setState(() => _shoppingItems[idx]['checked'] = newValue);
     await _shoppingService.updateChecked(id, newValue);
     if (!mounted) return;
     setState(() => _shoppingSyncError = _shoppingService.lastSyncError);
   }
 
-  Future<void> _deleteEntry(int index) async {
+  Future<void> _deleteEntry(Map<String, dynamic> item) async {
     if (_mode == _OrganizationMode.todos) {
-      final id = _todos[index]['id']?.toString();
-      setState(() => _todos.removeAt(index));
+      final id = item['id']?.toString();
+      setState(() {
+        if (id != null && id.isNotEmpty) {
+          _todos.removeWhere((e) => e['id']?.toString() == id);
+        } else {
+          _todos.remove(item);
+        }
+      });
       if (id != null && id.isNotEmpty) {
         await _todoService.deleteTodo(id);
       }
@@ -117,8 +127,14 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
       return;
     }
 
-    final id = _shoppingItems[index]['id']?.toString();
-    setState(() => _shoppingItems.removeAt(index));
+    final id = item['id']?.toString();
+    setState(() {
+      if (id != null && id.isNotEmpty) {
+        _shoppingItems.removeWhere((e) => e['id']?.toString() == id);
+      } else {
+        _shoppingItems.remove(item);
+      }
+    });
     if (id != null && id.isNotEmpty) {
       await _shoppingService.deleteItem(id);
     }
@@ -137,10 +153,12 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
         ? 'Neue Aufgabe hinzufügen...'
         : 'Neuen Einkaufsartikel hinzufügen...';
 
-    final openItems =
-        activeItems.where((item) => !(item[completeKey] as bool? ?? false));
-    final doneItems =
-        activeItems.where((item) => item[completeKey] as bool? ?? false);
+    final openItems = activeItems
+      .where((item) => !(item[completeKey] as bool? ?? false))
+      .toList();
+    final doneItems = activeItems
+      .where((item) => item[completeKey] as bool? ?? false)
+      .toList();
 
     final syncError = isTodos ? _todoSyncError : _shoppingSyncError;
 
@@ -267,10 +285,17 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                   ),
                 ),
               )
-            else
-              ...activeItems.asMap().entries.map((entry) {
-                final i = entry.key;
-                final item = entry.value;
+            else ...[
+              if (openItems.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Offen',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ...openItems.map((item) {
                 final isDone = item[completeKey] as bool? ?? false;
 
                 return Padding(
@@ -286,7 +311,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                     child: ListTile(
                       leading: Checkbox(
                         value: isDone,
-                        onChanged: (val) => _toggleEntry(i, val ?? false),
+                        onChanged: (val) => _toggleEntry(item, val ?? false),
                       ),
                       title: Text(
                         (item[titleKey] ?? '').toString(),
@@ -302,12 +327,60 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                       ),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _deleteEntry(i),
+                        onPressed: () => _deleteEntry(item),
                       ),
                     ),
                   ),
                 );
               }),
+              if (doneItems.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 6, 0, 8),
+                  child: Text(
+                    'Erledigt',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ...doneItems.map((item) {
+                final isDone = item[completeKey] as bool? ?? false;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Card(
+                    elevation: isDone ? 0 : 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: isDone
+                          ? BorderSide(color: Colors.grey[300]!, width: 1)
+                          : BorderSide.none,
+                    ),
+                    child: ListTile(
+                      leading: Checkbox(
+                        value: isDone,
+                        onChanged: (val) => _toggleEntry(item, val ?? false),
+                      ),
+                      title: Text(
+                        (item[titleKey] ?? '').toString(),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          decoration: isDone ? TextDecoration.lineThrough : null,
+                          color: isDone ? Colors.grey : null,
+                        ),
+                      ),
+                      subtitle: Text(
+                        (item['category'] ?? 'Allgemein').toString(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _deleteEntry(item),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
           ],
         ],
       ),

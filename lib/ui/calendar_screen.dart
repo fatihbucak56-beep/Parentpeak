@@ -733,39 +733,59 @@ class _MonthGrid extends StatelessWidget {
                       width: isSelected ? 1.4 : 1,
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${day.day}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      if (eventCount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.white.withOpacity(0.2)
-                                : const Color(0xFF4CAF50).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$eventCount',
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compactTile = constraints.maxHeight < 44;
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${day.day}',
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? Colors.white
-                                  : const Color(0xFF2D3748),
+                              fontWeight: FontWeight.w700,
+                              color: textColor,
                             ),
                           ),
-                        ),
-                    ],
+                          if (eventCount > 0) ...[
+                            SizedBox(height: compactTile ? 2 : 4),
+                            compactTile
+                                ? Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : const Color(0xFF4CAF50),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  )
+                                : Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.white.withOpacity(0.2)
+                                          : const Color(0xFF4CAF50)
+                                              .withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$eventCount',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : const Color(0xFF2D3748),
+                                      ),
+                                    ),
+                                  ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               );

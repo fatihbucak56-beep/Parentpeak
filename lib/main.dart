@@ -9,6 +9,7 @@ import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/home_screen.dart';
 import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
+import 'package:trusted_circle_demo/ui/parent_matching_screen.dart';
 import 'package:trusted_circle_demo/logic/theme_service.dart';
 import 'package:trusted_circle_demo/logic/language_service.dart';
 import 'package:trusted_circle_demo/widgets/language_aware_widget.dart';
@@ -219,6 +220,9 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
       LanguageAwareWidget(
           key: ValueKey('chat-${languageService.currentLanguage}'),
           child: const ChatScreen()),
+        LanguageAwareWidget(
+          key: ValueKey('match-${languageService.currentLanguage}'),
+          child: const ParentMatchingScreen()),
       LanguageAwareWidget(
           key: ValueKey('family-${languageService.currentLanguage}'),
           child: FamilyProfileScreen(
@@ -251,6 +255,11 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
               icon: Icon(Icons.chat_bubble_outline_rounded),
               selectedIcon: Icon(Icons.chat_bubble_rounded),
               label: 'KI Elternberatung',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.favorite_border_rounded),
+              selectedIcon: Icon(Icons.favorite_rounded),
+              label: 'Eltern Match',
             ),
             NavigationDestination(
               icon: Icon(Icons.family_restroom_outlined),

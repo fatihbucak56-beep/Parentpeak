@@ -78,11 +78,9 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-        ),
+      builder: (context) => Material(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -262,7 +260,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 80,
+            height: 92,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: _familyMembers.length + 1,
@@ -309,6 +307,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                       Text(
                         _familyMembers[index],
                         style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),

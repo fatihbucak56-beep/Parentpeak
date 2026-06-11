@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/calendar_backend_service.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
@@ -13,8 +14,10 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixin<CalendarScreen> {
   final List<_CalendarEvent> _events = [];
-  final CalendarBackendService _calendarService = CalendarBackendService();
+  final CalendarBackendService _calendarService =
+      BackendServiceFactory.createCalendarService();
   final TextEditingController _titleController = TextEditingController();
+  String? _syncError;
   String _filterPerson = 'Alle';
   final List<int> _reminderOptions = [0, 10, 30, 60];
   final List<String> _recurrenceOptions = ['Einmalig', 'Täglich', 'Wöchentlich', 'Monatlich'];
@@ -57,6 +60,7 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
       _events
         ..clear()
         ..addAll(saved.map(_CalendarEvent.fromJson));
+      _syncError = _calendarService.lastSyncError;
     });
   }
 
@@ -375,6 +379,9 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                       for (final e in expanded) {
                         _calendarService.addEvent(e.toJson());
                       }
+                      setState(() {
+                        _syncError = _calendarService.lastSyncError;
+                      });
                       // Erinnerungen planen
                       for (final e in expanded) {
                         if (e.reminderMinutes > 0) {
@@ -422,11 +429,32 @@ class _CalendarScreenState extends State<CalendarScreen> with LanguageChangeMixi
                         ),
                         const Spacer(),
                         IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          onPressed: _loadEvents,
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.notifications_outlined),
                           onPressed: () {},
                         ),
                       ],
                     ),
+                    if (_syncError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 8),
+                        child: Material(
+                          color: Colors.amber[100],
+                          borderRadius: BorderRadius.circular(12),
+                          child: ListTile(
+                            leading: const Icon(Icons.cloud_off_rounded),
+                            title: const Text('Server-Sync fehlgeschlagen'),
+                            subtitle: Text(_syncError!),
+                            trailing: TextButton(
+                              onPressed: _loadEvents,
+                              child: const Text('Retry'),
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

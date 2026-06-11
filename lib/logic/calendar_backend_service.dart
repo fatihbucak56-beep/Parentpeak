@@ -8,10 +8,12 @@ class CalendarBackendService {
   CalendarBackendService({this.apiClient});
 
   final BackendApiClient? apiClient;
+  String? lastSyncError;
 
   static const String _storageKey = 'backend.calendar.v1';
 
   Future<List<Map<String, dynamic>>> fetchEvents() async {
+    lastSyncError = null;
     if (apiClient != null) {
       try {
         final remote = await apiClient!.getList('/calendar/events');
@@ -21,7 +23,9 @@ class CalendarBackendService {
             .toList();
         await _persist(events);
         return events;
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Server-Sync fehlgeschlagen: $e';
+      }
     }
 
     return _readLocal();
@@ -35,7 +39,9 @@ class CalendarBackendService {
     if (apiClient != null) {
       try {
         await apiClient!.postJson('/calendar/events', event);
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Kalender-Event konnte nicht auf Server gespeichert werden: $e';
+      }
     }
   }
 

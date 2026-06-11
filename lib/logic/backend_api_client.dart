@@ -3,11 +3,26 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class BackendApiClient {
-  BackendApiClient({required this.baseUrl, http.Client? httpClient})
+  BackendApiClient({
+    required this.baseUrl,
+    this.authToken,
+    http.Client? httpClient,
+  })
       : _httpClient = httpClient ?? http.Client();
 
   final String baseUrl;
+  final String? authToken;
   final http.Client _httpClient;
+
+  Map<String, String> get _headers {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (authToken != null && authToken!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $authToken';
+    }
+    return headers;
+  }
 
   Uri _uri(String path) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
@@ -16,7 +31,7 @@ class BackendApiClient {
 
   Future<List<dynamic>> getList(String path) async {
     final response = await _httpClient
-        .get(_uri(path), headers: {'Content-Type': 'application/json'})
+        .get(_uri(path), headers: _headers)
         .timeout(const Duration(seconds: 8));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -37,7 +52,7 @@ class BackendApiClient {
     final response = await _httpClient
         .post(
           _uri(path),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers,
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 8));
@@ -57,7 +72,7 @@ class BackendApiClient {
     final response = await _httpClient
         .put(
           _uri(path),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers,
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 8));
@@ -71,7 +86,7 @@ class BackendApiClient {
     final response = await _httpClient
         .delete(
           _uri(path),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers,
         )
         .timeout(const Duration(seconds: 8));
 

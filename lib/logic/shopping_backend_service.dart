@@ -8,10 +8,12 @@ class ShoppingBackendService {
   ShoppingBackendService({this.apiClient});
 
   final BackendApiClient? apiClient;
+  String? lastSyncError;
 
   static const String _storageKey = 'backend.shopping.v1';
 
   Future<List<Map<String, dynamic>>> fetchItems() async {
+    lastSyncError = null;
     if (apiClient != null) {
       try {
         final remote = await apiClient!.getList('/shopping');
@@ -21,7 +23,9 @@ class ShoppingBackendService {
             .toList();
         await _persist(items);
         return items;
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Server-Sync fehlgeschlagen: $e';
+      }
     }
 
     return _readLocal();
@@ -45,7 +49,9 @@ class ShoppingBackendService {
     if (apiClient != null) {
       try {
         await apiClient!.postJson('/shopping', item);
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Shopping-Item konnte nicht auf Server gespeichert werden: $e';
+      }
     }
 
     return item;
@@ -64,7 +70,9 @@ class ShoppingBackendService {
     if (apiClient != null) {
       try {
         await apiClient!.putJson('/shopping/$id', updated);
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Shopping-Status konnte nicht synchronisiert werden: $e';
+      }
     }
   }
 
@@ -76,7 +84,9 @@ class ShoppingBackendService {
     if (apiClient != null) {
       try {
         await apiClient!.delete('/shopping/$id');
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Shopping-Item konnte nicht auf Server gelöscht werden: $e';
+      }
     }
   }
 

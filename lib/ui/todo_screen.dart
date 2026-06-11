@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/todo_backend_service.dart';
 
 class TodoScreen extends StatefulWidget {
@@ -9,9 +10,11 @@ class TodoScreen extends StatefulWidget {
 }
 
 class _TodoScreenState extends State<TodoScreen> {
-  final TodoBackendService _todoService = TodoBackendService();
+  final TodoBackendService _todoService =
+      BackendServiceFactory.createTodoService();
   List<Map<String, dynamic>> _todos = [];
   bool _loading = true;
+  String? _syncError;
 
   final TextEditingController _controller = TextEditingController();
 
@@ -27,6 +30,7 @@ class _TodoScreenState extends State<TodoScreen> {
     setState(() {
       _todos = todos;
       _loading = false;
+      _syncError = _todoService.lastSyncError;
     });
   }
 
@@ -50,6 +54,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
     setState(() {
       _todos.insert(0, created);
+      _syncError = _todoService.lastSyncError;
     });
   }
 
@@ -58,6 +63,10 @@ class _TodoScreenState extends State<TodoScreen> {
     if (id == null || id.isEmpty) return;
     setState(() => _todos[index]['done'] = value);
     await _todoService.updateDone(id, value);
+    if (!mounted) return;
+    setState(() {
+      _syncError = _todoService.lastSyncError;
+    });
   }
 
   Future<void> _removeTodo(int index) async {
@@ -66,6 +75,10 @@ class _TodoScreenState extends State<TodoScreen> {
     if (id != null && id.isNotEmpty) {
       await _todoService.deleteTodo(id);
     }
+    if (!mounted) return;
+    setState(() {
+      _syncError = _todoService.lastSyncError;
+    });
   }
 
   @override
@@ -77,10 +90,35 @@ class _TodoScreenState extends State<TodoScreen> {
         title: const Text('To-Do Liste'),
         elevation: 0,
         centerTitle: false,
+        actions: [
+          IconButton(
+            onPressed: _loadTodos,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Synchronisieren',
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_syncError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Material(
+                color: Colors.amber[100],
+                borderRadius: BorderRadius.circular(12),
+                child: ListTile(
+                  leading: const Icon(Icons.cloud_off_rounded),
+                  title: const Text('Server-Sync fehlgeschlagen'),
+                  subtitle: Text(_syncError!),
+                  trailing: TextButton(
+                    onPressed: _loadTodos,
+                    child: const Text('Retry'),
+                  ),
+                ),
+              ),
+            ),
+
           // Eingabe-Feld
           Card(
             elevation: 2,

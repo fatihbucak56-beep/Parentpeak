@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/shopping_backend_service.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
 import 'package:trusted_circle_demo/main.dart';
@@ -13,9 +14,11 @@ class ShoppingScreen extends StatefulWidget {
 
 class _ShoppingScreenState extends State<ShoppingScreen>
     with LanguageChangeMixin<ShoppingScreen> {
-  final ShoppingBackendService _shoppingService = ShoppingBackendService();
+  final ShoppingBackendService _shoppingService =
+      BackendServiceFactory.createShoppingService();
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
+  String? _syncError;
 
   final TextEditingController _controller = TextEditingController();
 
@@ -69,6 +72,7 @@ class _ShoppingScreenState extends State<ShoppingScreen>
     setState(() {
       _items = items;
       _loading = false;
+      _syncError = _shoppingService.lastSyncError;
     });
   }
 
@@ -91,6 +95,7 @@ class _ShoppingScreenState extends State<ShoppingScreen>
 
     setState(() {
       _items.insert(0, created);
+      _syncError = _shoppingService.lastSyncError;
     });
   }
 
@@ -101,6 +106,10 @@ class _ShoppingScreenState extends State<ShoppingScreen>
     if (id != null && id.isNotEmpty) {
       await _shoppingService.deleteItem(id);
     }
+    if (!mounted) return;
+    setState(() {
+      _syncError = _shoppingService.lastSyncError;
+    });
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.showSnackBar(
       SnackBar(
@@ -129,10 +138,35 @@ class _ShoppingScreenState extends State<ShoppingScreen>
         title: Text(_t('shopping')),
         elevation: 0,
         centerTitle: false,
+        actions: [
+          IconButton(
+            onPressed: _loadItems,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Synchronisieren',
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_syncError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Material(
+                color: Colors.amber[100],
+                borderRadius: BorderRadius.circular(12),
+                child: ListTile(
+                  leading: const Icon(Icons.cloud_off_rounded),
+                  title: const Text('Server-Sync fehlgeschlagen'),
+                  subtitle: Text(_syncError!),
+                  trailing: TextButton(
+                    onPressed: _loadItems,
+                    child: const Text('Retry'),
+                  ),
+                ),
+              ),
+            ),
+
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(24),
@@ -295,6 +329,9 @@ class _ShoppingScreenState extends State<ShoppingScreen>
               if (id != null && id.isNotEmpty) {
                 _shoppingService.updateChecked(id, checked);
               }
+              setState(() {
+                _syncError = _shoppingService.lastSyncError;
+              });
             },
             shape: const RoundedRectangleBorder(),
           ),

@@ -8,6 +8,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class APIConfig {
   // Gemini API Configuration - Gemini 2.0 Flash
   static const String geminiModelName = 'gemini-2.0-flash';
+
+  // Backend API configuration
+  static const String backendBaseUrlFallback = '';
   
   /// Hole den Gemini API-Key aus der .env Datei oder Fallback
   /// Falls nicht gefunden, wird null zurückgegeben
@@ -31,6 +34,32 @@ class APIConfig {
   /// Validiere ob ein API-Key vorhanden ist
   static bool isGeminiApiKeyConfigured() {
     return getGeminiApiKey() != null && getGeminiApiKey()!.isNotEmpty;
+  }
+
+  static String? getBackendBaseUrl() {
+    try {
+      final value = dotenv.env['BACKEND_BASE_URL']?.trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    } catch (_) {}
+
+    return backendBaseUrlFallback.isNotEmpty ? backendBaseUrlFallback : null;
+  }
+
+  static String? getBackendApiToken() {
+    try {
+      final token = dotenv.env['BACKEND_API_TOKEN']?.trim();
+      if (token != null && token.isNotEmpty) {
+        return token;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static bool isBackendConfigured() {
+    final baseUrl = getBackendBaseUrl();
+    return baseUrl != null && baseUrl.isNotEmpty;
   }
 
   /// System-Instruktion für Eltern-Assistent

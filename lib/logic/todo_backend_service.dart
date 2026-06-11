@@ -8,10 +8,12 @@ class TodoBackendService {
   TodoBackendService({this.apiClient});
 
   final BackendApiClient? apiClient;
+  String? lastSyncError;
 
   static const String _storageKey = 'backend.todos.v1';
 
   Future<List<Map<String, dynamic>>> fetchTodos() async {
+    lastSyncError = null;
     if (apiClient != null) {
       try {
         final remote = await apiClient!.getList('/todos');
@@ -21,7 +23,9 @@ class TodoBackendService {
             .toList();
         await _persist(todos);
         return todos;
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Server-Sync fehlgeschlagen: $e';
+      }
     }
 
     final local = await _readLocal();
@@ -54,7 +58,9 @@ class TodoBackendService {
     if (apiClient != null) {
       try {
         await apiClient!.postJson('/todos', todo);
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Todo konnte nicht auf Server gespeichert werden: $e';
+      }
     }
 
     return todo;
@@ -73,7 +79,9 @@ class TodoBackendService {
     if (apiClient != null) {
       try {
         await apiClient!.putJson('/todos/$id', updated);
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Todo-Status konnte nicht synchronisiert werden: $e';
+      }
     }
   }
 
@@ -85,7 +93,9 @@ class TodoBackendService {
     if (apiClient != null) {
       try {
         await apiClient!.delete('/todos/$id');
-      } catch (_) {}
+      } catch (e) {
+        lastSyncError = 'Todo konnte nicht auf Server gelöscht werden: $e';
+      }
     }
   }
 

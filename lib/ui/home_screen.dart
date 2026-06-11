@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 import 'package:trusted_circle_demo/ui/contacts_screen.dart';
-import 'package:trusted_circle_demo/ui/device_management_screen.dart';
-import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/location_screen.dart';
 import 'package:trusted_circle_demo/ui/photos_screen.dart';
 import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
@@ -30,10 +28,7 @@ class _FeatureAction {
 }
 
 class HomeScreen extends StatefulWidget {
-  final List<TrustedDevice> devices;
-  final Future<bool> Function(String deviceUuid, String deviceName) onRevoke;
-
-  const HomeScreen({super.key, required this.devices, required this.onRevoke});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -118,16 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.location_on_rounded,
         color: const Color(0xFFF97316),
         builder: (_) => const LocationScreen(),
-      ),
-      _FeatureAction(
-        label: 'Geräte',
-        description: 'Vertrauensgeräte verwalten',
-        icon: Icons.phonelink_setup_rounded,
-        color: const Color(0xFF0891B2),
-        builder: (_) => DeviceManagementScreen(
-          devices: widget.devices,
-          onRevoke: widget.onRevoke,
-        ),
       ),
       _FeatureAction(
         label: 'Sicherheit',

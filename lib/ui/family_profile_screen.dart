@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+import 'package:trusted_circle_demo/models/trusted_device.dart';
+import 'package:trusted_circle_demo/ui/device_management_screen.dart';
 import 'package:trusted_circle_demo/widgets/ala_rengin_flag_painter.dart';
 
 class FamilyProfileScreen extends StatefulWidget {
-  const FamilyProfileScreen({super.key});
+  final List<TrustedDevice> devices;
+  final Future<bool> Function(String deviceUuid, String deviceName) onRevoke;
+
+  const FamilyProfileScreen(
+      {super.key, required this.devices, required this.onRevoke});
 
   @override
   State<FamilyProfileScreen> createState() => _FamilyProfileScreenState();
@@ -548,6 +554,27 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(_t('privacy'))),
+                    );
+                  },
+                ),
+                Divider(height: 1, color: primary.withOpacity(0.1)),
+                ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  leading: const Icon(Icons.phonelink_setup,
+                      color: Color(0xFFBDB2FF)),
+                  title: const Text('Vertrauensgeraete'),
+                  subtitle: const Text('Aktive Geraete anzeigen und verwalten'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DeviceManagementScreen(
+                          devices: widget.devices,
+                          onRevoke: widget.onRevoke,
+                        ),
+                      ),
                     );
                   },
                 ),

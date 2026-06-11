@@ -46,11 +46,14 @@ class ShoppingBackendService {
 
     if (apiClient != null) {
       try {
+        final requestBody = ShoppingContract.buildCreatePayload(
+          name: name,
+          category: category,
+        );
         final payload =
-            await apiClient!.postJsonAny(ShoppingContract.shoppingPath, item);
-        if (payload is Map) {
-          final normalized =
-              ShoppingContract.normalize(Map<String, dynamic>.from(payload));
+            await apiClient!.postJsonAny(ShoppingContract.shoppingPath, requestBody);
+        final normalized = ShoppingContract.parseSingleItem(payload);
+        if (normalized != null) {
           item['id'] = normalized['id'];
         }
       } catch (e) {
@@ -73,7 +76,10 @@ class ShoppingBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.putJson(ShoppingContract.itemByIdPath(id), updated);
+        await apiClient!.putJson(
+          ShoppingContract.itemByIdPath(id),
+          ShoppingContract.buildUpdatePayload(checked: checked),
+        );
       } catch (e) {
         lastSyncError = 'Shopping-Status konnte nicht synchronisiert werden: $e';
       }

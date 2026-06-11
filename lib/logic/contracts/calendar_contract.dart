@@ -20,7 +20,7 @@ class CalendarContract {
       'title': pickString(raw, const ['title', 'name', 'subject'], ''),
       'start': start.toIso8601String(),
       'end': end.toIso8601String(),
-      'person': pickString(raw, const ['person', 'owner', 'assignee'], 'Eltern'),
+      'person': pickString(raw, const ['person', 'personName', 'owner', 'assignee'], 'Eltern'),
       'location': pickString(raw, const ['location', 'place', 'address'], ''),
       'allDay': pickBool(raw, const ['allDay', 'all_day'], false),
       'recurrence': pickString(raw, const ['recurrence', 'repeat'], 'Einmalig'),
@@ -28,6 +28,31 @@ class CalendarContract {
       'recurrenceEndMode': pickString(raw, const ['recurrenceEndMode', 'repeat_end_mode'], 'Kein Ende'),
       'recurrenceEndDate': _pickDate(raw, const ['recurrenceEndDate', 'repeat_end_date'])?.toIso8601String(),
       'recurrenceCount': _pickNullableInt(raw, const ['recurrenceCount', 'repeat_count']),
+    };
+  }
+
+  static Map<String, dynamic>? parseSingleItem(dynamic payload) {
+    final item = extractItemFromPayload(payload, const ['item', 'event', 'data', 'result']);
+    if (item == null) return null;
+    return normalize(item);
+  }
+
+  static Map<String, dynamic> buildCreatePayload(Map<String, dynamic> event) {
+    return {
+      'familyId': APIConfig.getBackendFamilyId(),
+      'title': event['title'] ?? '',
+      'description': '',
+      'personName': event['person'] ?? 'Eltern',
+      'location': event['location'] ?? '',
+      'startAt': event['start'],
+      'endAt': event['end'],
+      'allDay': event['allDay'] ?? false,
+      'recurrence': event['recurrence'] ?? 'Einmalig',
+      'recurrenceEndMode': event['recurrenceEndMode'] ?? 'Kein Ende',
+      'recurrenceEndDate': event['recurrenceEndDate'],
+      'recurrenceCount': event['recurrenceCount'],
+      'reminderMinutes': event['reminderMinutes'] ?? 0,
+      'schemaVersion': APIConfig.getBackendApiVersion(),
     };
   }
 

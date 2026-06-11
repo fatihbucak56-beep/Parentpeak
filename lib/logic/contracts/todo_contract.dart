@@ -21,8 +21,43 @@ class TodoContract {
       'id': pickString(raw, const ['id', '_id', 'uuid'], nowId),
       'title': pickString(raw, const ['title', 'name', 'text'], ''),
       'done': pickBool(raw, const ['done', 'completed', 'isDone'], false),
-      'assignee': pickString(raw, const ['assignee', 'owner', 'person'], 'Familie'),
+      'assignee': pickString(raw, const ['assignee', 'assigneeName', 'owner', 'person'], 'Familie'),
       'category': pickString(raw, const ['category', 'type', 'group'], 'Allgemein'),
+    };
+  }
+
+  static Map<String, dynamic>? parseSingleItem(dynamic payload) {
+    final item = extractItemFromPayload(payload, const ['item', 'todo', 'data', 'result']);
+    if (item == null) return null;
+    return normalize(item);
+  }
+
+  static Map<String, dynamic> buildCreatePayload({
+    required String title,
+    required String assignee,
+    required String category,
+  }) {
+    return {
+      'familyId': APIConfig.getBackendFamilyId(),
+      'title': title,
+      'notes': '',
+      'assigneeName': assignee,
+      'assigneeRole': assignee.toLowerCase() == 'familie' ? 'family' : 'parent',
+      'category': category,
+      'priority': 'medium',
+      'completed': false,
+      'schemaVersion': APIConfig.getBackendApiVersion(),
+    };
+  }
+
+  static Map<String, dynamic> buildUpdatePayload({
+    required bool done,
+  }) {
+    return {
+      'familyId': APIConfig.getBackendFamilyId(),
+      'completed': done,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      'schemaVersion': APIConfig.getBackendApiVersion(),
     };
   }
 }

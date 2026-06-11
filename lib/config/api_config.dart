@@ -57,6 +57,14 @@ class APIConfig {
     return null;
   }
 
+  static String getBackendFamilyId() {
+    return _getEnvOrDefault('BACKEND_FAMILY_ID', 'demo-family-001');
+  }
+
+  static String getBackendApiVersion() {
+    return _getEnvOrDefault('BACKEND_API_VERSION', 'v1');
+  }
+
   static bool isBackendConfigured() {
     final baseUrl = getBackendBaseUrl();
     return baseUrl != null && baseUrl.isNotEmpty;

@@ -36,7 +36,10 @@ class CalendarBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.postJsonAny(CalendarContract.eventsPath, event);
+        await apiClient!.postJsonAny(
+          CalendarContract.eventsPath,
+          CalendarContract.buildCreatePayload(event),
+        );
       } catch (e) {
         lastSyncError = 'Kalender-Event konnte nicht auf Server gespeichert werden: $e';
       }

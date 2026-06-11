@@ -1,0 +1,214 @@
+{
+  "version": "v1",
+  "notes": "Empfohlenes Parentpeak API-JSON fuer familienfreundliche Funktionen.",
+  "todos": {
+    "GET /todos": {
+      "response": {
+        "success": true,
+        "data": {
+          "items": [
+            {
+              "id": "todo_123",
+              "familyId": "demo-family-001",
+              "title": "Hausaufgaben Mathematik",
+              "notes": "Kapitel 3 fertigstellen",
+              "assigneeName": "Leon",
+              "assigneeRole": "child",
+              "category": "Schule",
+              "priority": "medium",
+              "dueAt": "2026-06-12T15:00:00Z",
+              "completed": false,
+              "createdAt": "2026-06-11T10:00:00Z",
+              "updatedAt": "2026-06-11T10:00:00Z"
+            }
+          ]
+        },
+        "meta": {
+          "page": 1,
+          "pageSize": 50,
+          "total": 1
+        }
+      }
+    },
+    "POST /todos": {
+      "request": {
+        "familyId": "demo-family-001",
+        "title": "Kinderarzttermin organisieren",
+        "notes": "Versicherungskarte mitnehmen",
+        "assigneeName": "Mama",
+        "assigneeRole": "parent",
+        "category": "Gesundheit",
+        "priority": "high",
+        "dueAt": "2026-06-14T09:00:00Z",
+        "completed": false,
+        "schemaVersion": "v1"
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "item": {
+            "id": "todo_124",
+            "familyId": "demo-family-001",
+            "title": "Kinderarzttermin organisieren",
+            "notes": "Versicherungskarte mitnehmen",
+            "assigneeName": "Mama",
+            "assigneeRole": "parent",
+            "category": "Gesundheit",
+            "priority": "high",
+            "dueAt": "2026-06-14T09:00:00Z",
+            "completed": false,
+            "createdAt": "2026-06-11T10:30:00Z",
+            "updatedAt": "2026-06-11T10:30:00Z"
+          }
+        }
+      }
+    },
+    "PUT /todos/{id}": {
+      "request": {
+        "familyId": "demo-family-001",
+        "completed": true,
+        "updatedAt": "2026-06-11T11:00:00Z",
+        "schemaVersion": "v1"
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "item": {
+            "id": "todo_124",
+            "completed": true,
+            "updatedAt": "2026-06-11T11:00:00Z"
+          }
+        }
+      }
+    }
+  },
+  "shopping": {
+    "GET /shopping": {
+      "response": {
+        "success": true,
+        "data": {
+          "items": [
+            {
+              "id": "shop_001",
+              "familyId": "demo-family-001",
+              "name": "Milch",
+              "quantity": 2,
+              "unit": "Packung",
+              "category": "Lebensmittel",
+              "checked": false,
+              "preferredStore": "Bio Markt",
+              "notes": "Laktosefrei",
+              "createdAt": "2026-06-11T09:00:00Z",
+              "updatedAt": "2026-06-11T09:00:00Z"
+            }
+          ]
+        }
+      }
+    },
+    "POST /shopping": {
+      "request": {
+        "familyId": "demo-family-001",
+        "name": "Windeln",
+        "quantity": 1,
+        "unit": "Packung",
+        "category": "Baby",
+        "checked": false,
+        "preferredStore": "Drogerie",
+        "notes": "Groesse 5",
+        "schemaVersion": "v1"
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "item": {
+            "id": "shop_002",
+            "familyId": "demo-family-001",
+            "name": "Windeln",
+            "quantity": 1,
+            "unit": "Packung",
+            "category": "Baby",
+            "checked": false,
+            "preferredStore": "Drogerie",
+            "notes": "Groesse 5"
+          }
+        }
+      }
+    },
+    "PUT /shopping/{id}": {
+      "request": {
+        "familyId": "demo-family-001",
+        "checked": true,
+        "updatedAt": "2026-06-11T11:15:00Z",
+        "schemaVersion": "v1"
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "item": {
+            "id": "shop_002",
+            "checked": true,
+            "updatedAt": "2026-06-11T11:15:00Z"
+          }
+        }
+      }
+    }
+  },
+  "calendar": {
+    "GET /calendar/events": {
+      "response": {
+        "success": true,
+        "data": {
+          "items": [
+            {
+              "id": "evt_100",
+              "familyId": "demo-family-001",
+              "title": "Elternabend Kita",
+              "description": "Austausch mit Erzieherinnen",
+              "personName": "Eltern",
+              "location": "Kita Sonnenschein",
+              "startAt": "2026-06-16T17:00:00Z",
+              "endAt": "2026-06-16T18:30:00Z",
+              "allDay": false,
+              "recurrence": "Einmalig",
+              "recurrenceEndMode": "Kein Ende",
+              "reminderMinutes": 60,
+              "createdAt": "2026-06-11T08:00:00Z",
+              "updatedAt": "2026-06-11T08:00:00Z"
+            }
+          ]
+        }
+      }
+    },
+    "POST /calendar/events": {
+      "request": {
+        "familyId": "demo-family-001",
+        "title": "Fussballtraining",
+        "description": "Woechentliches Training",
+        "personName": "Ben",
+        "location": "Sporthalle",
+        "startAt": "2026-06-18T14:00:00Z",
+        "endAt": "2026-06-18T15:30:00Z",
+        "allDay": false,
+        "recurrence": "Woechentlich",
+        "recurrenceEndMode": "10 Termine",
+        "recurrenceCount": 10,
+        "reminderMinutes": 30,
+        "schemaVersion": "v1"
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "item": {
+            "id": "evt_101",
+            "familyId": "demo-family-001",
+            "title": "Fussballtraining",
+            "personName": "Ben",
+            "startAt": "2026-06-18T14:00:00Z",
+            "endAt": "2026-06-18T15:30:00Z",
+            "recurrence": "Woechentlich"
+          }
+        }
+      }
+    }
+  }
+}

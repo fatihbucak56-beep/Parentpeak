@@ -24,4 +24,38 @@ class ShoppingContract {
       'category': pickString(raw, const ['category', 'group', 'type'], 'Allgemein'),
     };
   }
+
+  static Map<String, dynamic>? parseSingleItem(dynamic payload) {
+    final item = extractItemFromPayload(payload, const ['item', 'shopping', 'data', 'result']);
+    if (item == null) return null;
+    return normalize(item);
+  }
+
+  static Map<String, dynamic> buildCreatePayload({
+    required String name,
+    required String category,
+  }) {
+    return {
+      'familyId': APIConfig.getBackendFamilyId(),
+      'name': name,
+      'quantity': 1,
+      'unit': 'Stueck',
+      'category': category,
+      'checked': false,
+      'preferredStore': '',
+      'notes': '',
+      'schemaVersion': APIConfig.getBackendApiVersion(),
+    };
+  }
+
+  static Map<String, dynamic> buildUpdatePayload({
+    required bool checked,
+  }) {
+    return {
+      'familyId': APIConfig.getBackendFamilyId(),
+      'checked': checked,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      'schemaVersion': APIConfig.getBackendApiVersion(),
+    };
+  }
 }

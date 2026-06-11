@@ -52,6 +52,34 @@ List<Map<String, dynamic>> extractListFromPayload(
   return [];
 }
 
+Map<String, dynamic>? extractItemFromPayload(
+  dynamic payload,
+  List<String> candidateKeys,
+) {
+  if (payload is Map) {
+    final mapPayload = Map<String, dynamic>.from(payload);
+
+    for (final key in candidateKeys) {
+      final value = mapPayload[key];
+      if (value is Map) {
+        return Map<String, dynamic>.from(value);
+      }
+    }
+
+    final nested = extractFirstMapByKeys(mapPayload, const ['data', 'result']);
+    if (nested != null) {
+      for (final key in candidateKeys) {
+        final value = nested[key];
+        if (value is Map) {
+          return Map<String, dynamic>.from(value);
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 String pickString(Map<String, dynamic> source, List<String> keys, String fallback) {
   for (final key in keys) {
     final value = source[key];

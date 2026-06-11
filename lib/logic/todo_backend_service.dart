@@ -55,9 +55,17 @@ class TodoBackendService {
 
     if (apiClient != null) {
       try {
-        final payload = await apiClient!.postJsonAny(TodoContract.todosPath, todo);
-        if (payload is Map) {
-          final normalized = TodoContract.normalize(Map<String, dynamic>.from(payload));
+        final requestBody = TodoContract.buildCreatePayload(
+          title: title,
+          assignee: assignee,
+          category: category,
+        );
+        final payload = await apiClient!.postJsonAny(
+          TodoContract.todosPath,
+          requestBody,
+        );
+        final normalized = TodoContract.parseSingleItem(payload);
+        if (normalized != null) {
           todo['id'] = normalized['id'];
         }
       } catch (e) {
@@ -80,7 +88,10 @@ class TodoBackendService {
 
     if (apiClient != null) {
       try {
-        await apiClient!.putJson(TodoContract.todoByIdPath(id), updated);
+        await apiClient!.putJson(
+          TodoContract.todoByIdPath(id),
+          TodoContract.buildUpdatePayload(done: done),
+        );
       } catch (e) {
         lastSyncError = 'Todo-Status konnte nicht synchronisiert werden: $e';
       }

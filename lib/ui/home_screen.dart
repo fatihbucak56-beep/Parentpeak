@@ -4,11 +4,10 @@ import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 import 'package:trusted_circle_demo/ui/location_screen.dart';
 import 'package:trusted_circle_demo/ui/photos_screen.dart';
 import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
-import 'package:trusted_circle_demo/ui/shopping_screen.dart';
-import 'package:trusted_circle_demo/ui/todo_screen.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
 import 'package:trusted_circle_demo/ui/backend_status_screen.dart';
 import 'package:trusted_circle_demo/ui/events_activities_screen.dart';
+import 'package:trusted_circle_demo/ui/organization_screen.dart';
 
 class _FeatureAction {
   final String label;
@@ -79,18 +78,11 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const EventsActivitiesScreen(),
       ),
       _FeatureAction(
-        label: 'To-do',
-        description: 'Aufgaben und Erledigungen',
-        icon: Icons.check_circle_rounded,
-        color: const Color(0xFF059669),
-        builder: (_) => const TodoScreen(),
-      ),
-      _FeatureAction(
-        label: 'Einkauf',
-        description: 'Einkaufsliste gemeinsam pflegen',
-        icon: Icons.shopping_cart_rounded,
-        color: const Color(0xFFEC4899),
-        builder: (_) => const ShoppingScreen(),
+        label: 'Organisation',
+        description: 'To-do und Einkauf in einem Bereich',
+        icon: Icons.fact_check_rounded,
+        color: const Color(0xFF16A34A),
+        builder: (_) => const OrganizationScreen(),
       ),
       _FeatureAction(
         label: 'Fotos',

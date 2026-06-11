@@ -304,7 +304,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_initError != null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('💬 Eltern-Assistent'),
+            title: const Text('KI Elternberatung'),
           centerTitle: true,
           elevation: 0,
         ),
@@ -337,7 +337,7 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('💬 Eltern-Assistent'),
+            const Text('KI Elternberatung'),
             const SizedBox(height: 4),
             Text(
               'Powered by Gemini 2.0 Flash',

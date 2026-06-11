@@ -250,7 +250,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
             NavigationDestination(
               icon: Icon(Icons.chat_bubble_outline_rounded),
               selectedIcon: Icon(Icons.chat_bubble_rounded),
-              label: 'Chat',
+              label: 'KI Elternberatung',
             ),
             NavigationDestination(
               icon: Icon(Icons.family_restroom_outlined),

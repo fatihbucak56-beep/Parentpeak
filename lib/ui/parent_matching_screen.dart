@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/ui/match_conversation_screen.dart';
 
 class ParentMatchingScreen extends StatefulWidget {
   const ParentMatchingScreen({super.key});
@@ -13,6 +14,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   final List<_ParentProfile> _allProfiles = _seedProfiles();
   final List<_ParentProfile> _likedProfiles = [];
   final List<_ParentProfile> _matchedProfiles = [];
+  final Set<String> _blockedProfileIds = {};
 
   final Set<String> _interestFilter = {};
   final Set<String> _languageFilter = {};
@@ -24,6 +26,9 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
 
   List<_ParentProfile> get _filteredProfiles {
     return _allProfiles.where((profile) {
+      if (_blockedProfileIds.contains(profile.id)) {
+        return false;
+      }
       if (_interestFilter.isNotEmpty &&
           profile.interests.toSet().intersection(_interestFilter).isEmpty) {
         return false;
@@ -108,6 +113,86 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     }
 
     _moveNext();
+  }
+
+  void _reportCurrent() {
+    final profile = _currentProfile;
+    if (profile == null) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Profil ${profile.name} wurde gemeldet.'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _blockCurrent() {
+    final profile = _currentProfile;
+    if (profile == null) return;
+
+    setState(() {
+      _blockedProfileIds.add(profile.id);
+      _likedProfiles.removeWhere((p) => p.id == profile.id);
+      _matchedProfiles.removeWhere((p) => p.id == profile.id);
+      _currentIndex = 0;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${profile.name} wurde blockiert.'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _openSafetyInfo() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            children: [
+              Text(
+                'Sicherheit im Eltern-Matching',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const ListTile(
+                leading: Icon(Icons.flag_outlined),
+                title: Text('Profile melden'),
+                subtitle: Text('Unpassende Inhalte koennen jederzeit gemeldet werden.'),
+              ),
+              const ListTile(
+                leading: Icon(Icons.block_rounded),
+                title: Text('Profile blockieren'),
+                subtitle: Text('Blockierte Profile werden nicht mehr angezeigt.'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.verified_user_outlined),
+                title: const Text('Aktueller Status'),
+                subtitle: Text(
+                    '${_matchedProfiles.length} Matches, ${_blockedProfileIds.length} blockierte Profile'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openMatchChat(_ParentProfile profile) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MatchConversationScreen(profileName: profile.name),
+      ),
+    );
   }
 
   void _skipCurrent() {
@@ -286,6 +371,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         title: const Text('Eltern-Matching'),
         actions: [
           IconButton(
+            tooltip: 'Sicherheit',
+            onPressed: _openSafetyInfo,
+            icon: const Icon(Icons.shield_outlined),
+          ),
+          IconButton(
             tooltip: 'Filter',
             onPressed: _openFilterSheet,
             icon: const Icon(Icons.tune_rounded),
@@ -334,6 +424,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                   : _ProfileCard(
                       profile: profile,
                       compatibility: _compatibility(profile),
+                      onReport: _reportCurrent,
+                      onBlock: _blockCurrent,
                     ),
             ),
             const SizedBox(height: 12),
@@ -374,6 +466,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                               child: Text(p.name[0]),
                             ),
                             label: Text(p.name),
+                            onDeleted: () => _openMatchChat(p),
+                            deleteIcon: const Icon(Icons.chat_bubble_outline_rounded),
                           ))
                       .toList(),
                 ),
@@ -419,10 +513,17 @@ class _StatPill extends StatelessWidget {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.profile, required this.compatibility});
+  const _ProfileCard({
+    required this.profile,
+    required this.compatibility,
+    required this.onReport,
+    required this.onBlock,
+  });
 
   final _ParentProfile profile;
   final int compatibility;
+  final VoidCallback onReport;
+  final VoidCallback onBlock;
 
   @override
   Widget build(BuildContext context) {
@@ -482,7 +583,25 @@ class _ProfileCard extends StatelessWidget {
                   child: Text('$compatibility%',
                       style: const TextStyle(
                           color: Colors.white, fontWeight: FontWeight.w700)),
-                )
+                ),
+                PopupMenuButton<String>(
+                  color: Colors.white,
+                  iconColor: Colors.white,
+                  onSelected: (value) {
+                    if (value == 'report') onReport();
+                    if (value == 'block') onBlock();
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem<String>(
+                      value: 'report',
+                      child: Text('Profil melden'),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'block',
+                      child: Text('Profil blockieren'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

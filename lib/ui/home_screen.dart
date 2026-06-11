@@ -17,6 +17,7 @@ import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
 import 'package:trusted_circle_demo/ui/shopping_screen.dart';
 import 'package:trusted_circle_demo/ui/todo_screen.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
+import 'package:trusted_circle_demo/ui/backend_status_screen.dart';
 
 class _FeatureAction {
   final String label;
@@ -193,6 +194,13 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.add_circle_rounded,
         color: const Color(0xFF8B5CF6),
         builder: (_) => const CreateEventScreen(),
+      ),
+      _FeatureAction(
+        label: 'Backend',
+        description: 'API-Verbindung und Endpunkte prüfen',
+        icon: Icons.cloud_sync_rounded,
+        color: const Color(0xFF0F766E),
+        builder: (_) => const BackendStatusScreen(),
       ),
     ];
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
+import 'package:trusted_circle_demo/ui/contacts_screen.dart';
 import 'package:trusted_circle_demo/ui/device_management_screen.dart';
 import 'package:trusted_circle_demo/widgets/ala_rengin_flag_painter.dart';
 
@@ -554,6 +555,24 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(_t('privacy'))),
+                    );
+                  },
+                ),
+                Divider(height: 1, color: primary.withOpacity(0.1)),
+                ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  leading:
+                      const Icon(Icons.contact_phone, color: Color(0xFFBDB2FF)),
+                  title: const Text('Notfallkontakte'),
+                  subtitle: const Text('Wichtige Kontakte schnell erreichen'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ContactsScreen(),
+                      ),
                     );
                   },
                 ),

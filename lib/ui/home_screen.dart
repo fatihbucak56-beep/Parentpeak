@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
-import 'package:trusted_circle_demo/ui/contacts_screen.dart';
 import 'package:trusted_circle_demo/ui/location_screen.dart';
 import 'package:trusted_circle_demo/ui/photos_screen.dart';
 import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
@@ -99,13 +98,6 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.photo_library_rounded,
         color: const Color(0xFFF59E0B),
         builder: (_) => const PhotosScreen(),
-      ),
-      _FeatureAction(
-        label: 'Kontakte',
-        description: 'Wichtige Kontakte schnell öffnen',
-        icon: Icons.contact_phone_rounded,
-        color: const Color(0xFFE11D48),
-        builder: (_) => const ContactsScreen(),
       ),
       _FeatureAction(
         label: 'Standort',

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
@@ -76,12 +75,16 @@ class _ShoppingScreenState extends State<ShoppingScreen>
   void _deleteItem(int index) {
     final item = _items[index];
     setState(() => _items.removeAt(index));
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(
       SnackBar(
         content: Text('${item['name']} ${_t('deleted')}'),
         action: SnackBarAction(
           label: _t('undo'),
-          onPressed: () => setState(() => _items.insert(index, item)),
+          onPressed: () {
+            if (!mounted) return;
+            setState(() => _items.insert(index, item));
+          },
         ),
         duration: const Duration(seconds: 4),
       ),

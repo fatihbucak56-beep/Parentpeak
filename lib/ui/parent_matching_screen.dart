@@ -14,6 +14,20 @@ class ParentMatchingScreen extends StatefulWidget {
 
 class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   static const String _storageKey = 'parent_matching.v1';
+  static const Set<String> _myInterests = {
+    'Bildung',
+    'Spielplatz',
+    'Familienzeit',
+    'Outdoor',
+    'Gesundheit'
+  };
+  static const Set<String> _myLanguages = {'Deutsch', 'Englisch'};
+  static const Set<String> _myValues = {
+    'Gewaltfrei',
+    'Respekt',
+    'Inklusion',
+    'Empathie'
+  };
 
   final List<_ParentProfile> _allProfiles = _seedProfiles();
   final List<_ParentProfile> _likedProfiles = [];
@@ -190,43 +204,37 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   }
 
   int _compatibility(_ParentProfile profile) {
-    const myInterests = {
-      'Bildung',
-      'Spielplatz',
-      'Familienzeit',
-      'Outdoor',
-      'Gesundheit'
-    };
-    const myLanguages = {'Deutsch', 'Englisch'};
-    const myValues = {'Gewaltfrei', 'Respekt', 'Inklusion', 'Empathie'};
-
     final interestsMatch =
-        profile.interests.toSet().intersection(myInterests).length;
+        profile.interests.toSet().intersection(_myInterests).length;
     final languagesMatch =
-        profile.languages.toSet().intersection(myLanguages).length;
-    final valuesMatch = profile.valuesFocus.toSet().intersection(myValues).length;
+        profile.languages.toSet().intersection(_myLanguages).length;
+    final valuesMatch = profile.valuesFocus.toSet().intersection(_myValues).length;
 
     final base = (interestsMatch * 18) + (languagesMatch * 16) + (valuesMatch * 14);
     return min(98, max(45, base));
   }
 
-  List<String> _whyMatch(_ParentProfile profile) {
-    const myInterests = {
-      'Bildung',
-      'Spielplatz',
-      'Familienzeit',
-      'Outdoor',
-      'Gesundheit'
-    };
-    const myLanguages = {'Deutsch', 'Englisch'};
-    const myValues = {'Gewaltfrei', 'Respekt', 'Inklusion', 'Empathie'};
+  int _categoryScore(List<String> profileValues, Set<String> myValues) {
+    if (profileValues.isEmpty) return 0;
+    final overlap = profileValues.toSet().intersection(myValues).length;
+    return min(100, ((overlap / profileValues.length) * 100).round());
+  }
 
+  _MatchQuality _matchQuality(_ParentProfile profile) {
+    return _MatchQuality(
+      interests: _categoryScore(profile.interests, _myInterests),
+      languages: _categoryScore(profile.languages, _myLanguages),
+      values: _categoryScore(profile.valuesFocus, _myValues),
+    );
+  }
+
+  List<String> _whyMatch(_ParentProfile profile) {
     final reasons = <String>[];
     final sharedInterests =
-        profile.interests.toSet().intersection(myInterests).toList();
+        profile.interests.toSet().intersection(_myInterests).toList();
     final sharedLanguages =
-        profile.languages.toSet().intersection(myLanguages).toList();
-    final sharedValues = profile.valuesFocus.toSet().intersection(myValues).toList();
+        profile.languages.toSet().intersection(_myLanguages).toList();
+    final sharedValues = profile.valuesFocus.toSet().intersection(_myValues).toList();
 
     if (sharedInterests.isNotEmpty) {
       reasons.add('Gemeinsame Interessen: ${sharedInterests.take(2).join(', ')}');
@@ -615,6 +623,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                   : _ProfileCard(
                       profile: profile,
                       compatibility: _compatibility(profile),
+                      quality: _matchQuality(profile),
                       reasons: _whyMatch(profile),
                       onReport: _reportCurrent,
                       onBlock: _blockCurrent,
@@ -708,6 +717,7 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
     required this.compatibility,
+    required this.quality,
     required this.reasons,
     required this.onReport,
     required this.onBlock,
@@ -715,6 +725,7 @@ class _ProfileCard extends StatelessWidget {
 
   final _ParentProfile profile;
   final int compatibility;
+  final _MatchQuality quality;
   final List<String> reasons;
   final VoidCallback onReport;
   final VoidCallback onBlock;
@@ -821,6 +832,8 @@ class _ProfileCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 _TagSection(title: 'Kinderalter', values: profile.childAges),
                 const SizedBox(height: 10),
+                _MatchQualityRow(quality: quality),
+                const SizedBox(height: 10),
                 _TagSection(title: 'Warum ihr passt', values: reasons),
                 const SizedBox(height: 10),
                 Text('Familienform: ${profile.familyForm}',
@@ -861,6 +874,86 @@ class _TagSection extends StatelessWidget {
               .toList(),
         ),
       ],
+    );
+  }
+}
+
+class _MatchQuality {
+  const _MatchQuality({
+    required this.interests,
+    required this.languages,
+    required this.values,
+  });
+
+  final int interests;
+  final int languages;
+  final int values;
+}
+
+class _MatchQualityRow extends StatelessWidget {
+  const _MatchQualityRow({required this.quality});
+
+  final _MatchQuality quality;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Match-Qualitaet',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _QualityPill(label: 'Interessen', score: quality.interests),
+            _QualityPill(label: 'Sprache', score: quality.languages),
+            _QualityPill(label: 'Werte', score: quality.values),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QualityPill extends StatelessWidget {
+  const _QualityPill({required this.label, required this.score});
+
+  final String label;
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color;
+    if (score >= 80) {
+      color = const Color(0xFF16A34A);
+    } else if (score >= 55) {
+      color = const Color(0xFF0EA5E9);
+    } else {
+      color = const Color(0xFFF59E0B);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.45)),
+      ),
+      child: Text(
+        '$label $score%',
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
     );
   }
 }

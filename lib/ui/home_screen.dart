@@ -11,6 +11,7 @@ import 'package:trusted_circle_demo/ui/shopping_screen.dart';
 import 'package:trusted_circle_demo/ui/todo_screen.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
 import 'package:trusted_circle_demo/ui/backend_status_screen.dart';
+import 'package:trusted_circle_demo/ui/events_activities_screen.dart';
 
 class _FeatureAction {
   final String label;
@@ -75,6 +76,13 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.calendar_month_rounded,
         color: const Color(0xFF2563EB),
         builder: (_) => const CalendarScreen(),
+      ),
+      _FeatureAction(
+        label: 'Events & Aktivitäten',
+        description: 'Meetups entdecken oder selbst Event erstellen',
+        icon: Icons.celebration_rounded,
+        color: const Color(0xFF8B5CF6),
+        builder: (_) => const EventsActivitiesScreen(),
       ),
       _FeatureAction(
         label: 'To-do',

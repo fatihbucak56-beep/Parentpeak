@@ -1,17 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
-import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
 import 'package:trusted_circle_demo/ui/contacts_screen.dart';
-import 'package:trusted_circle_demo/ui/create_event_screen.dart';
 import 'package:trusted_circle_demo/ui/device_management_screen.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/location_screen.dart';
-import 'package:trusted_circle_demo/ui/marketplace_screen.dart';
-import 'package:trusted_circle_demo/ui/meetup_screen.dart';
-import 'package:trusted_circle_demo/ui/payment_screen.dart';
 import 'package:trusted_circle_demo/ui/photos_screen.dart';
 import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
 import 'package:trusted_circle_demo/ui/shopping_screen.dart';
@@ -78,24 +71,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final featureActions = <_FeatureAction>[
       _FeatureAction(
         label: 'Kalender',
-        description: 'Termine, Events und Familienplan',
+        description: 'Termine und Familienplan',
         icon: Icons.calendar_month_rounded,
         color: const Color(0xFF2563EB),
         builder: (_) => const CalendarScreen(),
-      ),
-      _FeatureAction(
-        label: 'Chat',
-        description: 'Nachrichten und Familienkommunikation',
-        icon: Icons.chat_bubble_rounded,
-        color: const Color(0xFF7C3AED),
-        builder: (_) => const ChatScreen(),
-      ),
-      _FeatureAction(
-        label: 'Familie',
-        description: 'Profile, Mitglieder und Sprache',
-        icon: Icons.family_restroom_rounded,
-        color: const Color(0xFF0EA5A4),
-        builder: (_) => const FamilyProfileScreen(),
       ),
       _FeatureAction(
         label: 'To-do',
@@ -105,18 +84,18 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const TodoScreen(),
       ),
       _FeatureAction(
+        label: 'Einkauf',
+        description: 'Einkaufsliste gemeinsam pflegen',
+        icon: Icons.shopping_cart_rounded,
+        color: const Color(0xFFEC4899),
+        builder: (_) => const ShoppingScreen(),
+      ),
+      _FeatureAction(
         label: 'Fotos',
         description: 'Bilder und Erinnerungen',
         icon: Icons.photo_library_rounded,
         color: const Color(0xFFF59E0B),
         builder: (_) => const PhotosScreen(),
-      ),
-      _FeatureAction(
-        label: 'Shopping',
-        description: 'Einkaufsliste gemeinsam pflegen',
-        icon: Icons.shopping_cart_rounded,
-        color: const Color(0xFFEC4899),
-        builder: (_) => const ShoppingScreen(),
       ),
       _FeatureAction(
         label: 'Kontakte',
@@ -131,20 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.location_on_rounded,
         color: const Color(0xFFF97316),
         builder: (_) => const LocationScreen(),
-      ),
-      _FeatureAction(
-        label: 'Meetups',
-        description: 'Gemeinsame Aktivitäten und Treffen',
-        icon: Icons.groups_rounded,
-        color: const Color(0xFF10B981),
-        builder: (_) => const MeetupScreen(),
-      ),
-      _FeatureAction(
-        label: 'Marktplatz',
-        description: 'Nachhilfe, Betreuung und Verkaufen',
-        icon: Icons.storefront_rounded,
-        color: const Color(0xFF4F46E5),
-        builder: (_) => const MarketplaceScreen(),
       ),
       _FeatureAction(
         label: 'Geräte',
@@ -164,39 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const SafetyGuideScreen(),
       ),
       _FeatureAction(
-        label: 'Payment',
-        description: 'Zahlung und Abrechnung',
-        icon: Icons.payments_rounded,
-        color: const Color(0xFF14B8A6),
-        builder: (_) => PaymentScreen(
-          event: MeetupEvent(
-            id: 'home-payment-demo',
-            hosterId: 'host_demo_001',
-            title: 'Parentpeak Familien-Event',
-            description: 'Demo-Zahlung aus der Home-Übersicht',
-            category: EventCategory.socialGathering,
-            ageGroups: const [AgeGroup.mixed],
-            location: 'Berlin, Deutschland',
-            latitude: 52.52,
-            longitude: 13.405,
-            eventDate: DateTime.now().add(const Duration(days: 7)),
-            createdAt: DateTime.now(),
-            maxParticipants: 20,
-            photoUrl: 'https://via.placeholder.com/300x200?text=Parentpeak',
-            price: 2.99,
-          ),
-          amount: 2.99,
-        ),
-      ),
-      _FeatureAction(
-        label: 'Event',
-        description: 'Neues Familien-Event erstellen',
-        icon: Icons.add_circle_rounded,
-        color: const Color(0xFF8B5CF6),
-        builder: (_) => const CreateEventScreen(),
-      ),
-      _FeatureAction(
-        label: 'Backend',
+        label: 'Systemstatus',
         description: 'API-Verbindung und Endpunkte prüfen',
         icon: Icons.cloud_sync_rounded,
         color: const Color(0xFF0F766E),
@@ -226,9 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                 child: _buildSectionHeader(
-                  title: 'Alle Funktionen',
-                  subtitle:
-                      'Jede Funktion ist als eigene Tap-Kachel erreichbar',
+                  title: 'Schnellzugriff',
+                  subtitle: 'Die wichtigsten Funktionen auf einen Blick',
                 ),
               ),
             ),

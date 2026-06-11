@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
 import 'package:trusted_circle_demo/ui/meetup_screen.dart';
 import 'package:trusted_circle_demo/ui/marketplace_screen.dart';
 import 'package:trusted_circle_demo/ui/todo_screen.dart';
-import 'package:trusted_circle_demo/ui/shopping_screen.dart';
 import 'package:trusted_circle_demo/ui/photos_screen.dart';
-import 'package:trusted_circle_demo/ui/contacts_screen.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/location_screen.dart';
+
+class _QuickAction {
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _QuickAction({required this.label, required this.icon, required this.color});
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +24,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final List<_QuickAction> _quickActions = const [
+    _QuickAction(label: 'Kalender', icon: Icons.calendar_month_rounded, color: Color(0xFF2563EB)),
+    _QuickAction(label: 'To-do', icon: Icons.check_circle_rounded, color: Color(0xFF059669)),
+    _QuickAction(label: 'Familie', icon: Icons.people_alt_rounded, color: Color(0xFF7C3AED)),
+    _QuickAction(label: 'Fotos', icon: Icons.photo_library_rounded, color: Color(0xFFF59E0B)),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -56,223 +69,185 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.blue[300]!,
-              Colors.indigo[400]!,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Logo und Greeting
-                  Center(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 20),
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                Icons.family_restroom,
-                                size: 60,
-                                color: theme.colorScheme.primary,
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          '$greeting${_t('greeting_family')}',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.brightness == Brightness.dark
-                                ? Colors.grey[300]
-                                : Colors.grey[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Text(
-                    _t('what_today'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.grey[300]
-                          : Colors.grey[700],
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildFeatureCard(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                child: _buildHeroCard(theme, greeting),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildSectionHeader(
+                  title: 'Schnellaktionen',
+                  subtitle: 'Alles Wichtige in einem Tap',
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final action = _quickActions[index];
+                    return _buildQuickActionCard(
+                      context,
+                      label: action.label,
+                      icon: action.icon,
+                      color: action.color,
+                      onTap: () => _openQuickAction(context, action.label),
+                    );
+                  },
+                  childCount: _quickActions.length,
+                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.2,
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                child: _buildSectionHeader(
+                  title: _t('what_today'),
+                  subtitle: _t('all_features'),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate.fixed([
+                  _buildPrimaryCard(
                     context,
                     title: _t('activities_title'),
                     subtitle: _t('activities_subtitle'),
-                    color: const Color(0xFF10B981),
-                    icon: Icons.groups,
+                    icon: Icons.groups_rounded,
+                    color: const Color(0xFF0EA5A4),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const MeetupScreen()),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // 🛍️ Marktplatz Button
-                  _buildFeatureCard(
+                  const SizedBox(height: 12),
+                  _buildPrimaryCard(
                     context,
                     title: 'Marktplatz',
-                    subtitle: 'Nachhilfe, Betreuung & Kaufen/Verkaufen',
-                    color: const Color(0xFF6366F1),
-                    icon: Icons.shopping_bag_rounded,
+                    subtitle: 'Nachhilfe, Betreuung und Kaufen/Verkaufen',
+                    icon: Icons.storefront_rounded,
+                    color: const Color(0xFF4F46E5),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const MarketplaceScreen()),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    _t('all_features'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.grey[300]
-                          : Colors.grey[700],
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    children: [
-                      _buildSmallCard(
-                        context,
-                        icon: Icons.check_box_rounded,
-                        title: _t('todo'),
-                        color: const Color(0xFF00BFA5),
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const TodoScreen())),
-                      ),
-                      _buildSmallCard(
-                        context,
-                        icon: Icons.shopping_cart_rounded,
-                        title: _t('shopping'),
-                        color: const Color(0xFFFF6B9D),
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ShoppingScreen())),
-                      ),
-                      _buildSmallCard(
-                        context,
-                        icon: Icons.photo_library_rounded,
-                        title: _t('photos'),
-                        color: const Color(0xFFFFC107),
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const PhotosScreen())),
-                      ),
-                      _buildSmallCard(
-                        context,
-                        icon: Icons.contact_phone_rounded,
-                        title: _t('contacts'),
-                        color: const Color(0xFFE91E63),
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ContactsScreen())),
-                      ),
-                      _buildSmallCard(
-                        context,
-                        icon: Icons.calendar_month_rounded,
-                        title: _t('calendar'),
-                        color: const Color(0xFF2196F3),
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const CalendarScreen())),
-                      ),
-                      _buildSmallCard(
-                        context,
-                        icon: Icons.location_on_rounded,
-                        title: _t('location'),
-                        color: const Color(0xFFFF9800),
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const LocationScreen())),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      6,
-                      (index) => Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 5),
-                        width: index == 0 ? 28 : 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: index == 0
-                              ? theme.colorScheme.primary
-                              : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(5),
-                          boxShadow: index == 0
-                              ? [
-                                  BoxShadow(
-                                    color: theme.colorScheme.primary
-                                        .withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : [],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  const SizedBox(height: 12),
+                  _buildInfoCard(theme),
+                ]),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildFeatureCard(
+  Widget _buildHeroCard(ThemeData theme, String greeting) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.primary.withOpacity(0.82),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(0.22),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.family_restroom_rounded, color: Colors.white, size: 34),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$greeting 👋',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white.withOpacity(0.95),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Alles für eure Familie an einem Ort',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Termine, Chat und Familie schneller erreichen.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({required String title, required String subtitle}) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrimaryCard(
     BuildContext context, {
     required String title,
     required String subtitle,
@@ -280,115 +255,153 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     VoidCallback? onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+    final theme = Theme.of(context);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.16), color.withOpacity(0.06)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(icon, color: Colors.white, size: 28),
               ),
-              child: Icon(icon, color: Colors.white, size: 32),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.92),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      height: 1.3,
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_ios_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildSmallCard(
+  Widget _buildQuickActionCard(
     BuildContext context, {
+    required String label,
     required IconData icon,
-    required String title,
     required Color color,
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: Colors.white, size: 28),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
-            ),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildInfoCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.6)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(Icons.verified_user_rounded, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Schneller und klarer', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(
+                  'Weniger Ablenkung, mehr Fokus auf Termine, Familie und Chat.',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openQuickAction(BuildContext context, String label) {
+    switch (label) {
+      case 'Kalender':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarScreen()));
+        return;
+      case 'To-do':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const TodoScreen()));
+        return;
+      case 'Familie':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const FamilyProfileScreen()));
+        return;
+      case 'Fotos':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PhotosScreen()));
+        return;
+    }
   }
 }

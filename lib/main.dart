@@ -13,7 +13,6 @@ import 'package:trusted_circle_demo/logic/theme_service.dart';
 import 'package:trusted_circle_demo/logic/language_service.dart';
 import 'package:trusted_circle_demo/widgets/language_aware_widget.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 import 'package:trusted_circle_demo/widgets/language_provider.dart';
 
 // Global service instances
@@ -45,10 +44,7 @@ class DemoApp extends StatefulWidget {
       print('❌ ERROR: DemoApp state not found via GlobalKey!');
       return;
     }
-    state.setState(() {
-      state._currentThemeMode = mode;
-      print('   Set _currentThemeMode=$mode inside setState()');
-    });
+    state._setThemeMode(mode);
     print('   setState() called, rebuilding with themeMode=$mode');
   }
 
@@ -104,6 +100,14 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
         // Erzwinge einen Rebuild wenn die Sprache wechselt
       });
     }
+  }
+
+  void _setThemeMode(ThemeMode mode) {
+    if (!mounted) return;
+    setState(() {
+      _currentThemeMode = mode;
+      print('   Set _currentThemeMode=$mode inside setState()');
+    });
   }
 
   @override
@@ -183,57 +187,47 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
     }
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, ThemeData theme) {
-    final isSelected = _index == index;
-    return InkWell(
-      onTap: () => setState(() => _index = index),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(
-          icon,
-          color: isSelected ? theme.colorScheme.primary : Colors.grey[600],
-          size: 24,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
     final tabs = <Widget>[
-      LanguageAwareWidget(key: ValueKey(languageService.currentLanguage), child: const HomeScreen()),
-      LanguageAwareWidget(key: ValueKey(languageService.currentLanguage), child: const ChatScreen()),
-      LanguageAwareWidget(key: ValueKey(languageService.currentLanguage), child: FamilyProfileScreen()),
+      LanguageAwareWidget(key: ValueKey('home-${languageService.currentLanguage}'), child: const HomeScreen()),
+      LanguageAwareWidget(key: ValueKey('chat-${languageService.currentLanguage}'), child: const ChatScreen()),
+      LanguageAwareWidget(key: ValueKey('family-${languageService.currentLanguage}'), child: FamilyProfileScreen()),
     ];
 
     return Scaffold(
-      body: tabs[_index],
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => setState(() => _index = 1),
-        backgroundColor: theme.colorScheme.primary,
-        shape: const CircleBorder(),
-        elevation: 4,
-        child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 28),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        color: Colors.white,
-        elevation: 8,
-        notchMargin: 8,
-        shape: const CircularNotchedRectangle(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.home_rounded, 'Home', theme),
-              const SizedBox(width: 64), // Space for FAB
-              _buildNavItem(2, Icons.person_rounded, 'Profil', theme),
-            ],
+      body: IndexedStack(index: _index, children: tabs),
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          indicatorColor: theme.colorScheme.primaryContainer,
+          labelTextStyle: MaterialStateProperty.all(
+            theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (index) => setState(() => _index = index),
+          height: 76,
+          backgroundColor: theme.colorScheme.surface,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline_rounded),
+              selectedIcon: Icon(Icons.chat_bubble_rounded),
+              label: 'Chat',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.family_restroom_outlined),
+              selectedIcon: Icon(Icons.family_restroom_rounded),
+              label: 'Familie',
+            ),
+          ],
         ),
       ),
     );

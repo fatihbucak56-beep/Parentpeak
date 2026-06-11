@@ -58,19 +58,19 @@ class ThemeService extends ChangeNotifier {
   ThemeData getLightTheme() {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF4CAF50),
-        primary: const Color(0xFF4CAF50),
-        secondary: const Color(0xFFE91E63),
-        tertiary: const Color(0xFFFFC107),
-        surface: const Color(0xFFF5EFE7),
+        seedColor: const Color(0xFF0F766E),
+        primary: const Color(0xFF0F766E),
+        secondary: const Color(0xFF4F46E5),
+        tertiary: const Color(0xFFF59E0B),
+        surface: const Color(0xFFF7F7F5),
         brightness: Brightness.light,
       ),
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFF5EFE7),
+      scaffoldBackgroundColor: const Color(0xFFF7F7F5),
       cardTheme: const CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(20)),
+          borderRadius: BorderRadius.all(Radius.circular(24)),
         ),
         color: Colors.white,
       ),
@@ -120,9 +120,16 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        elevation: 4,
+        elevation: 3,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        indicatorColor: const Color(0xFFE0F2F1),
+        labelTextStyle: MaterialStateProperty.all(
+          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -131,10 +138,10 @@ class ThemeService extends ChangeNotifier {
   ThemeData getDarkTheme() {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF4CAF50),
-        primary: const Color(0xFF66BB6A),
-        secondary: const Color(0xFFEC407A),
-        tertiary: const Color(0xFFFFCA28),
+        seedColor: const Color(0xFF14B8A6),
+        primary: const Color(0xFF14B8A6),
+        secondary: const Color(0xFF818CF8),
+        tertiary: const Color(0xFFFBBF24),
         surface: const Color(0xFF121212),
         brightness: Brightness.dark,
       ),
@@ -143,7 +150,7 @@ class ThemeService extends ChangeNotifier {
       cardTheme: const CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(20)),
+          borderRadius: BorderRadius.all(Radius.circular(24)),
         ),
         color: Color(0xFF1E1E1E),
       ),
@@ -193,9 +200,16 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        elevation: 4,
+        elevation: 3,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: const Color(0xFF1E1E1E),
+        indicatorColor: const Color(0xFF263238),
+        labelTextStyle: MaterialStateProperty.all(
+          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
     );

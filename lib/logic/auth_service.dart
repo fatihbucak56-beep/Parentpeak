@@ -110,7 +110,7 @@ class AuthService {
   bool get isLoggedIn => _currentUser != null;
 
   bool _firebaseReady = false;
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  FirebaseAuth? _firebaseAuth;
 
   // Singleton
   static final AuthService instance = AuthService._();
@@ -122,7 +122,7 @@ class AuthService {
     await _tryInitFirebase();
 
     if (_firebaseReady) {
-      final firebaseUser = _firebaseAuth.currentUser;
+      final firebaseUser = _firebaseAuth?.currentUser;
       if (firebaseUser != null) {
         _currentUser = await _readOrCreateFirebaseUser(firebaseUser);
       }
@@ -164,7 +164,15 @@ class AuthService {
       }
 
       try {
-        final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+        final auth = _firebaseAuth;
+        if (auth == null) {
+          return AuthResult.fail(
+            AuthErrorCode.unknown,
+            'Firebase ist nicht verfügbar. Bitte später erneut versuchen.',
+          );
+        }
+
+        final credential = await auth.createUserWithEmailAndPassword(
           email: email.trim(),
           password: password,
         );
@@ -255,7 +263,15 @@ class AuthService {
       }
 
       try {
-        final credential = await _firebaseAuth.signInWithEmailAndPassword(
+        final auth = _firebaseAuth;
+        if (auth == null) {
+          return AuthResult.fail(
+            AuthErrorCode.unknown,
+            'Firebase ist nicht verfügbar. Bitte später erneut versuchen.',
+          );
+        }
+
+        final credential = await auth.signInWithEmailAndPassword(
           email: email.trim(),
           password: password,
         );
@@ -359,7 +375,10 @@ class AuthService {
 
   Future<void> logout() async {
     if (_firebaseReady) {
-      await _firebaseAuth.signOut();
+      final auth = _firebaseAuth;
+      if (auth != null) {
+        await auth.signOut();
+      }
       _currentUser = null;
       return;
     }
@@ -396,9 +415,11 @@ class AuthService {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp();
       }
+      _firebaseAuth = FirebaseAuth.instance;
       _firebaseReady = true;
     } catch (_) {
       _firebaseReady = false;
+      _firebaseAuth = null;
     }
   }
 

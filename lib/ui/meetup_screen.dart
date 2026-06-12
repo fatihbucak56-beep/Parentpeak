@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/event_service.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/ui/event_detail_screen.dart';
@@ -16,7 +17,9 @@ class _MeetupScreenState extends State<MeetupScreen> {
   List<MeetupEvent> _events = [];
   bool _isGridView = true;
   bool _isLoading = true;
-  List<AgeGroup> _selectedAgeGroups = [];
+  final List<AgeGroup> _selectedAgeGroups = [];
+  static const double _viewerLatitude = 52.5200;
+  static const double _viewerLongitude = 13.4050;
 
   @override
   void initState() {
@@ -27,7 +30,14 @@ class _MeetupScreenState extends State<MeetupScreen> {
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
     try {
-      final events = await _eventService.getEvents();
+      final viewerUserId =
+          AuthService.instance.currentUser?.uid ?? 'guest_user';
+      final events = await _eventService.getDiscoverableEventsForUser(
+        viewerUserId: viewerUserId,
+        viewerLatitude: _viewerLatitude,
+        viewerLongitude: _viewerLongitude,
+        ageGroups: _selectedAgeGroups,
+      );
       setState(() {
         _events = events;
         _isLoading = false;
@@ -237,6 +247,28 @@ class _MeetupScreenState extends State<MeetupScreen> {
                           ),
                         ),
                       ),
+
+                    if (event.visibility == EventVisibility.privateOnly)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'PRIVAT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -317,6 +349,14 @@ class _MeetupScreenState extends State<MeetupScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 4),
+              if (event.visibility == EventVisibility.privateOnly)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'Privat · nur für dich sichtbar',
+                    style: TextStyle(fontSize: 10, color: Colors.black54),
+                  ),
+                ),
               Row(
                 children: [
                   Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/event_service.dart';
 import 'package:trusted_circle_demo/logic/participation_service.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
@@ -15,8 +16,6 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
   final _eventService = EventService();
   final _participationService = ParticipationService();
 
-  static const String _currentHostId = 'host_demo_001';
-
   List<MeetupEvent> _hostedEvents = [];
   List<EventParticipation> _pendingRequests = [];
   bool _isLoading = true;
@@ -31,11 +30,13 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final currentHostId =
+          AuthService.instance.currentUser?.uid ?? 'host_demo_001';
       final events = await _eventService.getEvents();
       final myEvents =
-          events.where((e) => e.hosterId == _currentHostId).toList();
+          events.where((e) => e.hosterId == currentHostId).toList();
 
-      final requests = await _eventService.getPendingRequestsForHost(_currentHostId);
+      final requests = await _eventService.getPendingRequestsForHost(currentHostId);
 
       setState(() {
         _hostedEvents = myEvents;

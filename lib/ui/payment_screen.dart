@@ -77,6 +77,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
         photoUrl: widget.event.photoUrl,
         status: EventStatus.active,
         price: widget.event.price,
+        visibility: widget.event.visibility,
+        shareRadiusKm: widget.event.shareRadiusKm,
       );
 
       await _eventService.createEvent(eventWithPayment);

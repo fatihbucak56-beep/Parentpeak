@@ -1,4 +1,4 @@
-import 'dart:math' as Math;
+import 'dart:math' as math;
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/models/event_participation.dart';
 
@@ -48,7 +48,39 @@ class EventService {
   // Hole alle Events
   Future<List<MeetupEvent>> getEvents() async {
     await Future.delayed(Duration(milliseconds: 500)); // Simuliere API-Latenz
-    return _mockEvents;
+    return _mockEvents.where((e) => e.status == EventStatus.active).toList();
+  }
+
+  /// Events für den aktuellen Nutzer mit Sichtbarkeits- und Standortregeln.
+  Future<List<MeetupEvent>> getDiscoverableEventsForUser({
+    required String viewerUserId,
+    required double viewerLatitude,
+    required double viewerLongitude,
+    List<AgeGroup>? ageGroups,
+  }) async {
+    await Future.delayed(Duration(milliseconds: 500));
+
+    final visible = _mockEvents.where((event) {
+      if (event.status != EventStatus.active) return false;
+
+      final canSee = _canUserSeeEvent(
+        event: event,
+        viewerUserId: viewerUserId,
+        viewerLatitude: viewerLatitude,
+        viewerLongitude: viewerLongitude,
+      );
+      if (!canSee) return false;
+
+      if (ageGroups != null && ageGroups.isNotEmpty) {
+        final hasMatchingAgeGroup =
+            event.ageGroups.any((eg) => ageGroups.contains(eg));
+        if (!hasMatchingAgeGroup) return false;
+      }
+
+      return true;
+    }).toList();
+
+    return visible;
   }
 
   // Hole Events nach Entfernung gefiltert
@@ -71,6 +103,13 @@ class EventService {
 
       if (distance > radiusKm) return false;
 
+      if (event.visibility == EventVisibility.privateOnly) {
+        return false;
+      }
+
+      final shareRadius = event.shareRadiusKm ?? radiusKm;
+      if (distance > shareRadius) return false;
+
       if (ageGroups != null && ageGroups.isNotEmpty) {
         final hasMatchingAgeGroup =
             event.ageGroups.any((eg) => ageGroups.contains(eg));
@@ -79,6 +118,30 @@ class EventService {
 
       return event.status == EventStatus.active;
     }).toList();
+  }
+
+  bool _canUserSeeEvent({
+    required MeetupEvent event,
+    required String viewerUserId,
+    required double viewerLatitude,
+    required double viewerLongitude,
+  }) {
+    // Eigene Events sind immer sichtbar (auch private).
+    if (event.hosterId == viewerUserId) return true;
+
+    if (event.visibility == EventVisibility.privateOnly) {
+      return false;
+    }
+
+    // Öffentlich: nur im definierten Radius teilen.
+    final distance = _calculateDistance(
+      viewerLatitude,
+      viewerLongitude,
+      event.latitude,
+      event.longitude,
+    );
+    final shareRadius = event.shareRadiusKm ?? 25;
+    return distance <= shareRadius;
   }
 
   // Hole Event Details
@@ -127,13 +190,13 @@ class EventService {
 
   // Entfernung berechnen (in km)
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const p = 0.017453292519943295; // Math.PI / 180
+    const p = 0.017453292519943295; // math.pi / 180
     final a = 0.5 -
-        Math.cos((lat2 - lat1) * p) / 2 +
-        Math.cos(lat1 * p) *
-            Math.cos(lat2 * p) *
-            (1 - Math.cos((lon2 - lon1) * p)) /
+      math.cos((lat2 - lat1) * p) / 2 +
+      math.cos(lat1 * p) *
+        math.cos(lat2 * p) *
+        (1 - math.cos((lon2 - lon1) * p)) /
             2;
-    return 12742 * Math.asin(Math.sqrt(a)); // 2 * R; R = 6371 km
+    return 12742 * math.asin(math.sqrt(a)); // 2 * R; R = 6371 km
   }
 }

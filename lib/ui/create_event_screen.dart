@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/logic/event_service.dart';
-import 'package:trusted_circle_demo/logic/payment_service.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/ui/payment_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
@@ -20,11 +19,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   late TextEditingController _maxParticipantsController;
 
   EventCategory _selectedCategory = EventCategory.socialGathering;
-  List<AgeGroup> _selectedAgeGroups = [];
+  final List<AgeGroup> _selectedAgeGroups = [];
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = TimeOfDay.now();
-  double _latitude = 52.5200;
-  double _longitude = 13.4050;
+  final double _latitude = 52.5200;
+  final double _longitude = 13.4050;
+  EventVisibility _visibility = EventVisibility.publicNearby;
+  double _shareRadiusKm = 25;
 
   bool _isSubmitting = false;
 
@@ -101,7 +102,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
       final event = MeetupEvent(
         id: 'event_${DateTime.now().millisecondsSinceEpoch}',
-        hosterId: 'host_demo_001',
+        hosterId: AuthService.instance.currentUser?.uid ?? 'host_demo_001',
         title: _titleController.text,
         description: _descriptionController.text,
         category: _selectedCategory,
@@ -115,6 +116,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         photoUrl: 'https://via.placeholder.com/300x200?text=${_titleController.text}',
         status: EventStatus.active,
         price: 2.99, // Gebühr für das Veröffentlichen
+        visibility: _visibility,
+        shareRadiusKm:
+            _visibility == EventVisibility.publicNearby ? _shareRadiusKm : null,
       );
 
       // Gehe zu Payment-Screen
@@ -193,6 +197,66 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+
+              // Sichtbarkeit & Standortverteilung
+              Text(
+                'Sichtbarkeit',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              RadioListTile<EventVisibility>(
+                value: EventVisibility.publicNearby,
+                groupValue: _visibility,
+                title: const Text('Öffentlich (in deiner Nähe sichtbar)'),
+                subtitle:
+                    const Text('Andere Eltern sehen dein Event im Standort-Radius.'),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _visibility = value);
+                },
+              ),
+              RadioListTile<EventVisibility>(
+                value: EventVisibility.privateOnly,
+                groupValue: _visibility,
+                title: const Text('Privat (nur für dich sichtbar)'),
+                subtitle: const Text('Nicht im Feed anderer Nutzer veröffentlichen.'),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _visibility = value);
+                },
+              ),
+
+              if (_visibility == EventVisibility.publicNearby) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Teilen im Umkreis',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Text(
+                      '${_shareRadiusKm.toStringAsFixed(0)} km',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                Slider(
+                  value: _shareRadiusKm,
+                  min: 5,
+                  max: 100,
+                  divisions: 19,
+                  label: '${_shareRadiusKm.toStringAsFixed(0)} km',
+                  onChanged: (v) => setState(() => _shareRadiusKm = v),
+                ),
+              ],
+
               const SizedBox(height: 16),
 
               // Kategorie

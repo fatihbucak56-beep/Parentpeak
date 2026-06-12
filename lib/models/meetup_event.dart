@@ -6,6 +6,8 @@ enum ParticipationStatus { pending, approved, declined, cancelled }
 
 enum EventStatus { active, completed, cancelled }
 
+enum EventVisibility { privateOnly, publicNearby }
+
 class MeetupEvent {
   final String id;
   final String hosterId;
@@ -24,6 +26,8 @@ class MeetupEvent {
   final String photoUrl;
   final EventStatus status;
   final double? price; // Preis für die Veröffentlichung
+  final EventVisibility visibility;
+  final double? shareRadiusKm;
 
   MeetupEvent({
     required this.id,
@@ -43,6 +47,8 @@ class MeetupEvent {
     required this.photoUrl,
     this.status = EventStatus.active,
     this.price,
+    this.visibility = EventVisibility.publicNearby,
+    this.shareRadiusKm = 25,
   });
 
   bool get isFull => currentParticipants >= maxParticipants;
@@ -71,6 +77,9 @@ class MeetupEvent {
         photoUrl: json['photoUrl'] as String,
         status: EventStatus.values.byName(json['status'] as String),
         price: json['price'] as double?,
+        visibility: EventVisibility.values.byName(
+            json['visibility'] as String? ?? EventVisibility.publicNearby.name),
+        shareRadiusKm: (json['shareRadiusKm'] as num?)?.toDouble(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -91,5 +100,7 @@ class MeetupEvent {
         'photoUrl': photoUrl,
         'status': status.name,
         'price': price,
+        'visibility': visibility.name,
+        'shareRadiusKm': shareRadiusKm,
       };
 }

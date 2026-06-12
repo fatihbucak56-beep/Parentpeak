@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/ui/create_event_screen.dart';
+import 'package:trusted_circle_demo/ui/event_discover_screen.dart';
 import 'package:trusted_circle_demo/ui/meetup_screen.dart';
 
 class EventsActivitiesScreen extends StatelessWidget {
@@ -15,10 +16,24 @@ class EventsActivitiesScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _ActionCard(
-            icon: Icons.groups_rounded,
-            title: 'Aktivitäten entdecken',
-            subtitle: 'Meetups ansehen und passende Treffs finden',
+            icon: Icons.auto_awesome_rounded,
+            title: 'KI-Aktivitäten entdecken',
+            subtitle: 'KI findet Events, Theater, Kino & mehr in deiner Stadt',
             color: const Color(0xFF0EA5A4),
+            badge: 'KI',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EventDiscoverScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _ActionCard(
+            icon: Icons.groups_rounded,
+            title: 'Eltern-Meetups',
+            subtitle: 'Meetups ansehen und passende Treffs finden',
+            color: const Color(0xFF6366F1),
             onTap: () {
               Navigator.push(
                 context,
@@ -52,6 +67,7 @@ class _ActionCard extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onTap,
+    this.badge,
   });
 
   final IconData icon;
@@ -59,6 +75,7 @@ class _ActionCard extends StatelessWidget {
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
+  final String? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -69,9 +86,9 @@ class _ActionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: Ink(
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: color.withOpacity(0.25)),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -91,11 +108,37 @@ class _ActionCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
+                          ),
+                          if (badge != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                badge!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(

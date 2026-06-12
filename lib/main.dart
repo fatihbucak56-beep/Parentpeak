@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/logic/revocation_service_impl.dart';
 import 'package:trusted_circle_demo/logic/secure_storage.dart';
 import 'package:trusted_circle_demo/logic/background_sync_manager.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/home_screen.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
-import 'package:trusted_circle_demo/ui/parent_matching_screen.dart';
+import 'package:trusted_circle_demo/ui/auth/login_screen.dart';
+import 'package:trusted_circle_demo/ui/auth/paywall_screen.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/theme_service.dart';
 import 'package:trusted_circle_demo/logic/language_service.dart';
 import 'package:trusted_circle_demo/widgets/language_aware_widget.dart';
@@ -19,19 +22,39 @@ import 'package:trusted_circle_demo/widgets/language_provider.dart';
 // Global service instances
 final themeService = ThemeService();
 final languageService = LanguageService();
-
 // Global key for DemoApp state access
-final GlobalKey<_DemoAppState> demoAppKey = GlobalKey<_DemoAppState>();
+final GlobalKey<DemoAppState> demoAppKey = GlobalKey<DemoAppState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await dotenv.load();
   } catch (e) {
-    print('Warnung: .env konnte nicht geladen werden: $e');
+    debugPrint('Warnung: .env konnte nicht geladen werden: $e');
   }
+
+  final missingSecrets = APIConfig.getMissingRequiredSecrets();
+  final releaseConfigIssues = APIConfig.getReleaseConfigIssues();
+  if (kReleaseMode && missingSecrets.isNotEmpty) {
+    throw StateError(
+        'Fehlende Pflicht-Secrets für Release: ${missingSecrets.join(', ')}');
+  }
+  if (kReleaseMode && releaseConfigIssues.isNotEmpty) {
+    throw StateError(
+        'Unsichere Release-Konfiguration: ${releaseConfigIssues.join('; ')}');
+  }
+  if (!kReleaseMode && missingSecrets.isNotEmpty) {
+    debugPrint(
+        'Konfigurationshinweis: Fehlende Secrets (${missingSecrets.join(', ')}).');
+  }
+  if (!kReleaseMode && releaseConfigIssues.isNotEmpty) {
+    debugPrint(
+        'Konfigurationshinweis: ${releaseConfigIssues.join('; ')}');
+  }
+
   await BackgroundSyncManager.initialize();
   await NotificationService.instance.initialize();
+  await AuthService.instance.initialize();
   runApp(DemoApp(key: demoAppKey));
 }
 
@@ -39,21 +62,21 @@ class DemoApp extends StatefulWidget {
   const DemoApp({super.key});
 
   static void setThemeMode(ThemeMode mode) {
-    print('📱 DemoApp.setThemeMode() called with mode=$mode');
+    debugPrint('📱 DemoApp.setThemeMode() called with mode=$mode');
     final state = demoAppKey.currentState;
     if (state == null) {
-      print('❌ ERROR: DemoApp state not found via GlobalKey!');
+      debugPrint('❌ ERROR: DemoApp state not found via GlobalKey!');
       return;
     }
     state._setThemeMode(mode);
-    print('   setState() called, rebuilding with themeMode=$mode');
+    debugPrint('   setState() called, rebuilding with themeMode=$mode');
   }
 
   @override
-  State<DemoApp> createState() => _DemoAppState();
+  State<DemoApp> createState() => DemoAppState();
 }
 
-class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
+class DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
   late ThemeMode _currentThemeMode;
 
   @override
@@ -63,14 +86,14 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
     languageService.addListener(_onLanguageChanged);
     // Reset to light mode first, then initialize from preferences
     _currentThemeMode = ThemeMode.light;
-    print('✅ App starting with Light Mode');
+    debugPrint('✅ App starting with Light Mode');
     // Initialize theme from SharedPreferences
     themeService.initialize().then((_) {
       if (mounted) {
         setState(() {
           _currentThemeMode =
               themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light;
-          print(
+          debugPrint(
               '✅ Theme initialized: isDarkMode=${themeService.isDarkMode}, _currentThemeMode=$_currentThemeMode');
         });
       }
@@ -86,20 +109,20 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
 
   void _onThemeChanged() {
     if (mounted) {
-      print('🔄 _onThemeChanged() called');
-      print('   isDarkMode=${themeService.isDarkMode}');
-      print('   OLD _currentThemeMode=$_currentThemeMode');
+      debugPrint('🔄 _onThemeChanged() called');
+      debugPrint('   isDarkMode=${themeService.isDarkMode}');
+      debugPrint('   OLD _currentThemeMode=$_currentThemeMode');
       setState(() {
         _currentThemeMode =
             themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light;
-        print('   NEW _currentThemeMode=$_currentThemeMode');
+        debugPrint('   NEW _currentThemeMode=$_currentThemeMode');
       });
     }
   }
 
   void _onLanguageChanged() {
     if (mounted) {
-      print(
+      debugPrint(
           '🔄 _onLanguageChanged() called: currentLanguage=${languageService.currentLanguage}');
       setState(() {
         // Erzwinge einen Rebuild wenn die Sprache wechselt
@@ -111,13 +134,13 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _currentThemeMode = mode;
-      print('   Set _currentThemeMode=$mode inside setState()');
+      debugPrint('   Set _currentThemeMode=$mode inside setState()');
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final storage = const FlutterSecureStorageAdapter();
+    const storage = FlutterSecureStorageAdapter();
     // For demo purpose only: write a fake token so the production-style revocation
     // implementation can read it from secure storage. DO NOT use real tokens here.
     storage.write(key: 'ABACUS_API_TOKEN', value: 'demo-token');
@@ -157,7 +180,7 @@ class _DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       home: LanguageProviderWrapper(
-        child: ParentpeakAppShell(
+        child: AuthGate(
           devices: mockDevices,
           onRevoke: (uuid, name) async {
             try {
@@ -200,7 +223,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
 
   void _onLanguageChanged() {
     if (mounted) {
-      print(
+      debugPrint(
           '🌍 Sprache geändert in ParentpeakAppShell - erzwinge Rebuild aller Screens');
       setState(() {
         // Erzwinge einen Rebuild aller Tabs
@@ -218,12 +241,6 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
         child: const HomeScreen(),
       ),
       LanguageAwareWidget(
-          key: ValueKey('chat-${languageService.currentLanguage}'),
-          child: const ChatScreen()),
-        LanguageAwareWidget(
-          key: ValueKey('match-${languageService.currentLanguage}'),
-          child: const ParentMatchingScreen()),
-      LanguageAwareWidget(
           key: ValueKey('family-${languageService.currentLanguage}'),
           child: FamilyProfileScreen(
             devices: widget.devices,
@@ -236,7 +253,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           indicatorColor: theme.colorScheme.primaryContainer,
-          labelTextStyle: MaterialStateProperty.all(
+          labelTextStyle: WidgetStateProperty.all(
             theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
@@ -252,16 +269,6 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
               label: 'Home',
             ),
             NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline_rounded),
-              selectedIcon: Icon(Icons.chat_bubble_rounded),
-              label: 'KI Elternberatung',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.favorite_border_rounded),
-              selectedIcon: Icon(Icons.favorite_rounded),
-              label: 'Eltern Match',
-            ),
-            NavigationDestination(
               icon: Icon(Icons.family_restroom_outlined),
               selectedIcon: Icon(Icons.family_restroom_rounded),
               label: 'Familie',
@@ -272,3 +279,51 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
     );
   }
 }
+
+// ─── AuthGate ─────────────────────────────────────────────────────────────────
+// Entscheidet beim App-Start: Login, Paywall oder Haupt-App
+
+class AuthGate extends StatefulWidget {
+  final List<TrustedDevice> devices;
+  final Future<bool> Function(String, String) onRevoke;
+
+  const AuthGate({super.key, required this.devices, required this.onRevoke});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  void _refresh() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+
+    // Nicht eingeloggt → Login
+    if (user == null) {
+      return LoginScreen(
+        onLoginSuccess: _refresh,
+      );
+    }
+
+    // Trial abgelaufen & kein Premium → Paywall
+    if (!user.hasFullAccess) {
+      return PaywallScreen(
+        onSubscribed: _refresh,
+      );
+    }
+
+    // Eingeloggt & Zugang vorhanden → Haupt-App
+    return ParentpeakAppShell(
+      devices: widget.devices,
+      onRevoke: widget.onRevoke,
+    );
+  }
+}
+
+

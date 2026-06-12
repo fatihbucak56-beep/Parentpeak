@@ -34,6 +34,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
   Future<void> _search() async {
     final city = _cityCtrl.text.trim();
     if (city.isEmpty) return;
+    if (!mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -42,11 +43,13 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
 
     try {
       final results = await _agent.discoverEvents(city: city);
+      if (!mounted) return;
       setState(() {
         _events = results;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Suche fehlgeschlagen. Bitte noch einmal versuchen.';
         _isLoading = false;

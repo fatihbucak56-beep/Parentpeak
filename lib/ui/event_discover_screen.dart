@@ -48,7 +48,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Suche fehlgeschlagen. Bitte nochmal versuchen.';
+        _errorMessage = 'Suche fehlgeschlagen. Bitte noch einmal versuchen.';
         _isLoading = false;
       });
     }
@@ -76,64 +76,66 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxScrolled) => [
-          SliverAppBar(
-            expandedHeight: 160,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: const Color(0xFF0C2B2E),
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 56),
-              title: _buildSearchBar(theme),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0C1B1F), Color(0xFF126C69)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 60),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 48),
-                      Text(
-                        'Aktivitäten entdecken',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'KI findet Events für eure Familie',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
-              child: _buildCategoryFilter(theme),
+      appBar: AppBar(
+        title: const Text('Aktivitäten entdecken'),
+        backgroundColor: const Color(0xFF0C2B2E),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          _buildHeader(theme),
+          _buildCategoryFilter(theme),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: _buildBody(theme),
             ),
           ),
         ],
-        body: _buildBody(theme),
+      ),
+    );
+  }
+
+  Widget _buildHeader(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0C1B1F), Color(0xFF126C69)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0C2B2E).withValues(alpha: 0.2),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Passende Angebote in deiner Stadt',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildSearchBar(theme),
+        ],
       ),
     );
   }
 
   Widget _buildSearchBar(ThemeData theme) {
     return SizedBox(
-      height: 40,
+      height: 44,
       child: TextField(
         controller: _cityCtrl,
         onTap: () =>
@@ -156,7 +158,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
           ),
         ),
@@ -179,11 +181,12 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
     ];
 
     return Container(
-      height: 48,
+      height: 56,
+      padding: const EdgeInsets.only(top: 6, bottom: 6),
       color: const Color(0xFF0C2B2E),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: categories.length,
         itemBuilder: (context, i) {
           final cat = categories[i];
@@ -194,7 +197,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
               selected: isSelected,
-              label: Text(label, style: const TextStyle(fontSize: 12)),
+              label: Text(label, style: const TextStyle(fontSize: 12.5)),
               onSelected: (_) =>
                   setState(() => _selectedCategory = isSelected ? null : cat),
               backgroundColor:
@@ -206,7 +209,8 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
                     isSelected ? FontWeight.w700 : FontWeight.normal,
               ),
               side: BorderSide.none,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              visualDensity: VisualDensity.compact,
             ),
           );
         },
@@ -217,13 +221,14 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
   Widget _buildBody(ThemeData theme) {
     if (_isLoading) {
       return Center(
+        key: const ValueKey('loading'),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'KI sucht Events in ${_cityCtrl.text}...',
+              'Suche Events in ${_cityCtrl.text}...',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -235,6 +240,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
 
     if (_errorMessage != null) {
       return Center(
+        key: const ValueKey('error'),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -258,6 +264,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
 
     if (events.isEmpty) {
       return Center(
+        key: const ValueKey('empty'),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -277,6 +284,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
     }
 
     return RefreshIndicator(
+      key: const ValueKey('list'),
       onRefresh: _search,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -306,7 +314,7 @@ class _EventDiscoverScreenState extends State<EventDiscoverScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Diese Events wurden vom KI-Agenten für ${_cityCtrl.text} entdeckt. Zum Aktualisieren nach unten ziehen.',
+              'Diese Events wurden automatisch für ${_cityCtrl.text} zusammengestellt. Zum Aktualisieren nach unten ziehen.',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: const Color(0xFF0EA5A4)),
             ),

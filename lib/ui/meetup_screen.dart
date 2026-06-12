@@ -73,7 +73,7 @@ class _MeetupScreenState extends State<MeetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Aktivitäten & Treffs'),
+        title: const Text('Aktivitäten & Treffen'),
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton(
@@ -89,10 +89,36 @@ class _MeetupScreenState extends State<MeetupScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined,
+                          color: Color(0xFF1D4ED8)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Öffentliche Events werden nach Standort geteilt. Private Events siehst nur du.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF1E3A8A),
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 // Filter-Chips für Altersgruppen
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
                   child: Row(
                     children: AgeGroup.values
                         .map(
@@ -102,6 +128,16 @@ class _MeetupScreenState extends State<MeetupScreen> {
                               label: Text(_getAgeGroupLabel(ageGroup)),
                               selected: _selectedAgeGroups.contains(ageGroup),
                               onSelected: (_) => _filterByAgeGroup(ageGroup),
+                              selectedColor: const Color(0xFFDBEAFE),
+                              checkmarkColor: const Color(0xFF1D4ED8),
+                              labelStyle: TextStyle(
+                                color: _selectedAgeGroups.contains(ageGroup)
+                                    ? const Color(0xFF1D4ED8)
+                                    : null,
+                                fontWeight: _selectedAgeGroups.contains(ageGroup)
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
                             ),
                           ),
                         )
@@ -118,23 +154,26 @@ class _MeetupScreenState extends State<MeetupScreen> {
                         '${_filteredEvents.length} Aktivitäten gefunden',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.view_comfy,
-                              color: _isGridView ? Theme.of(context).primaryColor : Colors.grey,
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildViewToggleButton(
+                              icon: Icons.view_comfy,
+                              selected: _isGridView,
+                              onTap: () => setState(() => _isGridView = true),
                             ),
-                            onPressed: () => setState(() => _isGridView = true),
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.list,
-                              color: !_isGridView ? Theme.of(context).primaryColor : Colors.grey,
+                            _buildViewToggleButton(
+                              icon: Icons.list,
+                              selected: !_isGridView,
+                              onTap: () => setState(() => _isGridView = false),
                             ),
-                            onPressed: () => setState(() => _isGridView = false),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -153,6 +192,14 @@ class _MeetupScreenState extends State<MeetupScreen> {
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                       color: Colors.grey[600],
                                     ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Passe die Altersgruppe an oder erstelle ein neues Event.',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey[500],
+                                    ),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -315,6 +362,29 @@ class _MeetupScreenState extends State<MeetupScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewToggleButton({
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected ? Colors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            icon,
+            size: 18,
+            color: selected ? Theme.of(context).primaryColor : Colors.grey,
+          ),
         ),
       ),
     );

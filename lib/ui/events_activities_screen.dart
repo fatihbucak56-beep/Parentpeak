@@ -8,53 +8,92 @@ class EventsActivitiesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Events & Aktivitäten'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _ActionCard(
-            icon: Icons.auto_awesome_rounded,
-            title: 'KI-Aktivitäten entdecken',
-            subtitle: 'KI findet Events, Theater, Kino & mehr in deiner Stadt',
-            color: const Color(0xFF0EA5A4),
-            badge: 'KI',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EventDiscoverScreen()),
-              );
-            },
+      appBar: AppBar(title: const Text('Events & Aktivitäten')),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFF3FAF9), Color(0xFFF7F8FE), Color(0xFFFFFAF2)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          const SizedBox(height: 12),
-          _ActionCard(
-            icon: Icons.groups_rounded,
-            title: 'Eltern-Meetups',
-            subtitle: 'Meetups ansehen und passende Treffs finden',
-            color: const Color(0xFF6366F1),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MeetupScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          _ActionCard(
-            icon: Icons.add_circle_rounded,
-            title: 'Event erstellen',
-            subtitle: 'Neues Familien-Event planen und teilen',
-            color: const Color(0xFF8B5CF6),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateEventScreen()),
-              );
-            },
-          ),
-        ],
+        ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Entdecke Aktivitäten, die zu euch passen',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Finde lokale Angebote, tausche dich mit Eltern aus oder veröffentliche eigene Events.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ActionCard(
+              icon: Icons.auto_awesome_rounded,
+              title: 'Aktivitäten entdecken',
+              subtitle: 'Events, Theater, Kino und mehr in deiner Stadt finden',
+              color: const Color(0xFF0EA5A4),
+              badge: 'Empfohlen',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EventDiscoverScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _ActionCard(
+              icon: Icons.groups_rounded,
+              title: 'Eltern-Meetups',
+              subtitle: 'Meetups ansehen und passende Treffen finden',
+              color: const Color(0xFF2563EB),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MeetupScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _ActionCard(
+              icon: Icons.add_circle_rounded,
+              title: 'Event erstellen',
+              subtitle: 'Neues Familien-Event planen und veröffentlichen',
+              color: const Color(0xFFF59E0B),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateEventScreen()),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -83,12 +122,19 @@ class _ActionCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: Ink(
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.1),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -125,13 +171,13 @@ class _ActionCard extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: color,
+                                color: color.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
                                 badge!,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: color,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -143,12 +189,27 @@ class _ActionCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: color,
+                  ),
+                ),
               ],
             ),
           ),

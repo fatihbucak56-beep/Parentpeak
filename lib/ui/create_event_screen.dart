@@ -83,7 +83,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAgeGroups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte mindestens eine Altersgruppe auswählen')),
+        const SnackBar(
+            content: Text('Bitte mindestens eine Altersgruppe auswählen')),
       );
       return;
     }
@@ -113,7 +114,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         eventDate: eventDateTime,
         createdAt: DateTime.now(),
         maxParticipants: int.parse(_maxParticipantsController.text),
-        photoUrl: 'https://via.placeholder.com/300x200?text=${_titleController.text}',
+        photoUrl:
+            'https://via.placeholder.com/300x200?text=${_titleController.text}',
         status: EventStatus.active,
         price: 2.99, // Gebühr für das Veröffentlichen
         visibility: _visibility,
@@ -145,275 +147,313 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Aktivität erstellen'),
+        title: const Text('Aktivität veröffentlichen'),
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Titel
-              Text(
-                'Grundinformationen',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Titel der Aktivität',
-                  hintText: 'z.B. Spielplatz Treffen',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return 'Bitte einen Titel eingeben';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Beschreibung',
-                  hintText: 'Beschreibe deine Aktivität...',
-                  prefixIcon: Icon(Icons.description),
-                ),
-                maxLines: 4,
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return 'Bitte eine Beschreibung eingeben';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Sichtbarkeit & Standortverteilung
-              Text(
-                'Sichtbarkeit',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              RadioListTile<EventVisibility>(
-                value: EventVisibility.publicNearby,
-                groupValue: _visibility,
-                title: const Text('Öffentlich (in deiner Nähe sichtbar)'),
-                subtitle:
-                    const Text('Andere Eltern sehen dein Event im Standort-Radius.'),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _visibility = value);
-                },
-              ),
-              RadioListTile<EventVisibility>(
-                value: EventVisibility.privateOnly,
-                groupValue: _visibility,
-                title: const Text('Privat (nur für dich sichtbar)'),
-                subtitle: const Text('Nicht im Feed anderer Nutzer veröffentlichen.'),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _visibility = value);
-                },
-              ),
-
-              if (_visibility == EventVisibility.publicNearby) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Teilen im Umkreis',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    Text(
-                      '${_shareRadiusKm.toStringAsFixed(0)} km',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-                Slider(
-                  value: _shareRadiusKm,
-                  min: 5,
-                  max: 100,
-                  divisions: 19,
-                  label: '${_shareRadiusKm.toStringAsFixed(0)} km',
-                  onChanged: (v) => setState(() => _shareRadiusKm = v),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              // Kategorie
-              DropdownButtonFormField<EventCategory>(
-                value: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Kategorie',
-                  prefixIcon: Icon(Icons.category),
-                ),
-                items: EventCategory.values
-                    .map(
-                      (category) => DropdownMenuItem(
-                        value: category,
-                        child: Text(_getCategoryLabel(category)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedCategory = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Altersgruppen
-              Text(
-                'Zielgruppe (Altersgruppen)',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: AgeGroup.values
-                    .map(
-                      (ageGroup) => FilterChip(
-                        label: Text(_getAgeGroupLabel(ageGroup)),
-                        selected: _selectedAgeGroups.contains(ageGroup),
-                        onSelected: (_) => _toggleAgeGroup(ageGroup),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 24),
-
-              // Datum & Zeit
-              Text(
-                'Termin',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ListTile(
-                      leading: const Icon(Icons.calendar_today),
-                      title: Text(
-                        '${_selectedDate.day}.${_selectedDate.month}.${_selectedDate.year}',
-                      ),
-                      onTap: _selectDate,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFF5FBFA), Color(0xFFF9FAFD)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant
+                          .withValues(alpha: 0.4),
                     ),
                   ),
-                  Expanded(
-                    child: ListTile(
-                      leading: const Icon(Icons.schedule),
-                      title: Text(
-                        '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
-                      ),
-                      onTap: _selectTime,
+                  child: Text(
+                    'Erstelle ein Event in wenigen Schritten und entscheide, ob es privat oder öffentlich geteilt wird.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.35,
                     ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Titel
+                Text(
+                  'Grundinformationen',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Titel der Aktivität',
+                    hintText: 'z. B. Spielplatz-Treffen',
+                    prefixIcon: Icon(Icons.title),
+                  ),
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Bitte einen Titel eingeben';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Beschreibung',
+                    hintText: 'Beschreibe deine Aktivität...',
+                    prefixIcon: Icon(Icons.description),
+                  ),
+                  maxLines: 4,
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Bitte eine Beschreibung eingeben';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Sichtbarkeit & Standortverteilung
+                Text(
+                  'Sichtbarkeit',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                RadioListTile<EventVisibility>(
+                  value: EventVisibility.publicNearby,
+                  groupValue: _visibility,
+                  title: const Text('Öffentlich (in deiner Nähe sichtbar)'),
+                  subtitle: const Text(
+                      'Andere Eltern sehen dein Event im Standort-Radius.'),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _visibility = value);
+                  },
+                ),
+                RadioListTile<EventVisibility>(
+                  value: EventVisibility.privateOnly,
+                  groupValue: _visibility,
+                  title: const Text('Privat (nur für dich sichtbar)'),
+                  subtitle: const Text(
+                      'Nicht im Feed anderer Nutzer veröffentlichen.'),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _visibility = value);
+                  },
+                ),
+
+                if (_visibility == EventVisibility.publicNearby) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Öffentlich teilen im Umkreis',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      Text(
+                        '${_shareRadiusKm.toStringAsFixed(0)} km',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: _shareRadiusKm,
+                    min: 5,
+                    max: 100,
+                    divisions: 19,
+                    label: '${_shareRadiusKm.toStringAsFixed(0)} km',
+                    onChanged: (v) => setState(() => _shareRadiusKm = v),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
 
-              // Ort
-              TextFormField(
-                controller: _locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Treffpunkt',
-                  prefixIcon: Icon(Icons.location_on),
-                  hintText: 'z.B. Zentralpark, Berlin',
-                ),
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return 'Bitte einen Ort eingeben';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Max Teilnehmer
-              TextFormField(
-                controller: _maxParticipantsController,
-                decoration: const InputDecoration(
-                  labelText: 'Maximale Teilnehmerzahl',
-                  prefixIcon: Icon(Icons.people),
-                  hintText: '10',
+                // Kategorie
+                DropdownButtonFormField<EventCategory>(
+                  value: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Kategorie',
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  items: EventCategory.values
+                      .map(
+                        (category) => DropdownMenuItem(
+                          value: category,
+                          child: Text(_getCategoryLabel(category)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedCategory = value);
+                    }
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return 'Bitte eine Zahl eingeben';
-                  }
-                  if (int.tryParse(value!) == null) {
-                    return 'Bitte nur Zahlen eingeben';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-              // Gebühr Info
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue[200]!),
+                // Altersgruppen
+                Text(
+                  'Zielgruppe (Altersgruppen)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
-                child: Row(
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: AgeGroup.values
+                      .map(
+                        (ageGroup) => FilterChip(
+                          label: Text(_getAgeGroupLabel(ageGroup)),
+                          selected: _selectedAgeGroups.contains(ageGroup),
+                          onSelected: (_) => _toggleAgeGroup(ageGroup),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 24),
+
+                // Datum & Zeit
+                Text(
+                  'Termin',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    Icon(Icons.info, color: Colors.blue[700]),
-                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'Diese Aktivität wird mit 2,99 € veröffentlicht',
-                        style: TextStyle(color: Colors.blue[700]),
+                      child: ListTile(
+                        leading: const Icon(Icons.calendar_today),
+                        title: Text(
+                          '${_selectedDate.day}.${_selectedDate.month}.${_selectedDate.year}',
+                        ),
+                        onTap: _selectDate,
+                      ),
+                    ),
+                    Expanded(
+                      child: ListTile(
+                        leading: const Icon(Icons.schedule),
+                        title: Text(
+                          '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+                        ),
+                        onTap: _selectTime,
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isSubmitting ? null : _submitForm,
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check),
-                  label: const Text('Zur Zahlung'),
+                // Ort
+                TextFormField(
+                  controller: _locationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Treffpunkt',
+                    prefixIcon: Icon(Icons.location_on),
+                    hintText: 'z.B. Zentralpark, Berlin',
+                  ),
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Bitte einen Ort eingeben';
+                    }
+                    return null;
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                // Max Teilnehmer
+                TextFormField(
+                  controller: _maxParticipantsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Maximale Teilnehmerzahl',
+                    prefixIcon: Icon(Icons.people),
+                    hintText: '10',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Bitte eine Zahl eingeben';
+                    }
+                    if (int.tryParse(value!) == null) {
+                      return 'Bitte nur Zahlen eingeben';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Gebühr Info
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info, color: Color(0xFF047857)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Veröffentlichungsgebühr: 2,99 € pro Event',
+                          style: const TextStyle(color: Color(0xFF047857)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: _isSubmitting ? null : _submitForm,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check),
+                    label: const Text('Weiter zur Zahlung'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

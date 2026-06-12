@@ -28,7 +28,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Future<void> _processPayment() async {
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte stimme den Bedingungen zu')),
+        const SnackBar(content: Text('Bitte akzeptiere die Bedingungen')),
       );
       return;
     }
@@ -146,179 +146,246 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => !_isProcessing,
+    return PopScope(
+      canPop: !_isProcessing,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Zahlungsbestätigung'),
+          title: const Text('Zahlung abschließen'),
           elevation: 0,
           automaticallyImplyLeading: !_isProcessing,
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Event Summary
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFF8FAFC), Color(0xFFF0F9FF)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.86),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: const Text(
+                    'Prüfe deine Angaben und bestätige die Zahlungsart, um dein Event zu veröffentlichen.',
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bestellübersicht',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
+                const SizedBox(height: 16),
+                // Event Summary
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bestellübersicht',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.event.title,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
                           ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          if (widget.event.visibility ==
+                              EventVisibility.privateOnly)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                'PRIVAT',
+                                style: TextStyle(
+                                    fontSize: 10, fontWeight: FontWeight.w700),
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDBEAFE),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                'ÖFFENTLICH',
+                                style: TextStyle(
+                                    fontSize: 10, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const Divider(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Veröffentlichungsgebühr'),
+                          Text(
+                            '${widget.amount.toStringAsFixed(2)} €',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Zahlungsmethode
+                Text(
+                  'Zahlungsmethode',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 12),
+
+                // Stripe Option
+                Card(
+                  child: RadioListTile<String>(
+                    title: Row(
                       children: [
-                        Text('Aktivität: ${widget.event.title}'),
-                        const Text(''),
+                        const Icon(Icons.credit_card, size: 20),
+                        const SizedBox(width: 8),
+                        const Text('Stripe'),
                       ],
                     ),
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    subtitle: const Text('Visa, Mastercard, etc.'),
+                    value: 'stripe',
+                    groupValue: _selectedPaymentMethod,
+                    onChanged: _isProcessing
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => _selectedPaymentMethod = value);
+                            }
+                          },
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // PayPal Option
+                Card(
+                  child: RadioListTile<String>(
+                    title: Row(
                       children: [
-                        const Text('Veröffentlichungsgebühr'),
-                        Text(
-                          '${widget.amount.toStringAsFixed(2)} €',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        const Icon(Icons.payment, size: 20),
+                        const SizedBox(width: 8),
+                        const Text('PayPal'),
+                      ],
+                    ),
+                    subtitle: const Text('Bezahl mit deinem PayPal-Konto'),
+                    value: 'paypal',
+                    groupValue: _selectedPaymentMethod,
+                    onChanged: _isProcessing
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => _selectedPaymentMethod = value);
+                            }
+                          },
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Sicherheits-Hinweis
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock,
+                          color: Color(0xFF1D4ED8), size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Deine Zahlungsdaten sind sicher verschlüsselt',
+                          style: const TextStyle(
+                              color: Color(0xFF1D4ED8), fontSize: 12),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Zahlungsmethode
-              Text(
-                'Zahlungsmethode',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 12),
-
-              // Stripe Option
-              Card(
-                child: RadioListTile<String>(
-                  title: Row(
-                    children: [
-                      const Icon(Icons.credit_card, size: 20),
-                      const SizedBox(width: 8),
-                      const Text('Stripe'),
+                      ),
                     ],
                   ),
-                  subtitle: const Text('Visa, Mastercard, etc.'),
-                  value: 'stripe',
-                  groupValue: _selectedPaymentMethod,
+                ),
+                const SizedBox(height: 24),
+
+                // Terms & Conditions
+                CheckboxListTile(
+                  title: const Text('Bedingungen akzeptieren'),
+                  subtitle:
+                      const Text('Ich akzeptiere die Zahlungsbedingungen.'),
+                  value: _agreeToTerms,
                   onChanged: _isProcessing
                       ? null
                       : (value) {
-                          if (value != null) {
-                            setState(() => _selectedPaymentMethod = value);
-                          }
+                          setState(() => _agreeToTerms = value ?? false);
                         },
+                  controlAffinity: ListTileControlAffinity.leading,
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 24),
 
-              // PayPal Option
-              Card(
-                child: RadioListTile<String>(
-                  title: Row(
-                    children: [
-                      const Icon(Icons.payment, size: 20),
-                      const SizedBox(width: 8),
-                      const Text('PayPal'),
-                    ],
-                  ),
-                  subtitle: const Text('Bezahl mit deinem PayPal-Konto'),
-                  value: 'paypal',
-                  groupValue: _selectedPaymentMethod,
-                  onChanged: _isProcessing
-                      ? null
-                      : (value) {
-                          if (value != null) {
-                            setState(() => _selectedPaymentMethod = value);
-                          }
-                        },
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Sicherheits-Hinweis
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock, color: Colors.blue[700], size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Deine Zahlungsdaten sind sicher verschlüsselt',
-                        style: TextStyle(color: Colors.blue[700], fontSize: 12),
+                // Pay Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Terms & Conditions
-              CheckboxListTile(
-                title: const Text('Bedingungen akzeptieren'),
-                subtitle: const Text('Ich akzeptiere die Zahlungsbedingungen'),
-                value: _agreeToTerms,
-                onChanged: _isProcessing
-                    ? null
-                    : (value) {
-                        setState(() => _agreeToTerms = value ?? false);
-                      },
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              const SizedBox(height: 24),
-
-              // Pay Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: (!_agreeToTerms || _isProcessing)
-                      ? null
-                      : _processPayment,
-                  icon: _isProcessing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.payment),
-                  label: Text(
-                    _isProcessing
-                        ? 'Wird verarbeitet...'
-                        : '${widget.amount.toStringAsFixed(2)} € zahlen',
+                    onPressed: (!_agreeToTerms || _isProcessing)
+                        ? null
+                        : _processPayment,
+                    icon: _isProcessing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.payment),
+                    label: Text(
+                      _isProcessing
+                          ? 'Wird verarbeitet...'
+                          : 'Jetzt ${widget.amount.toStringAsFixed(2)} € zahlen',
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

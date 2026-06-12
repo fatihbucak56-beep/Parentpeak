@@ -21,6 +21,20 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  void _insertIntoEmail(String value) {
+    final currentText = _emailCtrl.text;
+    final selection = _emailCtrl.selection;
+
+    final start = selection.start >= 0 ? selection.start : currentText.length;
+    final end = selection.end >= 0 ? selection.end : currentText.length;
+
+    final updated = currentText.replaceRange(start, end, value);
+    _emailCtrl.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + value.length),
+    );
+  }
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -193,9 +207,13 @@ class _LoginScreenState extends State<LoginScreen> {
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             autocorrect: false,
-            enableSuggestions: false,            onTap: () {
+            enableSuggestions: false,
+            textCapitalization: TextCapitalization.none,
+            autofillHints: const [AutofillHints.username, AutofillHints.email],
+            onTap: () {
               SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-            },            decoration: InputDecoration(
+            },
+            decoration: InputDecoration(
               labelText: 'E-Mail',
               prefixIcon: const Icon(Icons.email_outlined),
               border: OutlineInputBorder(
@@ -209,6 +227,23 @@ class _LoginScreenState extends State<LoginScreen> {
               }
               return null;
             },
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('@ einfügen'),
+                  onPressed: () => _insertIntoEmail('@'),
+                ),
+                ActionChip(
+                  label: const Text('.com einfügen'),
+                  onPressed: () => _insertIntoEmail('.com'),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           TextFormField(

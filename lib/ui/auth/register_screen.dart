@@ -24,6 +24,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  void _insertIntoEmail(String value) {
+    final currentText = _emailCtrl.text;
+    final selection = _emailCtrl.selection;
+
+    final start = selection.start >= 0 ? selection.start : currentText.length;
+    final end = selection.end >= 0 ? selection.end : currentText.length;
+
+    final updated = currentText.replaceRange(start, end, value);
+    _emailCtrl.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + value.length),
+    );
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -185,6 +199,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             textInputAction: TextInputAction.next,
             autocorrect: false,
             enableSuggestions: false,
+            textCapitalization: TextCapitalization.none,
+            autofillHints: const [AutofillHints.username, AutofillHints.email],
             onTap: () {
               SystemChannels.textInput.invokeMethod<void>('TextInput.show');
             },
@@ -202,6 +218,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
               }
               return null;
             },
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('@ einfügen'),
+                  onPressed: () => _insertIntoEmail('@'),
+                ),
+                ActionChip(
+                  label: const Text('.com einfügen'),
+                  onPressed: () => _insertIntoEmail('.com'),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           TextFormField(

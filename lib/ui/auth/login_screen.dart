@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/ui/auth/register_screen.dart';
 
@@ -192,8 +193,9 @@ class _LoginScreenState extends State<LoginScreen> {
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             autocorrect: false,
-            enableSuggestions: false,
-            decoration: InputDecoration(
+            enableSuggestions: false,            onTap: () {
+              SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+            },            decoration: InputDecoration(
               labelText: 'E-Mail',
               prefixIcon: const Icon(Icons.email_outlined),
               border: OutlineInputBorder(

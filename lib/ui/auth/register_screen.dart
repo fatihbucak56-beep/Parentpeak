@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -184,6 +185,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             textInputAction: TextInputAction.next,
             autocorrect: false,
             enableSuggestions: false,
+            onTap: () {
+              SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+            },
             decoration: InputDecoration(
               labelText: 'E-Mail-Adresse',
               prefixIcon: const Icon(Icons.email_outlined),

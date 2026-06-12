@@ -8,16 +8,18 @@ PODS:
     - Firebase/CoreOnly
     - FirebaseMessaging (~> 12.14.0)
   - firebase_auth (6.5.2):
-    - Firebase/Auth (= 12.14.0)
+    - Firebase/Auth (~> 12.14.0)
+    - Firebase/CoreOnly (~> 12.14.0)
     - firebase_core
-    - Flutter
+    - FlutterMacOS
   - firebase_core (4.10.0):
-    - Firebase/CoreOnly (= 12.14.0)
-    - Flutter
+    - Firebase/CoreOnly (~> 12.14.0)
+    - FlutterMacOS
   - firebase_messaging (16.3.0):
-    - Firebase/Messaging (= 12.14.0)
+    - Firebase/CoreOnly (~> 12.14.0)
+    - Firebase/Messaging (~> 12.14.0)
     - firebase_core
-    - Flutter
+    - FlutterMacOS
   - FirebaseAppCheckInterop (12.14.0)
   - FirebaseAuth (12.14.0):
     - FirebaseAppCheckInterop (~> 12.14.0)
@@ -51,14 +53,14 @@ PODS:
     - GoogleUtilities/Reachability (~> 8.1)
     - GoogleUtilities/UserDefaults (~> 8.1)
     - nanopb (~> 3.30910.0)
-  - Flutter (1.0.0)
   - flutter_local_notifications (0.0.1):
-    - Flutter
+    - FlutterMacOS
   - flutter_secure_storage_darwin (10.0.0):
     - Flutter
     - FlutterMacOS
   - flutter_tts (0.0.1):
-    - Flutter
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
   - GoogleDataTransport (10.1.0):
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
@@ -93,26 +95,25 @@ PODS:
   - nanopb/decode (3.30910.0)
   - nanopb/encode (3.30910.0)
   - printing (1.0.0):
-    - Flutter
+    - FlutterMacOS
   - PromisesObjC (2.4.1)
-  - RecaptchaInterop (101.0.0)
   - share_plus (0.0.1):
-    - Flutter
+    - FlutterMacOS
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
 
 DEPENDENCIES:
-  - firebase_auth (from `.symlinks/plugins/firebase_auth/ios`)
-  - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
-  - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
-  - Flutter (from `Flutter`)
-  - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
-  - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
-  - flutter_tts (from `.symlinks/plugins/flutter_tts/ios`)
-  - printing (from `.symlinks/plugins/printing/ios`)
-  - share_plus (from `.symlinks/plugins/share_plus/ios`)
-  - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
+  - firebase_auth (from `Flutter/ephemeral/.symlinks/plugins/firebase_auth/macos`)
+  - firebase_core (from `Flutter/ephemeral/.symlinks/plugins/firebase_core/macos`)
+  - firebase_messaging (from `Flutter/ephemeral/.symlinks/plugins/firebase_messaging/macos`)
+  - flutter_local_notifications (from `Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos`)
+  - flutter_secure_storage_darwin (from `Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
+  - flutter_tts (from `Flutter/ephemeral/.symlinks/plugins/flutter_tts/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - printing (from `Flutter/ephemeral/.symlinks/plugins/printing/macos`)
+  - share_plus (from `Flutter/ephemeral/.symlinks/plugins/share_plus/macos`)
+  - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
 
 SPEC REPOS:
   trunk:
@@ -130,35 +131,34 @@ SPEC REPOS:
     - GTMSessionFetcher
     - nanopb
     - PromisesObjC
-    - RecaptchaInterop
 
 EXTERNAL SOURCES:
   firebase_auth:
-    :path: ".symlinks/plugins/firebase_auth/ios"
+    :path: Flutter/ephemeral/.symlinks/plugins/firebase_auth/macos
   firebase_core:
-    :path: ".symlinks/plugins/firebase_core/ios"
+    :path: Flutter/ephemeral/.symlinks/plugins/firebase_core/macos
   firebase_messaging:
-    :path: ".symlinks/plugins/firebase_messaging/ios"
-  Flutter:
-    :path: Flutter
+    :path: Flutter/ephemeral/.symlinks/plugins/firebase_messaging/macos
   flutter_local_notifications:
-    :path: ".symlinks/plugins/flutter_local_notifications/ios"
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos
   flutter_secure_storage_darwin:
-    :path: ".symlinks/plugins/flutter_secure_storage_darwin/darwin"
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_darwin/darwin
   flutter_tts:
-    :path: ".symlinks/plugins/flutter_tts/ios"
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_tts/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
   printing:
-    :path: ".symlinks/plugins/printing/ios"
+    :path: Flutter/ephemeral/.symlinks/plugins/printing/macos
   share_plus:
-    :path: ".symlinks/plugins/share_plus/ios"
+    :path: Flutter/ephemeral/.symlinks/plugins/share_plus/macos
   shared_preferences_foundation:
-    :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+    :path: Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin
 
 SPEC CHECKSUMS:
   Firebase: 7cc10425300768ec86292688af5cb228f0604bde
-  firebase_auth: 08d9e2155c59dee7b84db916334a017a1c22633f
-  firebase_core: 059f6939d27b5644ea96ad8ad71a9a6e17db74f1
-  firebase_messaging: 1f7160e8953184618d25f45ae0d7131cdab97965
+  firebase_auth: 1c2e2584804fde1ffc13c53754e699b8b8090f9a
+  firebase_core: bc742c821e3b12138346586aac5a03cc22028e8e
+  firebase_messaging: 60228212cf7bcd59f0b61912f85512563c297fde
   FirebaseAppCheckInterop: f123c0261a7b46f060e98fc2961651f1ac68f384
   FirebaseAuth: 01a77d472aec77ec008141e7d859d1b9cb8dc2cf
   FirebaseAuthInterop: 63056ef7f9602e79a8f8d756d4cb35f38e2927c3
@@ -167,20 +167,19 @@ SPEC CHECKSUMS:
   FirebaseCoreInternal: 090369a5fffd7423cf88006ab4d2ccc2173a8db9
   FirebaseInstallations: 7cdc919e29dc54306edeffdbdc1eed1a40d7d1e7
   FirebaseMessaging: 4803888ce3002188f24e19faa8d2326261538426
-  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_local_notifications: eda81afddbf18f8589f6ec069ce593c4c6378769
+  flutter_local_notifications: 14e285ca39907db50704f7f46c9ab7a526bd7ead
   flutter_secure_storage_darwin: 557817588b80e60213cbecb573c45c76b788018d
-  flutter_tts: 91ad1884033cd95ef6e9338754adad54f01f090f
+  flutter_tts: 64651204e5d276ffea5a910f942d5e9785a96085
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleUtilities: 4f2618a4a1e762a1ee134a1e2323bba9843e06da
   GTMSessionFetcher: 127211aeec0b1e904fc49f4f6f895dcc535b0ecf
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
-  printing: 233e1b73bd1f4a05615548e9b5a324c98588640b
+  printing: 1dd6a1fce2209ec240698e2439a4adbb9b427637
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
-  RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
-  share_plus: 8b6f8b3447e494cca5317c8c3073de39b3600d1f
+  share_plus: 1fa619de8392a4398bfaf176d441853922614e89
   shared_preferences_foundation: 5086985c1d43c5ba4d5e69a4e8083a389e2909e6
 
-PODFILE CHECKSUM: 62225db2c4c5cb76cae89104d7b8dcd26601adf3
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
 
 COCOAPODS: 1.16.2

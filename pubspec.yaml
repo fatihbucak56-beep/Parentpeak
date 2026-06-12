@@ -11,6 +11,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   http: ^1.1.0
   firebase_core: ^4.10.0
+  firebase_auth: ^6.0.0
   firebase_messaging: ^16.3.0
   shared_preferences: ^2.0.15
   intl: ^0.20.2
@@ -22,6 +23,11 @@ dependencies:
   timezone: ^0.11.0
   google_generative_ai: ^0.4.4
   flutter_svg: ^2.2.3
+  flutter_tts: ^4.2.5
+  share_plus: ^10.1.4
+  pdf: ^3.11.3
+  printing: ^5.14.3
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

@@ -65,84 +65,350 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: Text(
-                      'Dein Familienkreis ist dein vertrauter Kontaktkreis. Private Events kannst du später nur mit diesen Kontakten oder gezielten Einladungen teilen.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF1E3A8A),
-                        height: 1.35,
+                      color: Colors.white.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant
+                            .withValues(alpha: 0.4),
                       ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dein vertrauensvoller Kreis',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Teile private Events gezielt mit deinen Kontakten und bearbeite Anfragen in einem ruhigen Flow.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _InfoPill(
+                                icon: Icons.people_alt_rounded,
+                                label: 'Kontakte',
+                                value: _contacts.length.toString(),
+                                color: const Color(0xFF2563EB),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _InfoPill(
+                                icon: Icons.mark_email_unread_rounded,
+                                label: 'Offene Anfragen',
+                                value: _requests.length.toString(),
+                                color: const Color(0xFFF59E0B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Text(
-                    'Kontaktanfragen',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                  _SectionHeader(
+                    title: 'Kontaktanfragen',
+                    subtitle: _requests.isEmpty
+                        ? 'Keine offenen Anfragen'
+                        : '${_requests.length} offen',
                   ),
                   const SizedBox(height: 10),
                   if (_requests.isEmpty)
-                    const Text('Aktuell keine offenen Anfragen.')
+                    const _EmptyStateTile(
+                      icon: Icons.inbox_rounded,
+                      text: 'Aktuell keine offenen Anfragen.',
+                    )
                   else
                     ..._requests.map(
-                      (r) => Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person_add_alt_1_rounded),
-                          ),
-                          title: Text(r.fromDisplayName),
-                          subtitle: const Text('möchte dich zum Familienkreis hinzufügen'),
-                          trailing: Wrap(
-                            spacing: 6,
-                            children: [
-                              IconButton(
-                                tooltip: 'Ablehnen',
-                                onPressed: () => _respond(r, false),
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                              FilledButton(
-                                onPressed: () => _respond(r, true),
-                                child: const Text('Annehmen'),
-                              ),
-                            ],
-                          ),
+                      (r) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _RequestRow(
+                          request: r,
+                          onAccept: () => _respond(r, true),
+                          onDecline: () => _respond(r, false),
                         ),
                       ),
                     ),
                   const SizedBox(height: 18),
-                  Text(
-                    'Deine Kontakte',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                  _SectionHeader(
+                    title: 'Deine Kontakte',
+                    subtitle: _contacts.isEmpty
+                        ? 'Noch keine Kontakte verbunden'
+                        : '${_contacts.length} verbunden',
                   ),
                   const SizedBox(height: 10),
                   if (_contacts.isEmpty)
-                    const Text('Noch keine Kontakte verbunden.')
+                    const _EmptyStateTile(
+                      icon: Icons.people_outline_rounded,
+                      text: 'Noch keine Kontakte verbunden.',
+                    )
                   else
                     ..._contacts.map(
-                      (c) => Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.people_alt_rounded),
-                          ),
-                          title: Text(c.displayName),
-                          subtitle: Text('${c.city} • ${c.childrenSummary}'),
+                      (c) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _ContactRow(
+                          contact: c,
                         ),
                       ),
                     ),
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestRow extends StatelessWidget {
+  const _RequestRow({
+    required this.request,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  final FamilyConnectionRequest request;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.6),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 16,
+                child: Icon(Icons.person_add_alt_1_rounded, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  request.fromDisplayName,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onDecline,
+                  child: const Text('Ablehnen'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  onPressed: onAccept,
+                  child: const Text('Annehmen'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContactRow extends StatelessWidget {
+  const _ContactRow({required this.contact});
+
+  final FamilyContact contact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.6),
+        ),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 16,
+            child: Icon(Icons.people_alt_rounded, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  contact.displayName,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${contact.city} • ${contact.childrenSummary}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyStateTile extends StatelessWidget {
+  const _EmptyStateTile({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.6),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

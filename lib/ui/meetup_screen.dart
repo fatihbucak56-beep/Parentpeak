@@ -12,12 +12,15 @@ class MeetupScreen extends StatefulWidget {
   State<MeetupScreen> createState() => _MeetupScreenState();
 }
 
+enum FeedVisibilityFilter { all, publicOnly, familyCircle, inviteOnly }
+
 class _MeetupScreenState extends State<MeetupScreen> {
   final _eventService = EventService();
   List<MeetupEvent> _events = [];
   bool _isGridView = true;
   bool _isLoading = true;
   final List<AgeGroup> _selectedAgeGroups = [];
+  FeedVisibilityFilter _visibilityFilter = FeedVisibilityFilter.all;
   static const double _viewerLatitude = 52.5200;
   static const double _viewerLongitude = 13.4050;
 
@@ -63,10 +66,29 @@ class _MeetupScreenState extends State<MeetupScreen> {
   }
 
   List<MeetupEvent> get _filteredEvents {
-    if (_selectedAgeGroups.isEmpty) return _events;
-    return _events
-        .where((event) => event.ageGroups.any((ag) => _selectedAgeGroups.contains(ag)))
-        .toList();
+    final byAge = _selectedAgeGroups.isEmpty
+        ? _events
+        : _events
+            .where((event) =>
+                event.ageGroups.any((ag) => _selectedAgeGroups.contains(ag)))
+            .toList();
+
+    switch (_visibilityFilter) {
+      case FeedVisibilityFilter.all:
+        return byAge;
+      case FeedVisibilityFilter.publicOnly:
+        return byAge
+            .where((e) => e.visibility == EventVisibility.publicNearby)
+            .toList();
+      case FeedVisibilityFilter.familyCircle:
+        return byAge
+            .where((e) => e.visibility == EventVisibility.familyCircle)
+            .toList();
+      case FeedVisibilityFilter.inviteOnly:
+        return byAge
+            .where((e) => e.visibility == EventVisibility.inviteOnly)
+            .toList();
+    }
   }
 
   @override
@@ -142,6 +164,46 @@ class _MeetupScreenState extends State<MeetupScreen> {
                           ),
                         )
                         .toList(),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildVisibilityChip(
+                          label: 'Alle',
+                          selected: _visibilityFilter == FeedVisibilityFilter.all,
+                          onTap: () =>
+                              setState(() => _visibilityFilter = FeedVisibilityFilter.all),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildVisibilityChip(
+                          label: 'Öffentlich',
+                          selected:
+                              _visibilityFilter == FeedVisibilityFilter.publicOnly,
+                          onTap: () => setState(
+                              () => _visibilityFilter = FeedVisibilityFilter.publicOnly),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildVisibilityChip(
+                          label: 'Familienkreis',
+                          selected:
+                              _visibilityFilter == FeedVisibilityFilter.familyCircle,
+                          onTap: () => setState(
+                              () => _visibilityFilter = FeedVisibilityFilter.familyCircle),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildVisibilityChip(
+                          label: 'Nur eingeladen',
+                          selected:
+                              _visibilityFilter == FeedVisibilityFilter.inviteOnly,
+                          onTap: () => setState(
+                              () => _visibilityFilter = FeedVisibilityFilter.inviteOnly),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Toggle zwischen Grid und List View
@@ -386,6 +448,23 @@ class _MeetupScreenState extends State<MeetupScreen> {
             color: selected ? Theme.of(context).primaryColor : Colors.grey,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildVisibilityChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: const Color(0xFFDBEAFE),
+      labelStyle: TextStyle(
+        color: selected ? const Color(0xFF1D4ED8) : null,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
       ),
     );
   }

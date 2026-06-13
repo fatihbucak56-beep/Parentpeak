@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/logic/family_circle_service.dart';
+import 'package:trusted_circle_demo/models/event_invitation.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/models/event_participation.dart';
 
@@ -47,6 +49,8 @@ class EventService {
   ];
 
   static final List<EventParticipation> _mockParticipations = [];
+  static final List<EventInvitation> _mockInvitations = [];
+  static final Map<String, String> _eventInviteCodes = {};
 
   // Hole alle Events
   Future<List<MeetupEvent>> getEvents() async {
@@ -84,6 +88,76 @@ class EventService {
     }).toList();
 
     return visible;
+  }
+
+  Future<List<EventInvitation>> getInvitationsForUser(String userId) async {
+    await Future.delayed(const Duration(milliseconds: 220));
+    return _mockInvitations.where((i) => i.invitedUserId == userId).toList();
+  }
+
+  Future<void> respondToInvitation({
+    required String invitationId,
+    required bool accept,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 220));
+
+    final index = _mockInvitations.indexWhere((i) => i.id == invitationId);
+    if (index == -1) return;
+
+    final invite = _mockInvitations[index];
+    _mockInvitations[index] = EventInvitation(
+      id: invite.id,
+      eventId: invite.eventId,
+      hostUserId: invite.hostUserId,
+      invitedUserId: invite.invitedUserId,
+      createdAt: invite.createdAt,
+      status: accept
+          ? EventInvitationStatus.accepted
+          : EventInvitationStatus.declined,
+    );
+  }
+
+  String? getInviteCodeForEvent(String eventId) => _eventInviteCodes[eventId];
+
+  Future<EventInvitation?> joinEventByInviteCode({
+    required String code,
+    required String userId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 260));
+
+    String? targetEventId;
+    for (final entry in _eventInviteCodes.entries) {
+      if (entry.value.toUpperCase() == code.trim().toUpperCase()) {
+        targetEventId = entry.key;
+        break;
+      }
+    }
+
+    if (targetEventId == null) return null;
+
+    final event = await getEventById(targetEventId);
+    if (event == null) return null;
+
+    final existing = _mockInvitations.where(
+      (i) => i.eventId == targetEventId && i.invitedUserId == userId,
+    );
+
+    if (existing.isNotEmpty) {
+      final existingInvite = existing.first;
+      await respondToInvitation(invitationId: existingInvite.id, accept: true);
+      return _mockInvitations.firstWhere((i) => i.id == existingInvite.id);
+    }
+
+    final invite = EventInvitation(
+      id: 'inv_${DateTime.now().millisecondsSinceEpoch}_$userId',
+      eventId: targetEventId,
+      hostUserId: event.hosterId,
+      invitedUserId: userId,
+      createdAt: DateTime.now(),
+      status: EventInvitationStatus.accepted,
+    );
+    _mockInvitations.add(invite);
+    return invite;
   }
 
   // Hole Events nach Entfernung gefiltert
@@ -146,7 +220,11 @@ class EventService {
     }
 
     if (event.visibility == EventVisibility.inviteOnly) {
-      return event.invitedUserIds.contains(viewerUserId);
+      final invite = _mockInvitations.where((i) =>
+          i.eventId == event.id &&
+          i.invitedUserId == viewerUserId &&
+          i.status == EventInvitationStatus.accepted);
+      return invite.isNotEmpty;
     }
 
     // Öffentlich: nur im definierten Radius teilen.
@@ -174,6 +252,26 @@ class EventService {
   Future<MeetupEvent> createEvent(MeetupEvent event) async {
     await Future.delayed(Duration(milliseconds: 800));
     _mockEvents.add(event);
+
+    if (event.visibility == EventVisibility.inviteOnly &&
+        event.invitedUserIds.isNotEmpty) {
+      for (final userId in event.invitedUserIds) {
+        _mockInvitations.add(
+          EventInvitation(
+            id: 'inv_${event.id}_$userId',
+            eventId: event.id,
+            hostUserId: event.hosterId,
+            invitedUserId: userId,
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+
+      final code = _generateInviteCode(event.id);
+      _eventInviteCodes[event.id] = code;
+      debugPrint('Invite code for ${event.id}: $code');
+    }
+
     return event;
   }
 
@@ -214,5 +312,12 @@ class EventService {
         (1 - math.cos((lon2 - lon1) * p)) /
             2;
     return 12742 * math.asin(math.sqrt(a)); // 2 * R; R = 6371 km
+  }
+
+  String _generateInviteCode(String eventId) {
+    final suffix = eventId.length >= 4
+        ? eventId.substring(eventId.length - 4)
+        : eventId;
+    return 'PP-${suffix.toUpperCase()}';
   }
 }

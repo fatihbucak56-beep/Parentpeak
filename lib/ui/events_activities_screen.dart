@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/ui/create_event_screen.dart';
 import 'package:trusted_circle_demo/ui/event_discover_screen.dart';
+import 'package:trusted_circle_demo/ui/event_invitations_screen.dart';
 import 'package:trusted_circle_demo/ui/meetup_screen.dart';
 
 class EventsActivitiesScreen extends StatelessWidget {
@@ -90,6 +91,19 @@ class EventsActivitiesScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const CreateEventScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _ActionCard(
+              icon: Icons.mark_email_unread_rounded,
+              title: 'Einladungen',
+              subtitle: 'Event-Einladungen annehmen oder per Code beitreten',
+              color: const Color(0xFF4F46E5),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EventInvitationsScreen()),
                 );
               },
             ),

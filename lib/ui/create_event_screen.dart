@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:trusted_circle_demo/logic/event_service.dart';
 import 'package:trusted_circle_demo/logic/family_circle_service.dart';
 import 'package:trusted_circle_demo/models/family_contact.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
-import 'package:trusted_circle_demo/ui/payment_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -15,6 +16,7 @@ class CreateEventScreen extends StatefulWidget {
 
 class _CreateEventScreenState extends State<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _eventService = EventService();
   final _familyCircleService = FamilyCircleService.instance;
 
   late TextEditingController _titleController;
@@ -152,7 +154,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         photoUrl:
             'https://via.placeholder.com/300x200?text=${_titleController.text}',
         status: EventStatus.active,
-        price: 2.99, // Gebühr für das Veröffentlichen
+        price: null,
         visibility: _visibility,
         shareRadiusKm:
             _visibility == EventVisibility.publicNearby ? _shareRadiusKm : null,
@@ -160,17 +162,54 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           _visibility == EventVisibility.inviteOnly ? _selectedInvitees.toList() : const [],
       );
 
-      // Gehe zu Payment-Screen
+      await _eventService.createEvent(event);
+
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PaymentScreen(
-              event: event,
-              amount: event.price ?? 2.99,
+        if (_visibility == EventVisibility.inviteOnly) {
+          final code = _eventService.getInviteCodeForEvent(event.id);
+          await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Event erstellt'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Dein privates Event wurde erstellt.'),
+                  const SizedBox(height: 10),
+                  if (code != null) ...[
+                    const Text('Einladungscode:'),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      code,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                if (code != null)
+                  TextButton(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: code));
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Code kopieren'),
+                  ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Fertig'),
+                ),
+              ],
             ),
-          ),
-        );
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event erfolgreich veröffentlicht.')),
+          );
+        }
+
+        if (mounted) Navigator.of(context).pop();
       }
     } catch (e) {
       setState(() => _isSubmitting = false);
@@ -512,7 +551,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Gebühr Info
+                // Kostenhinweis
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -520,14 +559,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFFA7F3D0)),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.info, color: Color(0xFF047857)),
-                      const SizedBox(width: 12),
+                      Icon(Icons.verified_rounded, color: Color(0xFF047857)),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Veröffentlichungsgebühr: 2,99 € pro Event',
-                          style: const TextStyle(color: Color(0xFF047857)),
+                          'Event-Veröffentlichung ist in deinem App-Abo enthalten.',
+                          style: TextStyle(color: Color(0xFF047857)),
                         ),
                       ),
                     ],
@@ -553,7 +592,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.check),
-                    label: const Text('Weiter zur Zahlung'),
+                    label: const Text('Event veröffentlichen'),
                   ),
                 ),
               ],

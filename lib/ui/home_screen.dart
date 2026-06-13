@@ -40,6 +40,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _initialInviteHandled = false;
+  bool _showAllHomeTabs = false;
 
   @override
   void initState() {
@@ -170,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final primaryActions = featureActions.take(4).toList();
     final moreActions = featureActions.skip(4).toList();
+    final visibleGridActions = _showAllHomeTabs ? featureActions : primaryActions;
 
     String greeting = _t('greeting_morning');
     if (hour >= 12 && hour < 18) {
@@ -194,8 +196,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                 child: _buildSectionHeader(
                   title: 'Schnellzugriff',
-                  subtitle: 'Vier Kernbereiche für den Alltag',
+                  subtitle: _showAllHomeTabs
+                      ? 'Alle Bereiche als kompakte Kacheln'
+                      : 'Kernbereiche für den Alltag',
                 ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: _buildHomeModeSwitch(theme),
               ),
             ),
             SliverPadding(
@@ -203,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final action = primaryActions[index];
+                    final action = visibleGridActions[index];
                     return _buildFeatureTile(
                       context,
                       title: action.label,
@@ -216,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   },
-                  childCount: primaryActions.length,
+                  childCount: visibleGridActions.length,
                 ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
@@ -226,29 +236,60 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: _buildSectionHeader(
-                  title: 'Weitere Schnellzugriffe',
-                  subtitle: 'Kompakte Tabs für alle übrigen Bereiche',
+            if (!_showAllHomeTabs)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                  child: _buildSectionHeader(
+                    title: 'Weitere Schnellzugriffe',
+                    subtitle: 'Kompakte Tabs für alle übrigen Bereiche',
+                  ),
                 ),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: moreActions
-                      .map((action) => _buildMiniActionTab(context, action: action))
-                      .toList(),
+            if (!_showAllHomeTabs)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: moreActions
+                        .map((action) => _buildMiniActionTab(context, action: action))
+                        .toList(),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildHomeModeSwitch(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _HomeModeButton(
+              label: 'Kernbereiche',
+              selected: !_showAllHomeTabs,
+              onTap: () => setState(() => _showAllHomeTabs = false),
+            ),
+          ),
+          Expanded(
+            child: _HomeModeButton(
+              label: 'Alle Bereiche',
+              selected: _showAllHomeTabs,
+              onTap: () => setState(() => _showAllHomeTabs = true),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -455,6 +496,49 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeModeButton extends StatelessWidget {
+  const _HomeModeButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? theme.colorScheme.primary.withValues(alpha: 0.14)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),

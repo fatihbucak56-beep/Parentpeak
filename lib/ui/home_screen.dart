@@ -47,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   WeeklyImpulse? _weeklyImpulse;
   bool _isLoadingWeeklyImpulse = true;
   bool _initialInviteHandled = false;
+  bool _showMoreTools = false;
 
   @override
   void initState() {
@@ -245,6 +246,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ];
 
+    final primaryActions = featureActions.take(4).toList();
+    final moreActions = featureActions.skip(4).toList();
+
     String greeting = _t('greeting_morning');
     if (hour >= 12 && hour < 18) {
       greeting = _t('greeting_afternoon');
@@ -268,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                 child: _buildSectionHeader(
                   title: 'Schnellzugriff',
-                  subtitle: 'Die wichtigsten Funktionen auf einen Blick',
+                  subtitle: 'Vier Kernbereiche für den Alltag',
                 ),
               ),
             ),
@@ -277,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final action = featureActions[index];
+                    final action = primaryActions[index];
                     return _buildFeatureTile(
                       context,
                       title: action.label,
@@ -290,7 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   },
-                  childCount: featureActions.length,
+                  childCount: primaryActions.length,
                 ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
@@ -300,6 +304,74 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Weitere Tools',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${moreActions.length} zusätzliche Bereiche bei Bedarf',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() => _showMoreTools = !_showMoreTools);
+                        },
+                        icon: Icon(_showMoreTools
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded),
+                        label: Text(_showMoreTools ? 'Weniger' : 'Mehr'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_showMoreTools)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final action = moreActions[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _buildSlimActionTile(
+                          context,
+                          action: action,
+                        ),
+                      );
+                    },
+                    childCount: moreActions.length,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -715,6 +787,58 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlimActionTile(
+    BuildContext context, {
+    required _FeatureAction action,
+  }) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: action.builder),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: action.color.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: action.color.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(action.icon, size: 18, color: action.color),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  action.label,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );

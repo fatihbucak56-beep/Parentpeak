@@ -29,6 +29,7 @@ class MeetupEvent {
   final EventVisibility visibility;
   final double? shareRadiusKm;
   final List<String> invitedUserIds;
+  final DateTime? inviteCodeExpiresAt;
 
   MeetupEvent({
     required this.id,
@@ -51,6 +52,7 @@ class MeetupEvent {
     this.visibility = EventVisibility.publicNearby,
     this.shareRadiusKm = 25,
     this.invitedUserIds = const [],
+    this.inviteCodeExpiresAt,
   });
 
   bool get isFull => currentParticipants >= maxParticipants;
@@ -85,6 +87,9 @@ class MeetupEvent {
         invitedUserIds: (json['invitedUserIds'] as List<dynamic>? ?? const [])
           .map((e) => e.toString())
           .toList(),
+        inviteCodeExpiresAt: json['inviteCodeExpiresAt'] != null
+          ? DateTime.parse(json['inviteCodeExpiresAt'] as String)
+          : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -108,5 +113,6 @@ class MeetupEvent {
         'visibility': visibility.name,
         'shareRadiusKm': shareRadiusKm,
         'invitedUserIds': invitedUserIds,
+        'inviteCodeExpiresAt': inviteCodeExpiresAt?.toIso8601String(),
       };
 }

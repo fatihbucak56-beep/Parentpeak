@@ -51,6 +51,7 @@ class EventService {
   static final List<EventParticipation> _mockParticipations = [];
   static final List<EventInvitation> _mockInvitations = [];
   static final Map<String, String> _eventInviteCodes = {};
+  static final Map<String, DateTime> _eventInviteExpiresAt = {};
 
   // Hole alle Events
   Future<List<MeetupEvent>> getEvents() async {
@@ -119,21 +120,59 @@ class EventService {
 
   String? getInviteCodeForEvent(String eventId) => _eventInviteCodes[eventId];
 
+  String? getInviteLinkForEvent(String eventId) {
+    final code = _eventInviteCodes[eventId];
+    if (code == null) return null;
+    final encoded = Uri.encodeComponent(code);
+    return 'parentpeak://invite?code=$encoded';
+  }
+
+  DateTime? getInviteExpiryForEvent(String eventId) => _eventInviteExpiresAt[eventId];
+
+  bool isInviteCodeExpired(String eventId) {
+    final expiry = _eventInviteExpiresAt[eventId];
+    if (expiry == null) return false;
+    return DateTime.now().isAfter(expiry);
+  }
+
+  bool isInviteInputExpired(String input) {
+    final normalizedInput = _extractCodeFromInput(input);
+    if (normalizedInput.isEmpty) return false;
+
+    String? eventId;
+    for (final entry in _eventInviteCodes.entries) {
+      if (entry.value.toUpperCase() == normalizedInput.toUpperCase()) {
+        eventId = entry.key;
+        break;
+      }
+    }
+
+    if (eventId == null) return false;
+    return isInviteCodeExpired(eventId);
+  }
+
   Future<EventInvitation?> joinEventByInviteCode({
     required String code,
     required String userId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 260));
 
+    final normalizedInput = _extractCodeFromInput(code);
+    if (normalizedInput.isEmpty) return null;
+
     String? targetEventId;
     for (final entry in _eventInviteCodes.entries) {
-      if (entry.value.toUpperCase() == code.trim().toUpperCase()) {
+      if (entry.value.toUpperCase() == normalizedInput.toUpperCase()) {
         targetEventId = entry.key;
         break;
       }
     }
 
     if (targetEventId == null) return null;
+
+    if (isInviteCodeExpired(targetEventId)) {
+      return null;
+    }
 
     final event = await getEventById(targetEventId);
     if (event == null) return null;
@@ -269,6 +308,8 @@ class EventService {
 
       final code = _generateInviteCode(event.id);
       _eventInviteCodes[event.id] = code;
+      _eventInviteExpiresAt[event.id] = event.inviteCodeExpiresAt ??
+          DateTime.now().add(const Duration(days: 14));
       debugPrint('Invite code for ${event.id}: $code');
     }
 
@@ -319,5 +360,35 @@ class EventService {
         ? eventId.substring(eventId.length - 4)
         : eventId;
     return 'PP-${suffix.toUpperCase()}';
+  }
+
+  String _extractCodeFromInput(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return '';
+
+    final asUri = Uri.tryParse(trimmed);
+    if (asUri != null && asUri.queryParameters.containsKey('code')) {
+      return (asUri.queryParameters['code'] ?? '').trim();
+    }
+
+    return trimmed;
+  }
+
+  Future<List<MeetupEvent>> getHostedInviteOnlyEvents(String hostUserId) async {
+    await Future.delayed(const Duration(milliseconds: 220));
+    return _mockEvents
+        .where((e) =>
+            e.hosterId == hostUserId &&
+            e.status == EventStatus.active &&
+            e.visibility == EventVisibility.inviteOnly)
+        .toList();
+  }
+
+  Future<List<EventInvitation>> getAcceptedInvitationsForEvent(String eventId) async {
+    await Future.delayed(const Duration(milliseconds: 220));
+    return _mockInvitations
+        .where((i) =>
+            i.eventId == eventId && i.status == EventInvitationStatus.accepted)
+        .toList();
   }
 }

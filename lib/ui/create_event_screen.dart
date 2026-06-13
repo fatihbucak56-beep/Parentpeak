@@ -32,6 +32,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final double _longitude = 13.4050;
   EventVisibility _visibility = EventVisibility.publicNearby;
   double _shareRadiusKm = 25;
+  int _inviteCodeExpiryDays = 14;
   List<FamilyContact> _familyContacts = [];
   final Set<String> _selectedInvitees = {};
 
@@ -160,6 +161,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             _visibility == EventVisibility.publicNearby ? _shareRadiusKm : null,
         invitedUserIds:
           _visibility == EventVisibility.inviteOnly ? _selectedInvitees.toList() : const [],
+        inviteCodeExpiresAt: _visibility == EventVisibility.inviteOnly
+          ? DateTime.now().add(Duration(days: _inviteCodeExpiryDays))
+          : null,
       );
 
       await _eventService.createEvent(event);
@@ -167,6 +171,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       if (mounted) {
         if (_visibility == EventVisibility.inviteOnly) {
           final code = _eventService.getInviteCodeForEvent(event.id);
+          final link = _eventService.getInviteLinkForEvent(event.id);
+          final expiresAt = _eventService.getInviteExpiryForEvent(event.id);
           await showDialog<void>(
             context: context,
             builder: (context) => AlertDialog(
@@ -184,7 +190,25 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       code,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
+                    const SizedBox(height: 10),
                   ],
+                  if (link != null) ...[
+                    const Text('Einladungslink:'),
+                    const SizedBox(height: 4),
+                    SelectableText(link),
+                    const SizedBox(height: 10),
+                  ],
+                  if (expiresAt != null)
+                    Text(
+                      'Gültig bis: ${expiresAt.day.toString().padLeft(2, '0')}.${expiresAt.month.toString().padLeft(2, '0')}.${expiresAt.year}',
+                    ),
+                  if (expiresAt != null)
+                    const SizedBox(height: 8),
+                  if (expiresAt != null)
+                    const Text(
+                      'Der Link bleibt für bereits angenommene Einladungen wirksam.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
                 ],
               ),
               actions: [
@@ -195,6 +219,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       Navigator.of(context).pop();
                     },
                     child: const Text('Code kopieren'),
+                  ),
+                if (link != null)
+                  TextButton(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: link));
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Link kopieren'),
                   ),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -431,6 +463,25 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         onChanged: (_) => _toggleInvitee(contact.userId),
                       ),
                     ),
+
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    value: _inviteCodeExpiryDays,
+                    decoration: const InputDecoration(
+                      labelText: 'Einladungscode gültig für',
+                      prefixIcon: Icon(Icons.timelapse_rounded),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 3, child: Text('3 Tage')),
+                      DropdownMenuItem(value: 7, child: Text('7 Tage')),
+                      DropdownMenuItem(value: 14, child: Text('14 Tage')),
+                      DropdownMenuItem(value: 30, child: Text('30 Tage')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _inviteCodeExpiryDays = value);
+                    },
+                  ),
                 ],
 
                 const SizedBox(height: 16),

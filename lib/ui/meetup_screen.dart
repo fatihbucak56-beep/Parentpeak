@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/event_service.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/ui/event_detail_screen.dart';
 import 'package:trusted_circle_demo/ui/create_event_screen.dart';
+import 'package:trusted_circle_demo/ui/event_detail_screen.dart';
 
 class MeetupScreen extends StatefulWidget {
   const MeetupScreen({super.key});
@@ -17,8 +17,9 @@ enum FeedVisibilityFilter { all, publicOnly, familyCircle, inviteOnly }
 class _MeetupScreenState extends State<MeetupScreen> {
   final _eventService = EventService();
   List<MeetupEvent> _events = [];
-  bool _isGridView = true;
+  bool _isGridView = false;
   bool _isLoading = true;
+  bool _showAgeFilters = false;
   final List<AgeGroup> _selectedAgeGroups = [];
   FeedVisibilityFilter _visibilityFilter = FeedVisibilityFilter.all;
   static const double _viewerLatitude = 52.5200;
@@ -33,25 +34,24 @@ class _MeetupScreenState extends State<MeetupScreen> {
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
     try {
-      final viewerUserId =
-          AuthService.instance.currentUser?.uid ?? 'guest_user';
+      final viewerUserId = AuthService.instance.currentUser?.uid ?? 'guest_user';
       final events = await _eventService.getDiscoverableEventsForUser(
         viewerUserId: viewerUserId,
         viewerLatitude: _viewerLatitude,
         viewerLongitude: _viewerLongitude,
         ageGroups: _selectedAgeGroups,
       );
+      if (!mounted) return;
       setState(() {
         _events = events;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler beim Laden: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler beim Laden: $e')),
+      );
     }
   }
 
@@ -112,58 +112,60 @@ class _MeetupScreenState extends State<MeetupScreen> {
           : Column(
               children: [
                 Container(
-                  margin: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
+                    color: Colors.white.withValues(alpha: 0.92),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                    border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant
+                          .withValues(alpha: 0.5),
+                    ),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.location_on_outlined,
-                          color: Color(0xFF1D4ED8)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Öffentliche Events werden nach Standort geteilt. Zusätzlich gibt es Familienkreis- und Einladungs-Events.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: const Color(0xFF1E3A8A),
-                                height: 1.3,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
+                      Text(
+                        'Aktivitäten in deiner Nähe',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                       ),
-                    ],
-                  ),
-                ),
-                // Filter-Chips für Altersgruppen
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-                  child: Row(
-                    children: AgeGroup.values
-                        .map(
-                          (ageGroup) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(_getAgeGroupLabel(ageGroup)),
-                              selected: _selectedAgeGroups.contains(ageGroup),
-                              onSelected: (_) => _filterByAgeGroup(ageGroup),
-                              selectedColor: const Color(0xFFDBEAFE),
-                              checkmarkColor: const Color(0xFF1D4ED8),
-                              labelStyle: TextStyle(
-                                color: _selectedAgeGroups.contains(ageGroup)
-                                    ? const Color(0xFF1D4ED8)
-                                    : null,
-                                fontWeight: _selectedAgeGroups.contains(ageGroup)
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Klare Filter für Sichtbarkeit, optional nach Alter verfeinern.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${_filteredEvents.length} Aktivitäten',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ),
-                        )
-                        .toList(),
+                          TextButton.icon(
+                            onPressed: () =>
+                                setState(() => _showAgeFilters = !_showAgeFilters),
+                            icon: Icon(_showAgeFilters
+                                ? Icons.tune_rounded
+                                : Icons.tune_outlined),
+                            label:
+                                Text(_showAgeFilters ? 'Weniger Filter' : 'Mehr Filter'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 Padding(
@@ -196,7 +198,7 @@ class _MeetupScreenState extends State<MeetupScreen> {
                         ),
                         const SizedBox(width: 8),
                         _buildVisibilityChip(
-                          label: 'Nur eingeladen',
+                          label: 'Eingeladen',
                           selected:
                               _visibilityFilter == FeedVisibilityFilter.inviteOnly,
                           onTap: () => setState(
@@ -206,15 +208,48 @@ class _MeetupScreenState extends State<MeetupScreen> {
                     ),
                   ),
                 ),
-                // Toggle zwischen Grid und List View
+                if (_showAgeFilters)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Row(
+                      children: AgeGroup.values
+                          .map(
+                            (ageGroup) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(_getAgeGroupLabel(ageGroup)),
+                                selected: _selectedAgeGroups.contains(ageGroup),
+                                onSelected: (_) => _filterByAgeGroup(ageGroup),
+                                selectedColor: const Color(0xFFDBEAFE),
+                                checkmarkColor: const Color(0xFF1D4ED8),
+                                labelStyle: TextStyle(
+                                  color: _selectedAgeGroups.contains(ageGroup)
+                                      ? const Color(0xFF1D4ED8)
+                                      : null,
+                                  fontWeight:
+                                      _selectedAgeGroups.contains(ageGroup)
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${_filteredEvents.length} Aktivitäten gefunden',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        'Ansicht',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                       Container(
                         padding: const EdgeInsets.all(4),
@@ -240,7 +275,6 @@ class _MeetupScreenState extends State<MeetupScreen> {
                     ],
                   ),
                 ),
-                // Events Grid/List
                 Expanded(
                   child: _filteredEvents.isEmpty
                       ? Center(
@@ -271,22 +305,22 @@ class _MeetupScreenState extends State<MeetupScreen> {
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
-                                mainAxisSpacing: 16,
-                                crossAxisSpacing: 16,
-                                childAspectRatio: 0.8,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 0.82,
                               ),
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                               itemCount: _filteredEvents.length,
                               itemBuilder: (context, index) =>
                                   _buildEventCard(_filteredEvents[index]),
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                               itemCount: _filteredEvents.length,
                               itemBuilder: (context, index) =>
                                   _buildEventListItem(_filteredEvents[index]),
                             ),
-                )
+                ),
               ],
             ),
     );
@@ -306,7 +340,6 @@ class _MeetupScreenState extends State<MeetupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Event Foto
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -319,7 +352,6 @@ class _MeetupScreenState extends State<MeetupScreen> {
                 ),
                 child: Stack(
                   children: [
-                    // Category Badge
                     Positioned(
                       top: 8,
                       right: 8,
@@ -335,7 +367,6 @@ class _MeetupScreenState extends State<MeetupScreen> {
                         ),
                       ),
                     ),
-                    // Plätze verfügbar Badge
                     if (event.isFull)
                       Positioned(
                         bottom: 8,
@@ -356,7 +387,6 @@ class _MeetupScreenState extends State<MeetupScreen> {
                           ),
                         ),
                       ),
-
                     if (event.visibility != EventVisibility.publicNearby)
                       Positioned(
                         top: 8,
@@ -382,7 +412,6 @@ class _MeetupScreenState extends State<MeetupScreen> {
                 ),
               ),
             ),
-            // Event Info
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -403,8 +432,7 @@ class _MeetupScreenState extends State<MeetupScreen> {
                       const SizedBox(width: 4),
                       Text(
                         '${event.eventDate.day}.${event.eventDate.month}. ${event.eventDate.hour.toString().padLeft(2, '0')}:${event.eventDate.minute.toString().padLeft(2, '0')}',
-                        style:
-                            TextStyle(fontSize: 10, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -415,8 +443,7 @@ class _MeetupScreenState extends State<MeetupScreen> {
                       const SizedBox(width: 4),
                       Text(
                         '${event.currentParticipants}/${event.maxParticipants}',
-                        style:
-                            TextStyle(fontSize: 10, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                       ),
                     ],
                   ),

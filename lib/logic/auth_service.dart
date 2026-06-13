@@ -167,15 +167,13 @@ class AuthService {
       try {
         final auth = _firebaseAuth;
         if (auth == null) {
-          if (kReleaseMode) {
-            return AuthResult.fail(
-              AuthErrorCode.unknown,
-              'Firebase ist nicht verfügbar. Bitte später erneut versuchen.',
-            );
-          }
+          return AuthResult.fail(
+            AuthErrorCode.unknown,
+            'Firebase ist nicht verfügbar. Bitte später erneut versuchen.',
+          );
         }
 
-        final credential = await auth!.createUserWithEmailAndPassword(
+        final credential = await auth.createUserWithEmailAndPassword(
           email: email.trim(),
           password: password,
         );
@@ -190,21 +188,17 @@ class AuthService {
         return AuthResult.ok(user);
       } on FirebaseAuthException catch (e) {
         final mapped = _mapFirebaseError(e);
-        if (kReleaseMode) {
-          return mapped;
-        }
         debugPrint(
-          'AuthService.register(): Firebase signup failed in debug, fallback to local auth. code=${e.code}',
+          'AuthService.register(): Firebase signup failed. code=${e.code}',
         );
+        return mapped;
       } catch (_) {
-        if (kReleaseMode) {
-          return AuthResult.fail(
-            AuthErrorCode.unknown,
-            'Registrierung ist fehlgeschlagen. Bitte versuche es erneut.',
-          );
-        }
         debugPrint(
-          'AuthService.register(): Firebase signup failed in debug, fallback to local auth.',
+          'AuthService.register(): Firebase signup failed.',
+        );
+        return AuthResult.fail(
+          AuthErrorCode.unknown,
+          'Registrierung ist fehlgeschlagen. Bitte versuche es erneut.',
         );
       }
     }
@@ -279,15 +273,13 @@ class AuthService {
       try {
         final auth = _firebaseAuth;
         if (auth == null) {
-          if (kReleaseMode) {
-            return AuthResult.fail(
-              AuthErrorCode.unknown,
-              'Firebase ist nicht verfügbar. Bitte später erneut versuchen.',
-            );
-          }
+          return AuthResult.fail(
+            AuthErrorCode.unknown,
+            'Firebase ist nicht verfügbar. Bitte später erneut versuchen.',
+          );
         }
 
-        final credential = await auth!.signInWithEmailAndPassword(
+        final credential = await auth.signInWithEmailAndPassword(
           email: email.trim(),
           password: password,
         );
@@ -305,21 +297,17 @@ class AuthService {
         return AuthResult.ok(user);
       } on FirebaseAuthException catch (e) {
         final mapped = _mapFirebaseError(e);
-        if (kReleaseMode) {
-          return mapped;
-        }
         debugPrint(
-          'AuthService.login(): Firebase login failed in debug, fallback to local auth. code=${e.code}',
+          'AuthService.login(): Firebase login failed. code=${e.code}',
         );
+        return mapped;
       } catch (_) {
-        if (kReleaseMode) {
-          return AuthResult.fail(
-            AuthErrorCode.unknown,
-            'Login ist fehlgeschlagen. Bitte versuche es erneut.',
-          );
-        }
         debugPrint(
-          'AuthService.login(): Firebase login failed in debug, fallback to local auth.',
+          'AuthService.login(): Firebase login failed.',
+        );
+        return AuthResult.fail(
+          AuthErrorCode.unknown,
+          'Login ist fehlgeschlagen. Bitte versuche es erneut.',
         );
       }
     }
@@ -342,7 +330,7 @@ class AuthService {
     if (record == null) {
       return AuthResult.fail(
         AuthErrorCode.userNotFound,
-        'Kein Konto mit dieser E-Mail-Adresse gefunden.',
+        'Kein lokales Konto mit dieser E-Mail-Adresse gefunden. Nach Neuinstallation bitte erneut registrieren oder Firebase-Login nutzen.',
       );
     }
 

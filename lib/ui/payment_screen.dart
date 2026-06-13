@@ -79,6 +79,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         price: widget.event.price,
         visibility: widget.event.visibility,
         shareRadiusKm: widget.event.shareRadiusKm,
+        invitedUserIds: widget.event.invitedUserIds,
       );
 
       await _eventService.createEvent(eventWithPayment);
@@ -209,8 +210,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                   const TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
-                          if (widget.event.visibility ==
-                              EventVisibility.privateOnly)
+                          if (widget.event.visibility == EventVisibility.privateOnly)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
@@ -221,6 +221,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
                               child: const Text(
                                 'PRIVAT',
                                 style: TextStyle(
+                                    fontSize: 10, fontWeight: FontWeight.w700),
+                              ),
+                            )
+                          else if (widget.event.visibility ==
+                              EventVisibility.familyCircle)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE0E7FF),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                'FAMILIENKREIS',
+                                style: TextStyle(
+                                    fontSize: 10, fontWeight: FontWeight.w700),
+                              ),
+                            )
+                          else if (widget.event.visibility ==
+                              EventVisibility.inviteOnly)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEDD5),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'NUR EINGELADEN (${widget.event.invitedUserIds.length})',
+                                style: const TextStyle(
                                     fontSize: 10, fontWeight: FontWeight.w700),
                               ),
                             )

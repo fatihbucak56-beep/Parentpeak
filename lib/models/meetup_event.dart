@@ -6,7 +6,7 @@ enum ParticipationStatus { pending, approved, declined, cancelled }
 
 enum EventStatus { active, completed, cancelled }
 
-enum EventVisibility { privateOnly, publicNearby }
+enum EventVisibility { privateOnly, familyCircle, inviteOnly, publicNearby }
 
 class MeetupEvent {
   final String id;
@@ -28,6 +28,7 @@ class MeetupEvent {
   final double? price; // Preis für die Veröffentlichung
   final EventVisibility visibility;
   final double? shareRadiusKm;
+  final List<String> invitedUserIds;
 
   MeetupEvent({
     required this.id,
@@ -49,6 +50,7 @@ class MeetupEvent {
     this.price,
     this.visibility = EventVisibility.publicNearby,
     this.shareRadiusKm = 25,
+    this.invitedUserIds = const [],
   });
 
   bool get isFull => currentParticipants >= maxParticipants;
@@ -80,6 +82,9 @@ class MeetupEvent {
         visibility: EventVisibility.values.byName(
             json['visibility'] as String? ?? EventVisibility.publicNearby.name),
         shareRadiusKm: (json['shareRadiusKm'] as num?)?.toDouble(),
+        invitedUserIds: (json['invitedUserIds'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -102,5 +107,6 @@ class MeetupEvent {
         'price': price,
         'visibility': visibility.name,
         'shareRadiusKm': shareRadiusKm,
+        'invitedUserIds': invitedUserIds,
       };
 }

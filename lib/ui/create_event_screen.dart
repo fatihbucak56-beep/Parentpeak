@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/family_circle_service.dart';
+import 'package:trusted_circle_demo/models/family_contact.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
+import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
 import 'package:trusted_circle_demo/ui/payment_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
@@ -12,6 +15,7 @@ class CreateEventScreen extends StatefulWidget {
 
 class _CreateEventScreenState extends State<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _familyCircleService = FamilyCircleService.instance;
 
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
@@ -26,6 +30,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final double _longitude = 13.4050;
   EventVisibility _visibility = EventVisibility.publicNearby;
   double _shareRadiusKm = 25;
+  List<FamilyContact> _familyContacts = [];
+  final Set<String> _selectedInvitees = {};
 
   bool _isSubmitting = false;
 
@@ -36,6 +42,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _descriptionController = TextEditingController();
     _locationController = TextEditingController(text: 'Berlin, Deutschland');
     _maxParticipantsController = TextEditingController(text: '10');
+    _loadFamilyContacts();
+  }
+
+  Future<void> _loadFamilyContacts() async {
+    final userId = AuthService.instance.currentUser?.uid ?? 'host_demo_001';
+    final contacts = await _familyCircleService.getConnectedContacts(userId: userId);
+    if (!mounted) return;
+    setState(() {
+      _familyContacts = contacts;
+    });
   }
 
   @override
@@ -79,12 +95,31 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     });
   }
 
+  void _toggleInvitee(String userId) {
+    setState(() {
+      if (_selectedInvitees.contains(userId)) {
+        _selectedInvitees.remove(userId);
+      } else {
+        _selectedInvitees.add(userId);
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAgeGroups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Bitte mindestens eine Altersgruppe auswählen')),
+      );
+      return;
+    }
+
+    if (_visibility == EventVisibility.inviteOnly && _selectedInvitees.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bitte mindestens einen Kontakt einladen.'),
+        ),
       );
       return;
     }
@@ -121,6 +156,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         visibility: _visibility,
         shareRadiusKm:
             _visibility == EventVisibility.publicNearby ? _shareRadiusKm : null,
+        invitedUserIds:
+          _visibility == EventVisibility.inviteOnly ? _selectedInvitees.toList() : const [],
       );
 
       // Gehe zu Payment-Screen
@@ -251,11 +288,33 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   },
                 ),
                 RadioListTile<EventVisibility>(
+                  value: EventVisibility.familyCircle,
+                  groupValue: _visibility,
+                  title: const Text('Familienkreis (für deine Kontakte sichtbar)'),
+                  subtitle: const Text(
+                      'Nur verbundene Eltern aus deinem Familienkreis sehen das Event.'),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _visibility = value);
+                  },
+                ),
+                RadioListTile<EventVisibility>(
+                  value: EventVisibility.inviteOnly,
+                  groupValue: _visibility,
+                  title: const Text('Nur eingeladen (individuelle Einladungen)'),
+                  subtitle: const Text(
+                      'Nur ausgewählte Kontakte sehen und erhalten die Einladung.'),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _visibility = value);
+                  },
+                ),
+                RadioListTile<EventVisibility>(
                   value: EventVisibility.privateOnly,
                   groupValue: _visibility,
-                  title: const Text('Privat (nur für dich sichtbar)'),
+                  title: const Text('Nur ich (nicht geteilt)'),
                   subtitle: const Text(
-                      'Nicht im Feed anderer Nutzer veröffentlichen.'),
+                      'Das Event bleibt nur in deinem Bereich sichtbar.'),
                   onChanged: (value) {
                     if (value == null) return;
                     setState(() => _visibility = value);
@@ -288,6 +347,51 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     label: '${_shareRadiusKm.toStringAsFixed(0)} km',
                     onChanged: (v) => setState(() => _shareRadiusKm = v),
                   ),
+                ],
+
+                if (_visibility == EventVisibility.inviteOnly) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Kontakte auswählen',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_familyContacts.isEmpty)
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Noch keine Kontakte im Familienkreis. Bitte zuerst Kontakte verbinden.',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const FamilyCircleScreen(),
+                              ),
+                            ).then((_) => _loadFamilyContacts());
+                          },
+                          child: const Text('Öffnen'),
+                        ),
+                      ],
+                    )
+                  else
+                    ..._familyContacts.map(
+                      (contact) => CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: _selectedInvitees.contains(contact.userId),
+                        title: Text(contact.displayName),
+                        subtitle:
+                            Text('${contact.city} · ${contact.childrenSummary}'),
+                        onChanged: (_) => _toggleInvitee(contact.userId),
+                      ),
+                    ),
                 ],
 
                 const SizedBox(height: 16),

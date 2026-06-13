@@ -1,8 +1,11 @@
 import 'dart:math' as math;
+import 'package:trusted_circle_demo/logic/family_circle_service.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/models/event_participation.dart';
 
 class EventService {
+  final _familyCircleService = FamilyCircleService.instance;
+
   // Mock data - in production würde das von Firebase/Backend kommen
   static final List<MeetupEvent> _mockEvents = [
     MeetupEvent(
@@ -103,7 +106,9 @@ class EventService {
 
       if (distance > radiusKm) return false;
 
-      if (event.visibility == EventVisibility.privateOnly) {
+      if (event.visibility == EventVisibility.privateOnly ||
+          event.visibility == EventVisibility.familyCircle ||
+          event.visibility == EventVisibility.inviteOnly) {
         return false;
       }
 
@@ -131,6 +136,17 @@ class EventService {
 
     if (event.visibility == EventVisibility.privateOnly) {
       return false;
+    }
+
+    if (event.visibility == EventVisibility.familyCircle) {
+      return _familyCircleService.areUsersConnected(
+        userA: event.hosterId,
+        userB: viewerUserId,
+      );
+    }
+
+    if (event.visibility == EventVisibility.inviteOnly) {
+      return event.invitedUserIds.contains(viewerUserId);
     }
 
     // Öffentlich: nur im definierten Radius teilen.

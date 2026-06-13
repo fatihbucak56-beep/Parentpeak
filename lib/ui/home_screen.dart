@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 import 'package:trusted_circle_demo/ui/photos_screen.dart';
@@ -6,7 +7,14 @@ import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
 import 'package:trusted_circle_demo/ui/backend_status_screen.dart';
 import 'package:trusted_circle_demo/ui/events_activities_screen.dart';
+import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
 import 'package:trusted_circle_demo/ui/organization_screen.dart';
+import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
+import 'package:trusted_circle_demo/ui/parent_matching_screen.dart';
+import 'package:trusted_circle_demo/ui/chat_screen.dart';
+import 'package:trusted_circle_demo/models_and_widgets/weekly_impulse_feature.dart';
+import 'package:trusted_circle_demo/models_and_widgets/development_schema_feature.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 
 class _FeatureAction {
   final String label;
@@ -32,16 +40,98 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final FlutterTts _tts = FlutterTts();
+  WeeklyImpulse? _weeklyImpulse;
+  bool _isLoadingWeeklyImpulse = true;
+
   @override
   void initState() {
     super.initState();
     languageService.addListener(_onLanguageChanged);
+    _loadWeeklyImpulse();
   }
 
   @override
   void dispose() {
+    _tts.stop();
     languageService.removeListener(_onLanguageChanged);
     super.dispose();
+  }
+
+  Future<void> _loadWeeklyImpulse() async {
+    try {
+      final service = BackendServiceFactory.createWeeklyImpulseService();
+      final impulse = await service.fetchWeeklyImpulse();
+      if (!mounted) return;
+      setState(() {
+        _weeklyImpulse = impulse;
+        _isLoadingWeeklyImpulse = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingWeeklyImpulse = false;
+      });
+    }
+  }
+
+  Future<void> _playWeeklyImpulseAudio() async {
+    final text = _weeklyImpulse?.audioScript;
+    if (text == null || text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kein Audio-Skript verfuegbar.')),
+      );
+      return;
+    }
+
+    await _tts.stop();
+    try {
+      await _tts.setLanguage(_resolveTtsLocale(languageService.currentLanguage));
+    } catch (_) {
+      await _tts.setLanguage('de-DE');
+    }
+    await _tts.setPitch(1.0);
+    await _tts.setSpeechRate(0.47);
+    await _tts.speak(text);
+  }
+
+  String _resolveTtsLocale(String languageCode) {
+    switch (languageCode) {
+      case 'en':
+        return 'en-US';
+      case 'fr':
+        return 'fr-FR';
+      case 'es':
+        return 'es-ES';
+      case 'it':
+        return 'it-IT';
+      case 'pt':
+        return 'pt-PT';
+      case 'nl':
+        return 'nl-NL';
+      case 'ar':
+        return 'ar-SA';
+      case 'fa':
+        return 'fa-IR';
+      case 'ku':
+        return 'ku';
+      case 'ckb':
+        return 'ckb';
+      case 'zh':
+        return 'zh-CN';
+      case 'ja':
+        return 'ja-JP';
+      case 'hi':
+        return 'hi-IN';
+      case 'tr':
+        return 'tr-TR';
+      case 'ru':
+        return 'ru-RU';
+      case 'de':
+      default:
+        return 'de-DE';
+    }
   }
 
   void _onLanguageChanged() {
@@ -61,7 +151,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     final now = DateTime.now();
     final hour = now.hour;
+
     final featureActions = <_FeatureAction>[
+      _FeatureAction(
+        label: 'Impulse & Entwicklung',
+        description: 'Wochenimpuls und Entwicklung in einem Bereich',
+        icon: Icons.auto_awesome_mosaic_rounded,
+        color: const Color(0xFF0EA5A4),
+        builder: (_) => const EntwicklungImpulseScreen(),
+      ),
       _FeatureAction(
         label: 'Kalender',
         description: 'Termine und Familienplan',
@@ -71,10 +169,31 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       _FeatureAction(
         label: 'Events & Aktivitäten',
-        description: 'Meetups entdecken oder selbst Event erstellen',
+        description: 'Aktivitäten entdecken, erstellen und Einladungen steuern',
         icon: Icons.celebration_rounded,
         color: const Color(0xFF8B5CF6),
         builder: (_) => const EventsActivitiesScreen(),
+      ),
+      _FeatureAction(
+        label: 'Familienkreis',
+        description: 'Vertrauenskontakte verwalten und Einladungen steuern',
+        icon: Icons.people_alt_rounded,
+        color: const Color(0xFF4F46E5),
+        builder: (_) => const FamilyCircleScreen(),
+      ),
+      _FeatureAction(
+        label: 'Eltern Match',
+        description: 'Eltern finden fuer Playdates und Austausch',
+        icon: Icons.diversity_3_rounded,
+        color: const Color(0xFF0EA5A4),
+        builder: (_) => const ParentMatchingScreen(),
+      ),
+      _FeatureAction(
+        label: 'KI Elternberatung',
+        description: 'Schnelle Hilfe und Tipps rund um Erziehung',
+        icon: Icons.tips_and_updates_rounded,
+        color: const Color(0xFF0284C7),
+        builder: (_) => const ChatScreen(),
       ),
       _FeatureAction(
         label: 'Organisation',
@@ -157,13 +276,260 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.92,
+                  childAspectRatio: 0.85,
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildInsightTabs(ThemeData theme) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            title: 'Entwicklung und Impulse',
+            subtitle: 'Zwei kompakte Tabs statt langer Karten im Home',
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: TabBar(
+              dividerColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              labelColor: theme.colorScheme.onPrimaryContainer,
+              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+              tabs: const [
+                Tab(icon: Icon(Icons.wb_sunny_rounded), text: 'Wochenimpuls'),
+                Tab(icon: Icon(Icons.checklist_rtl_rounded), text: 'Entwicklung'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 300,
+            child: TabBarView(
+              children: [
+                _buildWeeklyImpulsePreview(theme),
+                _buildDevelopmentPreview(theme),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyImpulsePreview(ThemeData theme) {
+    if (_isLoadingWeeklyImpulse) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Wochenimpuls wird geladen...')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_weeklyImpulse == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Wochenimpuls aktuell nicht verfuegbar',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Bitte pruefe die Backend-Verbindung und versuche es erneut.',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() => _isLoadingWeeklyImpulse = true);
+                  _loadWeeklyImpulse();
+                },
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Erneut laden'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final impulse = _weeklyImpulse!;
+    final shortBody = impulse.contentBody.length > 160
+        ? '${impulse.contentBody.substring(0, 160)}...'
+        : impulse.contentBody;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    impulse.category == PedagogicalCategory.gfk
+                        ? 'Gewaltfreie Kommunikation'
+                        : 'Paedagogischer Impuls',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const Spacer(),
+                if (impulse.audioScript != null)
+                  IconButton(
+                    icon: const Icon(Icons.volume_up_rounded),
+                    onPressed: _playWeeklyImpulseAudio,
+                    tooltip: 'Audio-Impuls anhoeren',
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              impulse.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Text(
+                shortBody,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: TextButton(
+                onPressed: _openWeeklyImpulseDetails,
+                child: const Text('Vollansicht'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDevelopmentPreview(ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Entwicklungsschema fuer Eltern',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Kinder 1 bis 3, Altersphasen von 0 bis 18 Jahren und Status pro Meilenstein.',
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: const [
+                Chip(label: Text('0-12 Monate')),
+                Chip(label: Text('1-3 Jahre')),
+                Chip(label: Text('3-6 Jahre')),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              'Die Detailansicht ist nur einen Tipp entfernt.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: TextButton(
+                onPressed: _openDevelopmentDetails,
+                child: const Text('Vollansicht'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openWeeklyImpulseDetails() {
+    if (_weeklyImpulse == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: WeeklyImpulseCard(
+              impulse: _weeklyImpulse!,
+              onAudioPressed: _playWeeklyImpulseAudio,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openDevelopmentDetails() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: const DevelopmentSchemaCard(),
+          ),
+        );
+      },
     );
   }
 

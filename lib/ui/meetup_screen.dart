@@ -104,7 +104,7 @@ class _MeetupScreenState extends State<MeetupScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Öffentliche Events werden nach Standort geteilt. Private Events siehst nur du.',
+                          'Öffentliche Events werden nach Standort geteilt. Zusätzlich gibt es Familienkreis- und Einladungs-Events.',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: const Color(0xFF1E3A8A),
                                 height: 1.3,
@@ -295,7 +295,7 @@ class _MeetupScreenState extends State<MeetupScreen> {
                         ),
                       ),
 
-                    if (event.visibility == EventVisibility.privateOnly)
+                    if (event.visibility != EventVisibility.publicNearby)
                       Positioned(
                         top: 8,
                         left: 8,
@@ -306,9 +306,9 @@ class _MeetupScreenState extends State<MeetupScreen> {
                             color: Colors.black87,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
-                            'PRIVAT',
-                            style: TextStyle(
+                          child: Text(
+                            _getVisibilityBadge(event),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -419,12 +419,12 @@ class _MeetupScreenState extends State<MeetupScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 4),
-              if (event.visibility == EventVisibility.privateOnly)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 4),
+              if (event.visibility != EventVisibility.publicNearby)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
-                    'Privat · nur für dich sichtbar',
-                    style: TextStyle(fontSize: 10, color: Colors.black54),
+                    _getVisibilityDescription(event),
+                    style: const TextStyle(fontSize: 10, color: Colors.black54),
                   ),
                 ),
               Row(
@@ -494,5 +494,31 @@ class _MeetupScreenState extends State<MeetupScreen> {
       AgeGroup.mixed: 'Altersgemischt',
     };
     return labels[ageGroup] ?? '';
+  }
+
+  String _getVisibilityBadge(MeetupEvent event) {
+    switch (event.visibility) {
+      case EventVisibility.privateOnly:
+        return 'PRIVAT';
+      case EventVisibility.familyCircle:
+        return 'KREIS';
+      case EventVisibility.inviteOnly:
+        return 'EINGELADEN';
+      case EventVisibility.publicNearby:
+        return '';
+    }
+  }
+
+  String _getVisibilityDescription(MeetupEvent event) {
+    switch (event.visibility) {
+      case EventVisibility.privateOnly:
+        return 'Privat · nur für den Host sichtbar';
+      case EventVisibility.familyCircle:
+        return 'Familienkreis · nur verbundene Kontakte';
+      case EventVisibility.inviteOnly:
+        return 'Nur eingeladen · individuelle Einladung';
+      case EventVisibility.publicNearby:
+        return '';
+    }
   }
 }

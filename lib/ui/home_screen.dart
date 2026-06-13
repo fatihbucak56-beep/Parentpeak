@@ -40,7 +40,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _initialInviteHandled = false;
-  bool _showMoreTools = false;
 
   @override
   void initState() {
@@ -110,6 +109,13 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.celebration_rounded,
         color: const Color(0xFF8B5CF6),
         builder: (_) => const EventsActivitiesScreen(),
+      ),
+      _FeatureAction(
+        label: 'Einladungen',
+        description: 'Codes einlösen und Zusagen verwalten',
+        icon: Icons.mark_email_unread_rounded,
+        color: const Color(0xFF4F46E5),
+        builder: (_) => const EventInvitationsScreen(),
       ),
       _FeatureAction(
         label: 'Familienkreis',
@@ -216,78 +222,31 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.85,
+                  childAspectRatio: 0.92,
                 ),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: theme.colorScheme.outlineVariant,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Weitere Tools',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${moreActions.length} zusätzliche Bereiche bei Bedarf',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () {
-                          setState(() => _showMoreTools = !_showMoreTools);
-                        },
-                        icon: Icon(_showMoreTools
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded),
-                        label: Text(_showMoreTools ? 'Weniger' : 'Mehr'),
-                      ),
-                    ],
-                  ),
+                child: _buildSectionHeader(
+                  title: 'Weitere Schnellzugriffe',
+                  subtitle: 'Kompakte Tabs für alle übrigen Bereiche',
                 ),
               ),
             ),
-            if (_showMoreTools)
-              SliverPadding(
+            SliverToBoxAdapter(
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final action = moreActions[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildSlimActionTile(
-                          context,
-                          action: action,
-                        ),
-                      );
-                    },
-                    childCount: moreActions.length,
-                  ),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: moreActions
+                      .map((action) => _buildMiniActionTab(context, action: action))
+                      .toList(),
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -464,50 +423,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSlimActionTile(
+  Widget _buildMiniActionTab(
     BuildContext context, {
     required _FeatureAction action,
   }) {
     return Material(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(999),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: action.builder),
         ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: action.color.withValues(alpha: 0.25),
-            ),
+            color: action.color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: action.color.withValues(alpha: 0.26)),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: action.color.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(action.icon, size: 18, color: action.color),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  action.label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              Icon(action.icon, size: 16, color: action.color),
+              const SizedBox(width: 8),
+              Text(
+                action.label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: action.color,
+                    ),
               ),
             ],
           ),

@@ -36,14 +36,14 @@ class EventsActivitiesScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Entdecke Aktivitäten, die zu euch passen',
+                    'Alles für eure Familien-Aktivitäten',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Finde lokale Angebote, tausche dich mit Eltern aus oder veröffentliche eigene Events.',
+                    'Entdecke lokale Angebote, finde Aktivitäten in deiner Nähe und veröffentliche eigene Events.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.35,
@@ -68,10 +68,11 @@ class EventsActivitiesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _ActionCard(
-              icon: Icons.groups_rounded,
-              title: 'Eltern-Meetups',
-              subtitle: 'Meetups ansehen und passende Treffen finden',
+              icon: Icons.explore_rounded,
+              title: 'Aktivitäten in der Nähe',
+              subtitle: 'Öffentliche und private Aktivitäten nach Standort ansehen',
               color: const Color(0xFF2563EB),
+              badge: 'Neu',
               onTap: () {
                 Navigator.push(
                   context,

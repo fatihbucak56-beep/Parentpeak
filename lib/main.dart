@@ -27,6 +27,7 @@ final GlobalKey<DemoAppState> demoAppKey = GlobalKey<DemoAppState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final startupInviteInput = _extractStartupInviteInput();
   try {
     await dotenv.load();
   } catch (e) {
@@ -55,11 +56,51 @@ void main() async {
   await BackgroundSyncManager.initialize();
   await NotificationService.instance.initialize();
   await AuthService.instance.initialize();
-  runApp(DemoApp(key: demoAppKey));
+  runApp(DemoApp(
+    key: demoAppKey,
+    startupInviteInput: startupInviteInput,
+  ));
+}
+
+String? _extractStartupInviteInput() {
+  // Support app-start deep links via route name (mobile) and base URI (web/desktop).
+  final candidates = <String>[
+    WidgetsBinding.instance.platformDispatcher.defaultRouteName,
+    Uri.base.toString(),
+  ];
+
+  for (final candidate in candidates) {
+    final parsed = _extractInviteInputFromString(candidate);
+    if (parsed != null) return parsed;
+  }
+
+  return null;
+}
+
+String? _extractInviteInputFromString(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final input = raw.trim();
+
+  final uri = Uri.tryParse(input);
+  if (uri != null) {
+    final code = uri.queryParameters['code']?.trim();
+    if (code != null && code.isNotEmpty) {
+      return code;
+    }
+  }
+
+  final codeMatch = RegExp(r'(PP-[A-Za-z0-9]+)').firstMatch(input);
+  if (codeMatch != null) {
+    return codeMatch.group(1)?.toUpperCase();
+  }
+
+  return null;
 }
 
 class DemoApp extends StatefulWidget {
-  const DemoApp({super.key});
+  final String? startupInviteInput;
+
+  const DemoApp({super.key, this.startupInviteInput});
 
   static void setThemeMode(ThemeMode mode) {
     debugPrint('📱 DemoApp.setThemeMode() called with mode=$mode');
@@ -182,6 +223,7 @@ class DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
       home: LanguageProviderWrapper(
         child: AuthGate(
           devices: mockDevices,
+          startupInviteInput: widget.startupInviteInput,
           onRevoke: (uuid, name) async {
             try {
               return await service.revokeDevice(uuid, 'Demo Revoke');
@@ -198,9 +240,13 @@ class DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
 class ParentpeakAppShell extends StatefulWidget {
   final List<TrustedDevice> devices;
   final Future<bool> Function(String deviceUuid, String deviceName) onRevoke;
+  final String? startupInviteInput;
 
   const ParentpeakAppShell(
-      {super.key, required this.devices, required this.onRevoke});
+      {super.key,
+      required this.devices,
+      required this.onRevoke,
+      this.startupInviteInput});
 
   @override
   State<ParentpeakAppShell> createState() => _ParentpeakAppShellState();
@@ -238,7 +284,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
     final tabs = <Widget>[
       LanguageAwareWidget(
         key: ValueKey('home-${languageService.currentLanguage}'),
-        child: const HomeScreen(),
+        child: HomeScreen(initialInviteInput: widget.startupInviteInput),
       ),
       LanguageAwareWidget(
           key: ValueKey('family-${languageService.currentLanguage}'),
@@ -286,8 +332,14 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
 class AuthGate extends StatefulWidget {
   final List<TrustedDevice> devices;
   final Future<bool> Function(String, String) onRevoke;
+  final String? startupInviteInput;
 
-  const AuthGate({super.key, required this.devices, required this.onRevoke});
+  const AuthGate({
+    super.key,
+    required this.devices,
+    required this.onRevoke,
+    this.startupInviteInput,
+  });
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -322,6 +374,7 @@ class _AuthGateState extends State<AuthGate> {
     return ParentpeakAppShell(
       devices: widget.devices,
       onRevoke: widget.onRevoke,
+      startupInviteInput: widget.startupInviteInput,
     );
   }
 }

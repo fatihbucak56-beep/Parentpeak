@@ -7,6 +7,7 @@ import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
 import 'package:trusted_circle_demo/ui/backend_status_screen.dart';
 import 'package:trusted_circle_demo/ui/events_activities_screen.dart';
+import 'package:trusted_circle_demo/ui/event_invitations_screen.dart';
 import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
 import 'package:trusted_circle_demo/ui/organization_screen.dart';
 import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
@@ -33,7 +34,9 @@ class _FeatureAction {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String? initialInviteInput;
+
+  const HomeScreen({super.key, this.initialInviteInput});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -43,12 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final FlutterTts _tts = FlutterTts();
   WeeklyImpulse? _weeklyImpulse;
   bool _isLoadingWeeklyImpulse = true;
+  bool _initialInviteHandled = false;
 
   @override
   void initState() {
     super.initState();
     languageService.addListener(_onLanguageChanged);
     _loadWeeklyImpulse();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openInitialInviteIfNeeded();
+    });
   }
 
   @override
@@ -73,6 +80,19 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoadingWeeklyImpulse = false;
       });
     }
+  }
+
+  void _openInitialInviteIfNeeded() {
+    if (_initialInviteHandled) return;
+    final input = widget.initialInviteInput?.trim();
+    if (input == null || input.isEmpty || !mounted) return;
+
+    _initialInviteHandled = true;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EventInvitationsScreen(initialInviteInput: input),
+      ),
+    );
   }
 
   Future<void> _playWeeklyImpulseAudio() async {

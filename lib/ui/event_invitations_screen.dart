@@ -7,7 +7,9 @@ import 'package:trusted_circle_demo/models/family_contact.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 
 class EventInvitationsScreen extends StatefulWidget {
-  const EventInvitationsScreen({super.key});
+  final String? initialInviteInput;
+
+  const EventInvitationsScreen({super.key, this.initialInviteInput});
 
   @override
   State<EventInvitationsScreen> createState() => _EventInvitationsScreenState();
@@ -31,7 +33,16 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
   @override
   void initState() {
     super.initState();
+    final initialInput = widget.initialInviteInput?.trim();
+    if (initialInput != null && initialInput.isNotEmpty) {
+      _codeCtrl.text = initialInput;
+    }
     _load();
+    if (initialInput != null && initialInput.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _joinByCode();
+      });
+    }
   }
 
   @override

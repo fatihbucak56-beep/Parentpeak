@@ -16,13 +16,13 @@ class EventsActivitiesScreen extends StatelessWidget {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFF3FAF9), Color(0xFFF7F8FE), Color(0xFFFFFAF2)],
+            colors: [Color(0xFFF5FBFA), Color(0xFFF8FAFD), Color(0xFFFFFBF5)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             Container(
               padding: const EdgeInsets.all(16),
@@ -37,14 +37,14 @@ class EventsActivitiesScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Alles für eure Familien-Aktivitäten',
+                    'Weniger klicken, schneller starten',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Entdecke lokale Angebote, finde Aktivitäten in deiner Nähe und veröffentliche eigene Events.',
+                    'Wir haben den Bereich vereinfacht: 2 Hauptwege und kompakte Schnellaktionen.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.35,
@@ -53,11 +53,11 @@ class EventsActivitiesScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-            _ActionCard(
+            const SizedBox(height: 16),
+            _PrimaryActionTile(
               icon: Icons.auto_awesome_rounded,
-              title: 'Aktivitäten entdecken',
-              subtitle: 'Events, Theater, Kino und mehr in deiner Stadt finden',
+              title: 'Entdecken',
+              subtitle: 'Kuratierte Aktivitäten wie Theater, Kurse und Ausflüge',
               color: const Color(0xFF0EA5A4),
               badge: 'Empfohlen',
               onTap: () {
@@ -68,10 +68,10 @@ class EventsActivitiesScreen extends StatelessWidget {
               },
             ),
             const SizedBox(height: 12),
-            _ActionCard(
+            _PrimaryActionTile(
               icon: Icons.explore_rounded,
-              title: 'Aktivitäten in der Nähe',
-              subtitle: 'Öffentliche und private Aktivitäten nach Standort ansehen',
+              title: 'In deiner Nähe',
+              subtitle: 'Feed mit öffentlichen, Familienkreis- und Einladungs-Events',
               color: const Color(0xFF2563EB),
               badge: 'Neu',
               onTap: () {
@@ -81,31 +81,44 @@ class EventsActivitiesScreen extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 12),
-            _ActionCard(
-              icon: Icons.add_circle_rounded,
-              title: 'Event erstellen',
-              subtitle: 'Neues Familien-Event planen und veröffentlichen',
-              color: const Color(0xFFF59E0B),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CreateEventScreen()),
-                );
-              },
+            const SizedBox(height: 16),
+            Text(
+              'Schnellaktionen',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            const SizedBox(height: 12),
-            _ActionCard(
-              icon: Icons.mark_email_unread_rounded,
-              title: 'Einladungen',
-              subtitle: 'Event-Einladungen annehmen oder per Code beitreten',
-              color: const Color(0xFF4F46E5),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EventInvitationsScreen()),
-                );
-              },
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _CompactActionButton(
+                    icon: Icons.add_circle_rounded,
+                    label: 'Event erstellen',
+                    color: const Color(0xFFF59E0B),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CreateEventScreen()),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _CompactActionButton(
+                    icon: Icons.mark_email_unread_rounded,
+                    label: 'Einladungen',
+                    color: const Color(0xFF4F46E5),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const EventInvitationsScreen()),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -114,8 +127,8 @@ class EventsActivitiesScreen extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
+class _PrimaryActionTile extends StatelessWidget {
+  const _PrimaryActionTile({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -146,18 +159,18 @@ class _ActionCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: color.withValues(alpha: 0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(15),
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(12),
@@ -208,6 +221,7 @@ class _ActionCard extends StatelessWidget {
                               color: Theme.of(context)
                                   .colorScheme
                                   .onSurfaceVariant,
+                          height: 1.3,
                             ),
                       ),
                     ],
@@ -227,6 +241,56 @@ class _ActionCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactActionButton extends StatelessWidget {
+  const _CompactActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.22)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

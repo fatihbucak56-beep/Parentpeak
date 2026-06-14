@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/main.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
-import 'package:trusted_circle_demo/ui/photos_screen.dart';
-import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/backend_status_screen.dart';
 import 'package:trusted_circle_demo/ui/events_activities_screen.dart';
 import 'package:trusted_circle_demo/ui/event_invitations_screen.dart';
 import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
@@ -12,6 +9,10 @@ import 'package:trusted_circle_demo/ui/organization_screen.dart';
 import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 import 'package:trusted_circle_demo/ui/parent_matching_screen.dart';
 import 'package:trusted_circle_demo/ui/chat_screen.dart';
+import 'package:trusted_circle_demo/ui/finance_budget_screen.dart';
+import 'package:trusted_circle_demo/ui/kettenbrecher_dashboard.dart';
+import 'package:trusted_circle_demo/ui/treasure_handover_screen.dart';
+import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 
 class _FeatureAction {
   final String label;
@@ -40,7 +41,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _initialInviteHandled = false;
-  bool _showAllHomeTabs = false;
 
   @override
   void initState() {
@@ -79,15 +79,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _t(String key) {
-    return AppStringsManager.getString(languageService.currentLanguage, key);
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final now = DateTime.now();
-    final hour = now.hour;
+    final l10n = AppLocalizations.of(context);
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final contentMaxWidth = viewportWidth >= 1400
+      ? 1260.0
+      : viewportWidth >= 1024
+        ? 1120.0
+        : double.infinity;
+    final horizontalPadding = viewportWidth >= 1024 ? 24.0 : 20.0;
+    final gridCrossAxisCount = viewportWidth >= 1220
+      ? 4
+      : viewportWidth >= 860
+        ? 3
+        : 2;
+    final gridAspectRatio = viewportWidth >= 1220
+      ? 1.42
+      : viewportWidth >= 860
+        ? 1.36
+        : 1.38;
 
     final featureActions = <_FeatureAction>[
       _FeatureAction(
@@ -106,17 +118,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       _FeatureAction(
         label: 'Events & Aktivitäten',
-        description: 'Aktivitäten entdecken, erstellen und Einladungen steuern',
+        description: 'Events finden und selbst anbieten',
         icon: Icons.celebration_rounded,
         color: const Color(0xFF8B5CF6),
         builder: (_) => const EventsActivitiesScreen(),
-      ),
-      _FeatureAction(
-        label: 'Einladungen',
-        description: 'Codes einlösen und Zusagen verwalten',
-        icon: Icons.mark_email_unread_rounded,
-        color: const Color(0xFF4F46E5),
-        builder: (_) => const EventInvitationsScreen(),
       ),
       _FeatureAction(
         label: 'Familienkreis',
@@ -124,6 +129,14 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.people_alt_rounded,
         color: const Color(0xFF4F46E5),
         builder: (_) => const FamilyCircleScreen(),
+      ),
+      _FeatureAction(
+        label: l10n.t('treasureTileTitle', fallback: 'Kinder-Schatzkiste'),
+        description:
+            l10n.t('treasureDateOrSwap', fallback: 'Date oder Geister-Tausch'),
+        icon: Icons.inventory_2_rounded,
+        color: const Color(0xFF1E5CD7),
+        builder: (_) => const TreasureHandoverScreen(),
       ),
       _FeatureAction(
         label: 'Eltern Match',
@@ -147,158 +160,101 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const OrganizationScreen(),
       ),
       _FeatureAction(
-        label: 'Fotos',
-        description: 'Bilder und Erinnerungen',
-        icon: Icons.photo_library_rounded,
+        label: 'Essensplaner X',
+        description: 'Guerilla-Kochen, Hub-Rotation und SOS',
+        icon: Icons.restaurant_menu_rounded,
         color: const Color(0xFFF59E0B),
-        builder: (_) => const PhotosScreen(),
+        builder: (_) => const KettenbrecherDashboard(),
       ),
       _FeatureAction(
-        label: 'Sicherheit',
-        description: 'Richtlinien und Schutz auf einen Blick',
-        icon: Icons.shield_rounded,
-        color: const Color(0xFF6366F1),
-        builder: (_) => const SafetyGuideScreen(),
-      ),
-      _FeatureAction(
-        label: 'Systemstatus',
-        description: 'API-Verbindung und Endpunkte prüfen',
-        icon: Icons.cloud_sync_rounded,
-        color: const Color(0xFF0F766E),
-        builder: (_) => const BackendStatusScreen(),
+        label: 'Finanzen & Budget',
+        description: 'Ausgaben fair teilen und smarter sparen',
+        icon: Icons.account_balance_wallet_rounded,
+        color: const Color(0xFF1D4ED8),
+        builder: (_) => const FinanceBudgetScreen(),
       ),
     ];
 
-    final primaryActions = featureActions.take(4).toList();
-    final moreActions = featureActions.skip(4).toList();
-    final visibleGridActions = _showAllHomeTabs ? featureActions : primaryActions;
+    final visibleGridActions = featureActions;
 
-    String greeting = _t('greeting_morning');
-    if (hour >= 12 && hour < 18) {
-      greeting = _t('greeting_afternoon');
-    } else if (hour >= 18) {
-      greeting = _t('greeting_evening');
-    }
+    final displayName = AuthService.instance.currentUser?.displayName.trim() ?? '';
+    final familyGreeting = displayName.isEmpty
+        ? 'Hallo Familie 👋'
+        : 'Hallo Familie $displayName 👋';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                child: _buildHeroCard(theme, greeting),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                child: _buildSectionHeader(
-                  title: 'Schnellzugriff',
-                  subtitle: _showAllHomeTabs
-                      ? 'Alle Bereiche als kompakte Kacheln'
-                      : 'Kernbereiche für den Alltag',
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: contentMaxWidth),
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(horizontalPadding, 10, horizontalPadding, 8),
+                    child: _buildHeroCard(theme, familyGreeting),
+                  ),
                 ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: _buildHomeModeSwitch(theme),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final action = visibleGridActions[index];
-                    return _buildFeatureTile(
-                      context,
-                      title: action.label,
-                      subtitle: action.description,
-                      icon: action.icon,
-                      color: action.color,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: action.builder),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    child: Container(
+                      height: 1,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.outline.withValues(alpha: 0),
+                            theme.colorScheme.outline.withValues(alpha: 0.2),
+                            theme.colorScheme.outline.withValues(alpha: 0),
+                          ],
+                        ),
                       ),
-                    );
-                  },
-                  childCount: visibleGridActions.length,
+                    ),
+                  ),
                 ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.92,
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(horizontalPadding, 14, horizontalPadding, 24),
+                  sliver: SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final action = visibleGridActions[index];
+                        return _buildFeatureTile(
+                          context,
+                          title: action.label,
+                          subtitle: action.description,
+                          icon: action.icon,
+                          color: action.color,
+                          compact: true,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: action.builder),
+                          ),
+                        );
+                      },
+                      childCount: visibleGridActions.length,
+                    ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: gridCrossAxisCount,
+                      mainAxisSpacing: 7,
+                      crossAxisSpacing: 7,
+                      childAspectRatio: gridAspectRatio,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-            if (!_showAllHomeTabs)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  child: _buildSectionHeader(
-                    title: 'Weitere Schnellzugriffe',
-                    subtitle: 'Kompakte Tabs für alle übrigen Bereiche',
-                  ),
-                ),
-              ),
-            if (!_showAllHomeTabs)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: moreActions
-                        .map((action) => _buildMiniActionTab(context, action: action))
-                        .toList(),
-                  ),
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHomeModeSwitch(ThemeData theme) {
+  Widget _buildHeroCard(ThemeData theme, String familyGreeting) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _HomeModeButton(
-              label: 'Kernbereiche',
-              selected: !_showAllHomeTabs,
-              onTap: () => setState(() => _showAllHomeTabs = false),
-            ),
-          ),
-          Expanded(
-            child: _HomeModeButton(
-              label: 'Alle Bereiche',
-              selected: _showAllHomeTabs,
-              onTap: () => setState(() => _showAllHomeTabs = true),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeroCard(ThemeData theme, String greeting) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
           colors: [
             theme.colorScheme.primary,
@@ -310,78 +266,88 @@ class _HomeScreenState extends State<HomeScreen> {
         boxShadow: [
           BoxShadow(
             color: theme.colorScheme.primary.withValues(alpha: 0.22),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(20),
+          Text(
+            'Parentpeak',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+              fontFamily: 'SF Pro Rounded',
             ),
-            child: const Icon(Icons.family_restroom_rounded,
-                color: Colors.white, size: 34),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greeting 👋',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    fontWeight: FontWeight.w600,
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(
+                    'assets/images/neue logo.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Alles für eure Familie an einem Ort',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      familyGreeting,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.97),
+                        fontWeight: FontWeight.w500,
+                        height: 1.18,
+                        letterSpacing: 0.15,
+                        fontFamily: 'SF Pro Rounded',
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Alles Wichtige für euren Alltag.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Gemeinsam planen, teilen und verbunden bleiben.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        height: 1.2,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'Termine, Chat und Familie schneller erreichen.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(
-      {required String title, required String subtitle}) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style:
-              theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 
@@ -391,6 +357,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     required Color color,
     required IconData icon,
+    bool compact = false,
     VoidCallback? onTap,
   }) {
     final theme = Theme.of(context);
@@ -401,10 +368,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compactTile =
-                constraints.maxWidth < 150 || constraints.maxHeight < 210;
+                compact || constraints.maxWidth < 150 || constraints.maxHeight < 210;
 
             return Container(
-              padding: EdgeInsets.all(compactTile ? 14 : 16),
+              padding: EdgeInsets.all(compactTile ? 9 : 14),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -419,24 +386,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: compactTile ? 28 : 42,
+                    height: compactTile ? 28 : 42,
                     decoration: BoxDecoration(
                       color: color,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(compactTile ? 10 : 14),
                     ),
-                    child: Icon(icon, color: Colors.white, size: 26),
+                    child: Icon(icon, color: Colors.white, size: compactTile ? 15 : 22),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: compactTile ? 4 : 8),
                   Text(
                     title,
-                    maxLines: 2,
+                    maxLines: compactTile ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: (compactTile
+                            ? theme.textTheme.labelLarge
+                            : theme.textTheme.titleMedium)
+                        ?.copyWith(
                       fontWeight: FontWeight.bold,
+                      fontSize: compactTile ? 12.5 : null,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: compactTile ? 1 : 3),
                   Text(
                     subtitle,
                     style: (compactTile
@@ -444,102 +415,24 @@ class _HomeScreenState extends State<HomeScreen> {
                             : theme.textTheme.bodyMedium)
                         ?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.3,
+                      height: compactTile ? 1.2 : 1.3,
+                      fontSize: compactTile ? 10.5 : null,
                     ),
                     maxLines: compactTile ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Spacer(),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Icon(Icons.arrow_forward_ios_rounded,
-                        size: 14, color: theme.colorScheme.onSurfaceVariant),
-                  ),
+                  if (!compactTile) ...[
+                    const Spacer(),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Icon(Icons.arrow_forward_ios_rounded,
+                          size: 14, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
                 ],
               ),
             );
           },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMiniActionTab(
-    BuildContext context, {
-    required _FeatureAction action,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: action.builder),
-        ),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: action.color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: action.color.withValues(alpha: 0.26)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(action.icon, size: 16, color: action.color),
-              const SizedBox(width: 8),
-              Text(
-                action.label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: action.color,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeModeButton extends StatelessWidget {
-  const _HomeModeButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected
-                ? theme.colorScheme.primary.withValues(alpha: 0.14)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
         ),
       ),
     );

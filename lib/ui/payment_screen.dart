@@ -147,6 +147,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final contentMaxWidth = viewportWidth >= 1200
+        ? 920.0
+        : viewportWidth >= 900
+            ? 820.0
+            : double.infinity;
+    final horizontalPadding = viewportWidth >= 900 ? 24.0 : 16.0;
+
     return PopScope(
       canPop: !_isProcessing,
       child: Scaffold(
@@ -164,10 +172,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            padding: EdgeInsets.all(horizontalPadding),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
@@ -296,74 +307,53 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 const SizedBox(height: 12),
 
                 // Stripe Option
-                Card(
-                  child: RadioListTile<String>(
-                    title: Row(
-                      children: [
-                        const Icon(Icons.credit_card, size: 20),
-                        const SizedBox(width: 8),
-                        const Text('Stripe'),
-                      ],
-                    ),
-                    subtitle: const Text('Visa, Mastercard, etc.'),
-                    value: 'stripe',
-                    groupValue: _selectedPaymentMethod,
-                    onChanged: _isProcessing
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setState(() => _selectedPaymentMethod = value);
-                            }
-                          },
-                  ),
+                _PaymentMethodOptionTile(
+                  title: 'Stripe',
+                  subtitle: 'Visa, Mastercard, etc.',
+                  icon: Icons.credit_card,
+                  selected: _selectedPaymentMethod == 'stripe',
+                  enabled: !_isProcessing,
+                  onTap: () => setState(() => _selectedPaymentMethod = 'stripe'),
                 ),
                 const SizedBox(height: 12),
 
                 // PayPal Option
-                Card(
-                  child: RadioListTile<String>(
-                    title: Row(
-                      children: [
-                        const Icon(Icons.payment, size: 20),
-                        const SizedBox(width: 8),
-                        const Text('PayPal'),
-                      ],
-                    ),
-                    subtitle: const Text('Bezahl mit deinem PayPal-Konto'),
-                    value: 'paypal',
-                    groupValue: _selectedPaymentMethod,
-                    onChanged: _isProcessing
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setState(() => _selectedPaymentMethod = value);
-                            }
-                          },
-                  ),
+                _PaymentMethodOptionTile(
+                  title: 'PayPal',
+                  subtitle: 'Bezahl mit deinem PayPal-Konto',
+                  icon: Icons.payment,
+                  selected: _selectedPaymentMethod == 'paypal',
+                  enabled: !_isProcessing,
+                  onTap: () => setState(() => _selectedPaymentMethod = 'paypal'),
                 ),
                 const SizedBox(height: 24),
 
                 // Sicherheits-Hinweis
-                Container(
-                  padding: const EdgeInsets.all(12),
+                const DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                    color: Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    border: Border.fromBorderSide(
+                      BorderSide(color: Color(0xFFBFDBFE)),
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.lock,
-                          color: Color(0xFF1D4ED8), size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Deine Zahlungsdaten sind sicher verschlüsselt',
-                          style: const TextStyle(
-                              color: Color(0xFF1D4ED8), fontSize: 12),
+                  child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock, color: Color(0xFF1D4ED8), size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Deine Zahlungsdaten sind sicher verschlüsselt',
+                            style: TextStyle(
+                              color: Color(0xFF1D4ED8),
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -414,8 +404,81 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentMethodOptionTile extends StatelessWidget {
+  const _PaymentMethodOptionTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderColor = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outlineVariant;
+
+    return Card(
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              Icon(icon, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

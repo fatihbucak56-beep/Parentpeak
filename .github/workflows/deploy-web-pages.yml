@@ -25,6 +25,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.44.1
 
       - name: Prepare env file
         run: cp .env.example .env
@@ -33,7 +34,14 @@ jobs:
         run: flutter pub get
 
       - name: Build web
-        run: flutter build web --release
+        run: flutter build web --release 2>&1 | tee flutter-build.log
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-build-log
+          path: flutter-build.log
 
       - name: Add custom domain
         run: echo "parentpeak.de" > build/web/CNAME

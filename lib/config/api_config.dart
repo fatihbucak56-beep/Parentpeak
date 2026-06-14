@@ -108,6 +108,22 @@ class APIConfig {
     return _getEnvOrDefault('BACKEND_FAMILY_ID', 'demo-family-001');
   }
 
+  static String getBackendProvidersPath() {
+    return _getEnvOrDefault('BACKEND_PROVIDERS_PATH', '/api/providers');
+  }
+
+  static String getBackendProviderCategoriesPath() {
+    return _getEnvOrDefault('BACKEND_PROVIDER_CATEGORIES_PATH', '/api/categories');
+  }
+
+  static String getBackendProviderSearchPath() {
+    return _getEnvOrDefault('BACKEND_PROVIDER_SEARCH_PATH', '/api/search');
+  }
+
+  static String getBackendProviderFilterPath() {
+    return _getEnvOrDefault('BACKEND_PROVIDER_FILTER_PATH', '/api/providers/filter');
+  }
+
   static String getBackendApiVersion() {
     return _getEnvOrDefault('BACKEND_API_VERSION', 'v1');
   }
@@ -129,6 +145,48 @@ class APIConfig {
     return _getEnvOrDefault('BACKEND_CALENDAR_EVENTS_PATH', '/calendar/events');
   }
 
+  static String getBackendMealPlansPath() {
+    return _getEnvOrDefault('BACKEND_MEAL_PLANS_PATH', '/meal-plans');
+  }
+
+  static String getBackendFinancePath() {
+    return _getEnvOrDefault('BACKEND_FINANCE_PATH', '/finance');
+  }
+
+  static String getBackendKettenbrecherHubPath() {
+    return _getEnvOrDefault('BACKEND_KETTENBRECHER_HUB_PATH', '/kettenbrecher/hub');
+  }
+
+  static String getBackendKettenbrecherLocalHelpProfilesPath() {
+    return _getEnvOrDefault(
+      'BACKEND_KETTENBRECHER_LOCAL_HELP_PROFILES_PATH',
+      '/kettenbrecher/local-help/profiles',
+    );
+  }
+
+  static String getBackendKettenbrecherSosPath() {
+    return _getEnvOrDefault('BACKEND_KETTENBRECHER_SOS_PATH', '/kettenbrecher/sos');
+  }
+
+  static String getBackendKettenbrecherSosResponderActionPath() {
+    return _getEnvOrDefault(
+      'BACKEND_KETTENBRECHER_SOS_RESPONDER_ACTION_PATH',
+      '/kettenbrecher/sos/responder-action',
+    );
+  }
+
+  static String getBackendCommunitySnacksPath() {
+    return _getEnvOrDefault('BACKEND_COMMUNITY_SNACKS_PATH', '/community/snacks');
+  }
+
+  static String getBackendAudioHacksPath() {
+    return _getEnvOrDefault('BACKEND_AUDIO_HACKS_PATH', '/community/audio-hacks');
+  }
+
+  static String getBackendIngredientSharesPath() {
+    return _getEnvOrDefault('BACKEND_INGREDIENT_SHARES_PATH', '/community/ingredient-shares');
+  }
+
   static String getBackendHealthPath() {
     return _getEnvOrDefault('BACKEND_HEALTH_PATH', '/health');
   }
@@ -136,6 +194,100 @@ class APIConfig {
   static String getBackendWeeklyImpulsePath() {
     return _getEnvOrDefault(
         'BACKEND_WEEKLY_IMPULSE_PATH', '/api/weekly-impulse');
+  }
+
+  static String getBackendPhotosPath() {
+    return _getEnvOrDefault('BACKEND_PHOTOS_PATH', '/photos');
+  }
+
+  static String getBackendParentMatchingProfilesPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PARENT_MATCHING_PROFILES_PATH',
+      '/parent-matching/profiles',
+    );
+  }
+
+  static String getBackendParentMatchingActionsPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PARENT_MATCHING_ACTIONS_PATH',
+      '/parent-matching/actions',
+    );
+  }
+
+  static String getBackendFamilyContactsPath() {
+    return _getEnvOrDefault('BACKEND_FAMILY_CONTACTS_PATH', '/family/contacts');
+  }
+
+  static String getBackendFamilyRequestsPath() {
+    return _getEnvOrDefault('BACKEND_FAMILY_REQUESTS_PATH', '/family/requests');
+  }
+
+  static String getBackendEventsPath() {
+    return _getEnvOrDefault('BACKEND_EVENTS_PATH', '/events');
+  }
+
+  static String getBackendEventInvitationsPath() {
+    return _getEnvOrDefault('BACKEND_EVENT_INVITATIONS_PATH', '/events/invitations');
+  }
+
+  static String getBackendEventInvitationsJoinPath() {
+    return _getEnvOrDefault(
+      'BACKEND_EVENT_INVITATIONS_JOIN_PATH',
+      '/events/invitations/join',
+    );
+  }
+
+  static String getBackendHostedInviteOnlyEventsPath() {
+    return _getEnvOrDefault(
+      'BACKEND_HOSTED_INVITE_ONLY_EVENTS_PATH',
+      '/events/hosted-invite-only',
+    );
+  }
+
+  static String getBackendPaymentsStripeInitPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PAYMENTS_STRIPE_INIT_PATH',
+      '/payments/stripe/initiate',
+    );
+  }
+
+  static String getBackendPaymentsPayPalInitPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PAYMENTS_PAYPAL_INIT_PATH',
+      '/payments/paypal/initiate',
+    );
+  }
+
+  static String getBackendPaymentsConfirmPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PAYMENTS_CONFIRM_PATH',
+      '/payments/confirm',
+    );
+  }
+
+  static String getBackendPaymentsTransactionsPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PAYMENTS_TRANSACTIONS_PATH',
+      '/payments/transactions',
+    );
+  }
+
+  static String getBackendPaymentsHostPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PAYMENTS_HOST_PATH',
+      '/payments/host',
+    );
+  }
+
+  static String getBackendPaymentsPath() {
+    return _getEnvOrDefault('BACKEND_PAYMENTS_PATH', '/payments');
+  }
+
+  static String getBackendPaymentTransactionsPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PAYMENT_TRANSACTIONS_PATH',
+      '/payments/transactions',
+    );
   }
 
   static String _getEnvOrDefault(String key, String fallback) {

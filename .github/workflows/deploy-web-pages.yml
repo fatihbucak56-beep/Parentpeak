@@ -46,9 +46,6 @@ jobs:
           name: flutter-build-log
           path: flutter-build.log
 
-      - name: Add custom domain
-        run: echo "parentpeak.de" > build/web/CNAME
-
       - name: SPA fallback for deep links
         run: cp build/web/index.html build/web/404.html
 

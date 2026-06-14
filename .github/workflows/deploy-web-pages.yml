@@ -26,6 +26,9 @@ jobs:
         with:
           channel: stable
 
+      - name: Prepare env file
+        run: cp .env.example .env
+
       - name: Flutter pub get
         run: flutter pub get
 

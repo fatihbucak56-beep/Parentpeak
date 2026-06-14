@@ -1,9 +1,12 @@
+import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/models/family_contact.dart';
 
 class FamilyCircleService {
   FamilyCircleService._();
 
   static final FamilyCircleService instance = FamilyCircleService._();
+  static final _apiClient = BackendServiceFactory.createApiClient();
 
   static final List<FamilyContact> _contacts = [
     const FamilyContact(
@@ -52,19 +55,80 @@ class FamilyCircleService {
     return '${sorted[0]}::${sorted[1]}';
   }
 
+  List<FamilyContact> _localContactsFor(String userId) {
+    return [
+      ..._contacts.where((contact) => contact.userId != 'host_demo_001'),
+      FamilyContact(
+        userId: userId,
+        displayName: 'Du',
+        city: 'Berlin',
+        childrenSummary: 'Familienprofil',
+      ),
+    ];
+  }
+
+  Set<String> _localConnectionKeysFor(String userId) {
+    return {
+      _pairKey(userId, 'host_001'),
+      _pairKey(userId, 'host_002'),
+      ..._connectionKeys.where((key) => !key.contains('host_demo_001')),
+    };
+  }
+
+  List<FamilyConnectionRequest> _localRequestsFor(String userId) {
+    return [
+      FamilyConnectionRequest(
+        id: 'req_1',
+        fromUserId: 'host_003',
+        toUserId: userId,
+        fromDisplayName: 'Noah Weber',
+        sentAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+    ];
+  }
+
   Future<List<FamilyContact>> getConnectedContacts({required String userId}) async {
+    if (_apiClient != null) {
+      try {
+        final payload = await _apiClient!
+            .getJson('${APIConfig.getBackendFamilyContactsPath()}?userId=$userId');
+        final remote = _parseContacts(payload);
+        if (remote.isNotEmpty) return remote;
+      } catch (_) {
+        // Fallback below.
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 180));
-    return _contacts.where((c) {
+    final contacts = _localContactsFor(userId);
+    final connectionKeys = _localConnectionKeysFor(userId);
+    return contacts.where((c) {
       if (c.userId == userId) return false;
-      return areUsersConnected(userA: userId, userB: c.userId);
+      return connectionKeys.contains(_pairKey(userId, c.userId));
     }).toList();
   }
 
   Future<List<FamilyConnectionRequest>> getIncomingRequests({
     required String userId,
   }) async {
+    if (_apiClient != null) {
+      try {
+        final payload = await _apiClient!
+            .getJson('${APIConfig.getBackendFamilyRequestsPath()}?userId=$userId');
+        final remote = _parseRequests(payload);
+        if (remote.isNotEmpty) {
+          return remote
+              .where((r) =>
+                  r.toUserId == userId && r.status == FamilyRequestStatus.pending)
+              .toList();
+        }
+      } catch (_) {
+        // Fallback below.
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 180));
-    return _incomingRequests
+    return _localRequestsFor(userId)
         .where((r) => r.toUserId == userId && r.status == FamilyRequestStatus.pending)
         .toList();
   }
@@ -91,6 +155,25 @@ class FamilyCircleService {
     if (accept) {
       _connectionKeys.add(_pairKey(req.fromUserId, req.toUserId));
     }
+
+    if (_apiClient != null) {
+      try {
+        final path = APIConfig.getBackendFamilyRequestsPath();
+        final normalizedPath = path.endsWith('/')
+            ? '${path.substring(0, path.length - 1)}/$requestId'
+            : '$path/$requestId';
+        await _apiClient!.putJson(
+          normalizedPath,
+          {
+            'status': accept ? 'accepted' : 'declined',
+            'updatedAt': DateTime.now().toUtc().toIso8601String(),
+            'schemaVersion': APIConfig.getBackendApiVersion(),
+          },
+        );
+      } catch (_) {
+        // Local state remains source of truth if backend update fails.
+      }
+    }
   }
 
   bool areUsersConnected({required String userA, required String userB}) {
@@ -102,5 +185,79 @@ class FamilyCircleService {
       if (c.userId == userId) return c;
     }
     return null;
+  }
+
+  static List<FamilyContact> _parseContacts(dynamic payload) {
+    final rawList = <Map<String, dynamic>>[];
+
+    if (payload is List) {
+      for (final item in payload) {
+        if (item is Map) rawList.add(Map<String, dynamic>.from(item));
+      }
+    } else if (payload is Map) {
+      final map = Map<String, dynamic>.from(payload);
+      final list = map['contacts'] ?? map['items'] ?? map['data'] ?? map['results'];
+      if (list is List) {
+        for (final item in list) {
+          if (item is Map) rawList.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+
+    return rawList
+        .map(
+          (raw) => FamilyContact(
+            userId: (raw['userId'] ?? raw['id'] ?? '').toString(),
+            displayName: (raw['displayName'] ?? raw['name'] ?? 'Kontakt').toString(),
+            city: (raw['city'] ?? '').toString(),
+            childrenSummary: (raw['childrenSummary'] ?? raw['children'] ?? '').toString(),
+          ),
+        )
+        .where((c) => c.userId.isNotEmpty)
+        .toList();
+  }
+
+  static List<FamilyConnectionRequest> _parseRequests(dynamic payload) {
+    final rawList = <Map<String, dynamic>>[];
+
+    if (payload is List) {
+      for (final item in payload) {
+        if (item is Map) rawList.add(Map<String, dynamic>.from(item));
+      }
+    } else if (payload is Map) {
+      final map = Map<String, dynamic>.from(payload);
+      final list = map['requests'] ?? map['items'] ?? map['data'] ?? map['results'];
+      if (list is List) {
+        for (final item in list) {
+          if (item is Map) rawList.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+
+    FamilyRequestStatus parseStatus(String raw) {
+      switch (raw.toLowerCase().trim()) {
+        case 'accepted':
+          return FamilyRequestStatus.accepted;
+        case 'declined':
+          return FamilyRequestStatus.declined;
+        default:
+          return FamilyRequestStatus.pending;
+      }
+    }
+
+    return rawList
+        .map(
+          (raw) => FamilyConnectionRequest(
+            id: (raw['id'] ?? raw['_id'] ?? '').toString(),
+            fromUserId: (raw['fromUserId'] ?? raw['from'] ?? '').toString(),
+            toUserId: (raw['toUserId'] ?? raw['to'] ?? '').toString(),
+            fromDisplayName:
+                (raw['fromDisplayName'] ?? raw['fromName'] ?? 'Unbekannt').toString(),
+            sentAt: DateTime.tryParse((raw['sentAt'] ?? '').toString()) ?? DateTime.now(),
+            status: parseStatus((raw['status'] ?? 'pending').toString()),
+          ),
+        )
+        .where((r) => r.id.isNotEmpty)
+        .toList();
   }
 }

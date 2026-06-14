@@ -22,7 +22,10 @@ class TodoBackendService {
         await _persist(todos);
         return todos;
       } catch (e) {
-        lastSyncError = 'Server-Sync fehlgeschlagen: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Server-Sync fehlgeschlagen',
+          error: e,
+        );
       }
     }
 
@@ -41,6 +44,7 @@ class TodoBackendService {
     required String assignee,
     required String category,
   }) async {
+    lastSyncError = null;
     final todo = {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
       'title': title,
@@ -69,7 +73,10 @@ class TodoBackendService {
           todo['id'] = normalized['id'];
         }
       } catch (e) {
-        lastSyncError = 'Todo konnte nicht auf Server gespeichert werden: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Todo konnte nicht auf Server gespeichert werden',
+          error: e,
+        );
       }
     }
 
@@ -77,6 +84,7 @@ class TodoBackendService {
   }
 
   Future<void> updateDone(String id, bool done) async {
+    lastSyncError = null;
     final current = await _readOrSeed();
     final idx = current.indexWhere((t) => t['id'] == id);
     if (idx == -1) return;
@@ -93,12 +101,16 @@ class TodoBackendService {
           TodoContract.buildUpdatePayload(done: done),
         );
       } catch (e) {
-        lastSyncError = 'Todo-Status konnte nicht synchronisiert werden: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Todo-Status konnte nicht synchronisiert werden',
+          error: e,
+        );
       }
     }
   }
 
   Future<void> deleteTodo(String id) async {
+    lastSyncError = null;
     final current = await _readOrSeed();
     current.removeWhere((t) => t['id'] == id);
     await _persist(current);
@@ -107,9 +119,36 @@ class TodoBackendService {
       try {
         await apiClient!.delete(TodoContract.todoByIdPath(id));
       } catch (e) {
-        lastSyncError = 'Todo konnte nicht auf Server gelöscht werden: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Todo konnte nicht auf Server gelöscht werden',
+          error: e,
+        );
       }
     }
+  }
+
+  String _friendlySyncError({
+    required String action,
+    required Object error,
+  }) {
+    final raw = error.toString().toLowerCase();
+
+    if (raw.contains('handshakeexception') ||
+        raw.contains('tls') ||
+        raw.contains('ssl') ||
+        raw.contains('certificate')) {
+      return 'Server-Verbindung aktuell nicht sicher verfuegbar. Daten bleiben lokal gespeichert.';
+    }
+
+    if (raw.contains('socketexception') ||
+        raw.contains('failed host lookup') ||
+        raw.contains('connection refused') ||
+        raw.contains('timed out') ||
+        raw.contains('timeout')) {
+      return 'Keine Verbindung zum Server. Daten bleiben lokal gespeichert.';
+    }
+
+    return '$action: $error';
   }
 
   Future<List<Map<String, dynamic>>> _readOrSeed() async {

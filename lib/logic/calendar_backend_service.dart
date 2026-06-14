@@ -22,7 +22,8 @@ class CalendarBackendService {
         await _persist(events);
         return events;
       } catch (e) {
-        lastSyncError = 'Server-Sync fehlgeschlagen: $e';
+        lastSyncError =
+            'Server derzeit nicht erreichbar. Kalender läuft im Offline-Modus.';
       }
     }
 
@@ -42,7 +43,7 @@ class CalendarBackendService {
         );
       } catch (e) {
         lastSyncError =
-            'Kalender-Event konnte nicht auf Server gespeichert werden: $e';
+            'Termin lokal gespeichert. Server-Sync wird später erneut versucht.';
       }
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:trusted_circle_demo/logic/event_backend_service.dart';
 import 'package:trusted_circle_demo/logic/family_circle_service.dart';
 import 'package:trusted_circle_demo/models/event_invitation.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
@@ -7,6 +8,7 @@ import 'package:trusted_circle_demo/models/event_participation.dart';
 
 class EventService {
   final _familyCircleService = FamilyCircleService.instance;
+  final EventBackendService _backend = EventBackendService();
 
   // Mock data - in production würde das von Firebase/Backend kommen
   static final List<MeetupEvent> _mockEvents = [
@@ -16,16 +18,16 @@ class EventService {
       title: 'Spielplatz Treffen',
       description: 'Treffen für Kinder zum gemeinsamen Spielen auf dem Spielplatz',
       category: EventCategory.socialGathering,
-      ageGroups: [AgeGroup.toddler, AgeGroup.preschool],
+      ageGroups: const [AgeGroup.toddler, AgeGroup.preschool],
       location: 'Zentralpark, Berlin',
       latitude: 52.5200,
       longitude: 13.4050,
-      eventDate: DateTime.now().add(Duration(days: 3)),
-      createdAt: DateTime.now().subtract(Duration(days: 1)),
-      paymentDate: DateTime.now().subtract(Duration(hours: 2)),
+      eventDate: DateTime.now().add(const Duration(days: 3)),
+      createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      paymentDate: DateTime.now().subtract(const Duration(hours: 2)),
       maxParticipants: 15,
       currentParticipants: 5,
-      photoUrl: 'https://via.placeholder.com/300x200?text=Playground',
+      photoUrl: '',
       status: EventStatus.active,
     ),
     MeetupEvent(
@@ -34,16 +36,16 @@ class EventService {
       title: 'Kinderturnen im Park',
       description: 'Altersgerechtes Turntraining für kleine Sportler',
       category: EventCategory.sports,
-      ageGroups: [AgeGroup.elementary],
+      ageGroups: const [AgeGroup.elementary],
       location: 'Sportplatz Mitte, Berlin',
       latitude: 52.5300,
       longitude: 13.4150,
-      eventDate: DateTime.now().add(Duration(days: 5)),
-      createdAt: DateTime.now().subtract(Duration(days: 2)),
-      paymentDate: DateTime.now().subtract(Duration(hours: 1)),
+      eventDate: DateTime.now().add(const Duration(days: 5)),
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      paymentDate: DateTime.now().subtract(const Duration(hours: 1)),
       maxParticipants: 20,
       currentParticipants: 12,
-      photoUrl: 'https://via.placeholder.com/300x200?text=Sports',
+      photoUrl: '',
       status: EventStatus.active,
     ),
   ];
@@ -55,7 +57,15 @@ class EventService {
 
   // Hole alle Events
   Future<List<MeetupEvent>> getEvents() async {
-    await Future.delayed(Duration(milliseconds: 500)); // Simuliere API-Latenz
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchEvents(status: EventStatus.active.name);
+      if (remote.isNotEmpty) {
+        _syncFromRemoteEvents(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500)); // Simuliere API-Latenz
     return _mockEvents.where((e) => e.status == EventStatus.active).toList();
   }
 
@@ -66,7 +76,20 @@ class EventService {
     required double viewerLongitude,
     List<AgeGroup>? ageGroups,
   }) async {
-    await Future.delayed(Duration(milliseconds: 500));
+    if (_backend.isEnabled) {
+      final remote = await _backend.discoverEventsForUser(
+        viewerUserId: viewerUserId,
+        viewerLatitude: viewerLatitude,
+        viewerLongitude: viewerLongitude,
+        ageGroups: ageGroups,
+      );
+      if (remote.isNotEmpty) {
+        _syncFromRemoteEvents(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500));
 
     final visible = _mockEvents.where((event) {
       if (event.status != EventStatus.active) return false;
@@ -92,6 +115,14 @@ class EventService {
   }
 
   Future<List<EventInvitation>> getInvitationsForUser(String userId) async {
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchInvitationsForUser(userId);
+      if (remote.isNotEmpty) {
+        _syncFromRemoteInvitations(remote);
+        return remote;
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 220));
     return _mockInvitations.where((i) => i.invitedUserId == userId).toList();
   }
@@ -100,6 +131,17 @@ class EventService {
     required String invitationId,
     required bool accept,
   }) async {
+    if (_backend.isEnabled) {
+      final remote = await _backend.respondToInvitation(
+        invitationId: invitationId,
+        accept: accept,
+      );
+      if (remote != null) {
+        _mergeRemoteInvitation(remote);
+        return;
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 220));
 
     final index = _mockInvitations.indexWhere((i) => i.id == invitationId);
@@ -155,6 +197,14 @@ class EventService {
     required String code,
     required String userId,
   }) async {
+    if (_backend.isEnabled) {
+      final remote = await _backend.joinByCode(code: code, userId: userId);
+      if (remote != null) {
+        _mergeRemoteInvitation(remote);
+        return remote;
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 260));
 
     final normalizedInput = _extractCodeFromInput(code);
@@ -206,7 +256,7 @@ class EventService {
     double radiusKm = 25,
     List<AgeGroup>? ageGroups,
   }) async {
-    await Future.delayed(Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     return _mockEvents.where((event) {
       // Berechne Entfernung (vereinfachte Haversine-Formel)
@@ -279,7 +329,15 @@ class EventService {
 
   // Hole Event Details
   Future<MeetupEvent?> getEventById(String eventId) async {
-    await Future.delayed(Duration(milliseconds: 300));
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchEventById(eventId);
+      if (remote != null) {
+        _mergeRemoteEvent(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
     try {
       return _mockEvents.firstWhere((e) => e.id == eventId);
     } catch (e) {
@@ -289,7 +347,15 @@ class EventService {
 
   // Erstelle ein neues Event
   Future<MeetupEvent> createEvent(MeetupEvent event) async {
-    await Future.delayed(Duration(milliseconds: 800));
+    if (_backend.isEnabled) {
+      final remote = await _backend.createEvent(event);
+      if (remote != null) {
+        _mergeRemoteEvent(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 800));
     _mockEvents.add(event);
 
     if (event.visibility == EventVisibility.inviteOnly &&
@@ -318,21 +384,49 @@ class EventService {
 
   // Lösche ein Event
   Future<bool> deleteEvent(String eventId) async {
-    await Future.delayed(Duration(milliseconds: 500));
+    if (_backend.isEnabled) {
+      final removed = await _backend.deleteEvent(eventId);
+      if (removed) {
+        _mockEvents.removeWhere((e) => e.id == eventId);
+        _mockInvitations.removeWhere((i) => i.eventId == eventId);
+        _mockParticipations.removeWhere((p) => p.eventId == eventId);
+        _eventInviteCodes.remove(eventId);
+        _eventInviteExpiresAt.remove(eventId);
+        return true;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500));
     _mockEvents.removeWhere((e) => e.id == eventId);
     return true;
   }
 
   // Hole Partizipationen für einen User
   Future<List<EventParticipation>> getUserParticipations(String userId) async {
-    await Future.delayed(Duration(milliseconds: 300));
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchUserParticipations(userId);
+      if (remote.isNotEmpty) {
+        _syncFromRemoteParticipations(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
     return _mockParticipations.where((p) => p.userId == userId).toList();
   }
 
   // Hole ausstehende Anfragen für einen Host
   Future<List<EventParticipation>> getPendingRequestsForHost(
       String hosterId) async {
-    await Future.delayed(Duration(milliseconds: 300));
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchPendingRequestsForHost(hosterId);
+      if (remote.isNotEmpty) {
+        _syncFromRemoteParticipations(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
 
     final hostEvents = _mockEvents.where((e) => e.hosterId == hosterId).toList();
     final hostEventIds = hostEvents.map((e) => e.id).toList();
@@ -375,6 +469,14 @@ class EventService {
   }
 
   Future<List<MeetupEvent>> getHostedInviteOnlyEvents(String hostUserId) async {
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchHostedInviteOnlyEvents(hostUserId);
+      if (remote.isNotEmpty) {
+        _syncFromRemoteEvents(remote);
+        return remote;
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 220));
     return _mockEvents
         .where((e) =>
@@ -385,10 +487,59 @@ class EventService {
   }
 
   Future<List<EventInvitation>> getAcceptedInvitationsForEvent(String eventId) async {
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchAcceptedInvitationsForEvent(eventId);
+      if (remote.isNotEmpty) {
+        _syncFromRemoteInvitations(remote);
+        return remote;
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 220));
     return _mockInvitations
         .where((i) =>
             i.eventId == eventId && i.status == EventInvitationStatus.accepted)
         .toList();
+  }
+
+  void _syncFromRemoteEvents(List<MeetupEvent> events) {
+    for (final event in events) {
+      _mergeRemoteEvent(event);
+    }
+  }
+
+  void _mergeRemoteEvent(MeetupEvent event) {
+    final index = _mockEvents.indexWhere((e) => e.id == event.id);
+    if (index == -1) {
+      _mockEvents.add(event);
+    } else {
+      _mockEvents[index] = event;
+    }
+  }
+
+  void _syncFromRemoteInvitations(List<EventInvitation> invitations) {
+    for (final invitation in invitations) {
+      _mergeRemoteInvitation(invitation);
+    }
+  }
+
+  void _mergeRemoteInvitation(EventInvitation invitation) {
+    final index = _mockInvitations.indexWhere((i) => i.id == invitation.id);
+    if (index == -1) {
+      _mockInvitations.add(invitation);
+    } else {
+      _mockInvitations[index] = invitation;
+    }
+  }
+
+  void _syncFromRemoteParticipations(List<EventParticipation> participations) {
+    for (final participation in participations) {
+      final index = _mockParticipations.indexWhere((p) => p.id == participation.id);
+      if (index == -1) {
+        _mockParticipations.add(participation);
+      } else {
+        _mockParticipations[index] = participation;
+      }
+    }
   }
 }

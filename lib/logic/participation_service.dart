@@ -1,15 +1,37 @@
 import 'package:trusted_circle_demo/models/event_participation.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
+import 'package:trusted_circle_demo/logic/event_backend_service.dart';
 
 class ParticipationService {
   static final List<EventParticipation> _participations = [];
+  final EventBackendService _backend = EventBackendService();
+
+  void _storeLocal(EventParticipation participation) {
+    final index = _participations.indexWhere((p) => p.id == participation.id);
+    if (index == -1) {
+      _participations.add(participation);
+    } else {
+      _participations[index] = participation;
+    }
+  }
 
   // Frage Teilnahme an
   Future<EventParticipation> requestParticipation({
     required String eventId,
     required String userId,
   }) async {
-    await Future.delayed(Duration(milliseconds: 600));
+    if (_backend.isEnabled) {
+      final remote = await _backend.requestParticipation(
+        eventId: eventId,
+        userId: userId,
+      );
+      if (remote != null) {
+        _storeLocal(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 600));
 
     final participation = EventParticipation(
       id: 'participation_${DateTime.now().millisecondsSinceEpoch}',
@@ -19,13 +41,24 @@ class ParticipationService {
       status: ParticipationStatus.pending,
     );
 
-    _participations.add(participation);
+    _storeLocal(participation);
     return participation;
   }
 
   // Genehmige Teilnahme-Anfrage
   Future<bool> approveParticipation(String participationId) async {
-    await Future.delayed(Duration(milliseconds: 400));
+    if (_backend.isEnabled) {
+      final remote = await _backend.respondToParticipation(
+        participationId: participationId,
+        accept: true,
+      );
+      if (remote != null) {
+        _storeLocal(remote);
+        return true;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 400));
 
     try {
       final index =
@@ -50,7 +83,18 @@ class ParticipationService {
 
   // Lehne Teilnahme-Anfrage ab
   Future<bool> declineParticipation(String participationId) async {
-    await Future.delayed(Duration(milliseconds: 400));
+    if (_backend.isEnabled) {
+      final remote = await _backend.respondToParticipation(
+        participationId: participationId,
+        accept: false,
+      );
+      if (remote != null) {
+        _storeLocal(remote);
+        return true;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 400));
 
     try {
       final index =
@@ -75,7 +119,7 @@ class ParticipationService {
 
   // Hole Partizipation-Details
   Future<EventParticipation?> getParticipation(String participationId) async {
-    await Future.delayed(Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 200));
 
     try {
       return _participations.firstWhere((p) => p.id == participationId);
@@ -89,13 +133,28 @@ class ParticipationService {
     required String userId,
     required String eventId,
   }) async {
-    await Future.delayed(Duration(milliseconds: 300));
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchParticipationByUserAndEvent(
+        userId: userId,
+        eventId: eventId,
+      );
+      if (remote != null) {
+        _storeLocal(remote);
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
 
     try {
-      return _participations.firstWhere((p) =>
+      final matches = _participations.where((p) =>
           p.userId == userId &&
           p.eventId == eventId &&
-          p.status == ParticipationStatus.approved);
+          p.status != ParticipationStatus.cancelled);
+      if (matches.isEmpty) return null;
+      final list = matches.toList()
+        ..sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+      return list.first;
     } catch (e) {
       return null;
     }
@@ -104,7 +163,17 @@ class ParticipationService {
   // Hole alle genehmigten Teilnehmer eines Events
   Future<List<EventParticipation>> getApprovedParticipantsForEvent(
       String eventId) async {
-    await Future.delayed(Duration(milliseconds: 300));
+    if (_backend.isEnabled) {
+      final remote = await _backend.fetchApprovedParticipantsForEvent(eventId);
+      if (remote.isNotEmpty) {
+        for (final item in remote) {
+          _storeLocal(item);
+        }
+        return remote;
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
 
     return _participations
         .where((p) =>

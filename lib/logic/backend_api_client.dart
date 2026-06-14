@@ -78,7 +78,7 @@ class BackendApiClient {
     return _decodeResponse(response.body);
   }
 
-  Future<void> putJson(String path, Map<String, dynamic> body) async {
+  Future<dynamic> putJson(String path, Map<String, dynamic> body) async {
     final response = await _httpClient
         .put(
           _uri(path),
@@ -90,6 +90,8 @@ class BackendApiClient {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('PUT $path failed: ${response.statusCode}');
     }
+
+    return _decodeResponse(response.body);
   }
 
   Future<void> delete(String path) async {

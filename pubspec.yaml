@@ -24,7 +24,13 @@ dependencies:
   google_generative_ai: ^0.4.4
   flutter_svg: ^2.2.3
   flutter_tts: ^4.2.5
+  image_picker: ^1.1.2
   share_plus: ^10.1.4
+  video_player: ^2.9.2
+  just_audio: ^0.9.46
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  qr_flutter: ^4.1.0
   pdf: ^3.11.3
   printing: ^5.14.3
   crypto: ^3.0.7

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/event_service.dart';
+import 'package:trusted_circle_demo/logic/family_circle_service.dart';
 import 'package:trusted_circle_demo/logic/participation_service.dart';
+import 'package:trusted_circle_demo/models/family_contact.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/models/event_participation.dart';
 
@@ -14,11 +16,18 @@ class HostDashboardScreen extends StatefulWidget {
 
 class _HostDashboardScreenState extends State<HostDashboardScreen> {
   final _eventService = EventService();
+  final _familyCircleService = FamilyCircleService.instance;
   final _participationService = ParticipationService();
 
   List<MeetupEvent> _hostedEvents = [];
   List<EventParticipation> _pendingRequests = [];
+  Map<String, FamilyContact> _contactsById = {};
   bool _isLoading = true;
+
+  String get _currentUserId =>
+      AuthService.instance.currentUser?.uid ?? 'host_demo_001';
+  String get _currentUserName =>
+      AuthService.instance.currentUser?.displayName ?? 'Du';
 
   @override
   void initState() {
@@ -30,17 +39,21 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final currentHostId =
-          AuthService.instance.currentUser?.uid ?? 'host_demo_001';
-      final events = await _eventService.getEvents();
-      final myEvents =
-          events.where((e) => e.hosterId == currentHostId).toList();
+      final currentHostId = _currentUserId;
+      final myEvents = await _eventService.getDiscoverableEventsForUser(
+        viewerUserId: currentHostId,
+        viewerLatitude: 52.5200,
+        viewerLongitude: 13.4050,
+      );
+      final hostedEvents = myEvents.where((e) => e.hosterId == currentHostId).toList();
 
       final requests = await _eventService.getPendingRequestsForHost(currentHostId);
+      final contacts = await _familyCircleService.getConnectedContacts(userId: currentHostId);
 
       setState(() {
-        _hostedEvents = myEvents;
+        _hostedEvents = hostedEvents;
         _pendingRequests = requests;
+        _contactsById = {for (final contact in contacts) contact.userId: contact};
         _isLoading = false;
       });
     } catch (e) {
@@ -51,6 +64,11 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
         );
       }
     }
+  }
+
+  String _displayNameFor(String userId) {
+    if (userId == _currentUserId) return _currentUserName;
+    return _contactsById[userId]?.displayName ?? userId;
   }
 
   Future<void> _approveRequest(String requestId) async {
@@ -266,7 +284,7 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nutzer: ${request.userId}',
+                        'Nutzer: ${_displayNameFor(request.userId)}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -351,11 +369,20 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
           height: 60,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            image: DecorationImage(
-              image: NetworkImage(event.photoUrl),
-              fit: BoxFit.cover,
-            ),
+            color: event.photoUrl.isEmpty ? const Color(0xFFE0F2FE) : null,
+            image: event.photoUrl.isEmpty
+                ? null
+                : DecorationImage(
+                    image: NetworkImage(event.photoUrl),
+                    fit: BoxFit.cover,
+                  ),
           ),
+          child: event.photoUrl.isEmpty
+              ? const Icon(
+                  Icons.celebration_rounded,
+                  color: Color(0xFF2563EB),
+                )
+              : null,
         ),
         title: Text(event.title),
         subtitle: Column(

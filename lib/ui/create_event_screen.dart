@@ -113,7 +113,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (_selectedAgeGroups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Bitte mindestens eine Altersgruppe auswählen')),
+            content: Text('Bitte wähle mindestens eine Altersgruppe.')),
       );
       return;
     }
@@ -121,7 +121,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (_visibility == EventVisibility.inviteOnly && _selectedInvitees.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Bitte mindestens einen Kontakt einladen.'),
+          content: Text('Bitte lade mindestens einen Kontakt ein.'),
         ),
       );
       return;
@@ -152,8 +152,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         eventDate: eventDateTime,
         createdAt: DateTime.now(),
         maxParticipants: int.parse(_maxParticipantsController.text),
-        photoUrl:
-            'https://via.placeholder.com/300x200?text=${_titleController.text}',
+        photoUrl: '',
         status: EventStatus.active,
         price: null,
         visibility: _visibility,
@@ -176,15 +175,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           await showDialog<void>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Event erstellt'),
+              title: const Text('Event ist bereit'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Dein privates Event wurde erstellt.'),
+                  const Text('Dein Event wurde erfolgreich erstellt.'),
                   const SizedBox(height: 10),
                   if (code != null) ...[
-                    const Text('Einladungscode:'),
+                    const Text('Dein Code:'),
                     const SizedBox(height: 4),
                     SelectableText(
                       code,
@@ -193,7 +192,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     const SizedBox(height: 10),
                   ],
                   if (link != null) ...[
-                    const Text('Einladungslink:'),
+                    const Text('Dein Link:'),
                     const SizedBox(height: 4),
                     SelectableText(link),
                     const SizedBox(height: 10),
@@ -206,7 +205,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     const SizedBox(height: 8),
                   if (expiresAt != null)
                     const Text(
-                      'Der Link bleibt für bereits angenommene Einladungen wirksam.',
+                      'Bereits akzeptierte Einladungen bleiben aktiv.',
                       style: TextStyle(fontSize: 12, color: Colors.black54),
                     ),
                 ],
@@ -218,7 +217,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       Clipboard.setData(ClipboardData(text: code));
                       Navigator.of(context).pop();
                     },
-                    child: const Text('Code kopieren'),
+                    child: const Text('Code kopieren & schließen'),
                   ),
                 if (link != null)
                   TextButton(
@@ -226,18 +225,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       Clipboard.setData(ClipboardData(text: link));
                       Navigator.of(context).pop();
                     },
-                    child: const Text('Link kopieren'),
+                    child: const Text('Link kopieren & schließen'),
                   ),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Fertig'),
+                  child: const Text('Weiter'),
                 ),
               ],
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event erfolgreich veröffentlicht.')),
+            const SnackBar(content: Text('Event ist jetzt live.')),
           );
         }
 
@@ -247,7 +246,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       setState(() => _isSubmitting = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler: $e')),
+          SnackBar(content: Text('Konnte nicht speichern: $e')),
         );
       }
     }
@@ -259,7 +258,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Aktivität veröffentlichen'),
+        title: const Text('Event planen'),
         elevation: 0,
       ),
       body: Container(
@@ -309,7 +308,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 TextFormField(
                   controller: _titleController,
                   decoration: const InputDecoration(
-                    labelText: 'Titel der Aktivität',
+                    labelText: 'Event-Titel',
                     hintText: 'z. B. Spielplatz-Treffen',
                     prefixIcon: Icon(Icons.title),
                   ),
@@ -326,7 +325,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   controller: _descriptionController,
                   decoration: const InputDecoration(
                     labelText: 'Beschreibung',
-                    hintText: 'Beschreibe deine Aktivität...',
+                    hintText: 'Was macht euer Event besonders?',
                     prefixIcon: Icon(Icons.description),
                   ),
                   maxLines: 4,
@@ -347,49 +346,39 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                RadioListTile<EventVisibility>(
-                  value: EventVisibility.publicNearby,
-                  groupValue: _visibility,
-                  title: const Text('Öffentlich (in deiner Nähe sichtbar)'),
-                  subtitle: const Text(
-                      'Andere Eltern sehen dein Event im Standort-Radius.'),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _visibility = value);
-                  },
+                _VisibilityOptionTile(
+                  title: 'Öffentlich (in deiner Nähe sichtbar)',
+                  subtitle: 'Andere Eltern sehen dein Event im Standort-Radius.',
+                  selected: _visibility == EventVisibility.publicNearby,
+                  onTap: () => setState(
+                    () => _visibility = EventVisibility.publicNearby,
+                  ),
                 ),
-                RadioListTile<EventVisibility>(
-                  value: EventVisibility.familyCircle,
-                  groupValue: _visibility,
-                  title: const Text('Familienkreis (für deine Kontakte sichtbar)'),
-                  subtitle: const Text(
-                      'Nur verbundene Eltern aus deinem Familienkreis sehen das Event.'),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _visibility = value);
-                  },
+                _VisibilityOptionTile(
+                  title: 'Familienkreis (für deine Kontakte sichtbar)',
+                  subtitle:
+                      'Nur verbundene Eltern aus deinem Familienkreis sehen das Event.',
+                  selected: _visibility == EventVisibility.familyCircle,
+                  onTap: () => setState(
+                    () => _visibility = EventVisibility.familyCircle,
+                  ),
                 ),
-                RadioListTile<EventVisibility>(
-                  value: EventVisibility.inviteOnly,
-                  groupValue: _visibility,
-                  title: const Text('Nur eingeladen (individuelle Einladungen)'),
-                  subtitle: const Text(
-                      'Nur ausgewählte Kontakte sehen und erhalten die Einladung.'),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _visibility = value);
-                  },
+                _VisibilityOptionTile(
+                  title: 'Nur eingeladen (individuelle Einladungen)',
+                  subtitle:
+                      'Nur ausgewählte Kontakte sehen und erhalten die Einladung.',
+                  selected: _visibility == EventVisibility.inviteOnly,
+                  onTap: () => setState(
+                    () => _visibility = EventVisibility.inviteOnly,
+                  ),
                 ),
-                RadioListTile<EventVisibility>(
-                  value: EventVisibility.privateOnly,
-                  groupValue: _visibility,
-                  title: const Text('Nur ich (nicht geteilt)'),
-                  subtitle: const Text(
-                      'Das Event bleibt nur in deinem Bereich sichtbar.'),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _visibility = value);
-                  },
+                _VisibilityOptionTile(
+                  title: 'Nur ich (nicht geteilt)',
+                  subtitle: 'Das Event bleibt nur in deinem Bereich sichtbar.',
+                  selected: _visibility == EventVisibility.privateOnly,
+                  onTap: () => setState(
+                    () => _visibility = EventVisibility.privateOnly,
+                  ),
                 ),
 
                 if (_visibility == EventVisibility.publicNearby) ...[
@@ -466,7 +455,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
                   const SizedBox(height: 8),
                   DropdownButtonFormField<int>(
-                    value: _inviteCodeExpiryDays,
+                    initialValue: _inviteCodeExpiryDays,
                     decoration: const InputDecoration(
                       labelText: 'Einladungscode gültig für',
                       prefixIcon: Icon(Icons.timelapse_rounded),
@@ -488,7 +477,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
                 // Kategorie
                 DropdownButtonFormField<EventCategory>(
-                  value: _selectedCategory,
+                  initialValue: _selectedCategory,
                   decoration: const InputDecoration(
                     labelText: 'Kategorie',
                     prefixIcon: Icon(Icons.category),
@@ -676,5 +665,79 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       AgeGroup.mixed: 'Altersgemischt',
     };
     return labels[ageGroup] ?? '';
+  }
+}
+
+class _VisibilityOptionTile extends StatelessWidget {
+  const _VisibilityOptionTile({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outlineVariant,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

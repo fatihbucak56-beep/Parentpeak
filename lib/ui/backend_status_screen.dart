@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 
 class BackendStatusScreen extends StatefulWidget {
@@ -14,6 +15,9 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
   List<_EndpointCheck> _checks = [];
   String? _baseUrl;
   bool _hasToken = false;
+
+  String get _currentUserId =>
+      AuthService.instance.currentUser?.uid ?? 'host_demo_001';
 
   @override
   void initState() {
@@ -44,6 +48,28 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
       {'label': 'Todos', 'path': APIConfig.getBackendTodosPath()},
       {'label': 'Shopping', 'path': APIConfig.getBackendShoppingPath()},
       {'label': 'Kalender', 'path': APIConfig.getBackendCalendarEventsPath()},
+      {'label': 'Fotos', 'path': APIConfig.getBackendPhotosPath()},
+      {
+        'label': 'Parent Matching',
+        'path': APIConfig.getBackendParentMatchingProfilesPath(),
+      },
+      {
+        'label': 'Familienkontakte',
+        'path': '${APIConfig.getBackendFamilyContactsPath()}?userId=$_currentUserId',
+      },
+      {'label': 'Events', 'path': APIConfig.getBackendEventsPath()},
+      {
+        'label': 'Event-Einladungen',
+        'path': '${APIConfig.getBackendEventInvitationsPath()}?userId=$_currentUserId',
+      },
+      {
+        'label': 'Host Invite-Only',
+        'path': '${APIConfig.getBackendHostedInviteOnlyEventsPath()}?hostUserId=$_currentUserId',
+      },
+      {
+        'label': 'Payment-Transaktionen',
+        'path': '${APIConfig.getBackendPaymentsHostPath()}/$_currentUserId',
+      },
     ];
 
     for (final endpoint in endpoints) {
@@ -149,8 +175,10 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _kv('Base URL',
-                      (_baseUrl ?? '').isEmpty ? 'nicht gesetzt' : _baseUrl!),
+                  _kv(
+                    'Base URL',
+                    (_baseUrl ?? '').isEmpty ? 'nicht gesetzt' : _baseUrl!,
+                  ),
                   const SizedBox(height: 8),
                   _kv('API Token', _tokenState()),
                   const SizedBox(height: 8),
@@ -159,13 +187,17 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
                   _kv('Schema Version', APIConfig.getBackendApiVersion()),
                   const SizedBox(height: 8),
                   _kv('Health Path', APIConfig.getBackendHealthPath()),
+                  const SizedBox(height: 8),
+                  _kv('Events Path', APIConfig.getBackendEventsPath()),
+                  const SizedBox(height: 8),
+                  _kv('Payments Path', APIConfig.getBackendPaymentsHostPath()),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 12),
           Card(
-            color: _summaryColor(theme).withOpacity(0.1),
+            color: _summaryColor(theme).withValues(alpha: 0.1),
             child: ListTile(
               leading:
                   Icon(Icons.cloud_done_rounded, color: _summaryColor(theme)),

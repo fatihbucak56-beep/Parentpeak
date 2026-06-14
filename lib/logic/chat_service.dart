@@ -34,10 +34,20 @@ class ChatService {
   ];
 
   static const _escalationKeywords = [
-    'selbstmord', 'suizid', 'umbringen', 'töten', 'sterben wollen',
-    'missbrauch', 'gewalt', 'schlagen', 'verletzen', 'angst',
-    'notfall', 'hilfe', 'verzweifelt', 'allein', 'hoffnungslos',
-    'panik', 'ohnmächtig', 'ausgeliefert', 'bedroht',
+    'selbstmord',
+    'suizid',
+    'ich will sterben',
+    'ich kann nicht mehr',
+    'ich halte das nicht mehr aus',
+    'ich koennte meinem kind etwas antun',
+    'ich könnte meinem kind etwas antun',
+    'ich moechte mein baby schuetteln',
+    'ich möchte mein baby schütteln',
+    'notfall',
+    'akute gefahr',
+    'kindeswohlgefaehrdung',
+    'kindeswohlgefährdung',
+    'selbstverletzung',
   ];
 
   static const _helpResources = {
@@ -111,7 +121,8 @@ class ChatService {
   /// Prüft, ob eine Nachricht Eskalations-Keywords enthält
   bool _isEscalation(String message) {
     final lowerMessage = message.toLowerCase();
-    return _escalationKeywords.any((keyword) => lowerMessage.contains(keyword));
+    return _escalationKeywords
+        .any((keyword) => lowerMessage.contains(keyword));
   }
 
   /// Generiert eine Eskalationsantwort mit Hilfsressourcen

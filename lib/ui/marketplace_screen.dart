@@ -13,8 +13,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
   late TabController _tabController;
   late TabController _educationSubTabController;
   List<Provider> _allProviders = [];
-  List<Provider> _filteredProviders = [];
-  List<String> _categories = [];
   String? _selectedCategory;
   bool _isLoading = true;
   String? _error;
@@ -60,7 +58,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
 
       setState(() {
         _allProviders = providers;
-        _filteredProviders = _getProvidersForCurrentTab();
         _isLoading = false;
         _error = null;
         // Setze Sub-Tabs für Bildung wenn Tab 0 aktiv ist
@@ -73,46 +70,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
         _error = 'Fehler beim Laden: $e';
         _isLoading = false;
       });
-      print('Fehler: $e');
     }
-  }
-
-  List<Provider> _getProvidersForCurrentTab() {
-    final groups = ['Bildungsangebote', 'Betreuung', 'Kaufen & Verkaufen'];
-    final currentGroup = groups[_tabController.index];
-    return _allProviders
-        .where((p) => p.categoryGroup == currentGroup)
-        .toList();
-  }
-
-  void _applyFilters() {
-    List<Provider> filtered = _getProvidersForCurrentTab();
-
-    // Nach Kategorie filtern
-    if (_selectedCategory != null) {
-      filtered = filtered.where((p) => p.category == _selectedCategory).toList();
-    }
-
-    // Nach Preis filtern (nur für Betreuung & Bildung, nicht für Basar)
-    if (_tabController.index < 2) {
-      filtered = filtered.where((p) => p.price <= _maxPrice).toList();
-    }
-
-    // Nach Bewertung filtern
-    filtered = filtered.where((p) => p.rating >= _minRating).toList();
-
-    // Nach Suchtext filtern
-    if (_searchController.text.isNotEmpty) {
-      final query = _searchController.text.toLowerCase();
-      filtered = filtered
-          .where((p) =>
-              p.name.toLowerCase().contains(query) ||
-              p.description.toLowerCase().contains(query) ||
-              p.category.toLowerCase().contains(query))
-          .toList();
-    }
-
-    setState(() => _filteredProviders = filtered);
   }
 
   void _resetFilters() {
@@ -121,7 +79,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
       _maxPrice = 50;
       _minRating = 1;
       _searchController.clear();
-      _filteredProviders = _getProvidersForCurrentTab();
     });
   }
 
@@ -142,7 +99,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
         backgroundColor: Colors.blue.shade600,
         bottom: TabBar(
           controller: _tabController,
-          tabs: [
+          tabs: const [
             Tab(
               icon: Icon(Icons.school_rounded),
               text: 'Bildung',
@@ -159,7 +116,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
         ),
       ),
       body: _isLoading
-          ? Center(
+          ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -174,13 +131,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error, size: 64, color: Colors.red),
-                      SizedBox(height: 16),
+                      const Icon(Icons.error, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
                       Text(_error!),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadData,
-                        child: Text('Erneut versuchen'),
+                        child: const Text('Erneut versuchen'),
                       ),
                     ],
                   ),
@@ -207,23 +164,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
 
     // Bekome alle Provider für diesen Tab
     List<Provider> tabProviders;
-    String groupName;
     
     if (tabIndex == 0) {
       tabProviders = _allProviders
           .where((p) => p.categoryGroup == 'Bildungsangebote')
           .toList();
-      groupName = 'Bildungsangebote';
     } else if (tabIndex == 1) {
       tabProviders = _allProviders
           .where((p) => p.categoryGroup == 'Betreuung')
           .toList();
-      groupName = 'Betreuung';
     } else {
       tabProviders = _allProviders
           .where((p) => p.categoryGroup == 'Kaufen & Verkaufen')
           .toList();
-      groupName = 'Kaufen & Verkaufen';
     }
 
     // Bekome alle einzigartigen Kategorien für diesen Tab
@@ -272,12 +225,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           child: Row(
             children: [
               IconButton(
-                icon: Icon(Icons.arrow_back),
+                icon: const Icon(Icons.arrow_back),
                 onPressed: () {
                   setState(() => _selectedCategory = null);
                 },
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _selectedCategory ?? '',
@@ -296,13 +249,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Anbieter suchen...',
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear),
+                      icon: const Icon(Icons.clear),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {});
@@ -312,7 +265,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             ),
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         
         // Filter Section - nur für Tab 0 und 1
         if (tabIndex < 2)
@@ -328,11 +281,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                         style: Theme.of(context).textTheme.titleMedium),
                     TextButton(
                       onPressed: _resetFilters,
-                      child: Text('Zurücksetzen'),
+                      child: const Text('Zurücksetzen'),
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 // Preis-Slider
                 Text('Max. Preis: €${_maxPrice.toStringAsFixed(0)}/Stunde'),
                 Slider(
@@ -344,7 +297,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                     setState(() => _maxPrice = value);
                   },
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 // Rating Filter
                 Text('Min. Bewertung: ${_minRating.toStringAsFixed(1)} ⭐'),
                 Slider(
@@ -356,7 +309,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                     setState(() => _minRating = value);
                   },
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -368,19 +321,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.search_off, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text('Keine Angebote gefunden'),
-                      SizedBox(height: 8),
+                      const Icon(Icons.search_off, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      const Text('Keine Angebote gefunden'),
+                      const SizedBox(height: 8),
                       TextButton(
                         onPressed: _resetFilters,
-                        child: Text('Filter zurücksetzen'),
+                        child: const Text('Filter zurücksetzen'),
                       ),
                     ],
                   ),
                 )
               : ListView.builder(
-                  padding: EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(bottom: 16),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final provider = filtered[index];
@@ -398,7 +351,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
         // Sub-Tabs für Bildung
         TabBar(
           controller: _educationSubTabController,
-          tabs: [
+          tabs: const [
             Tab(
               icon: Icon(Icons.school_rounded),
               text: 'Nachhilfe',
@@ -472,12 +425,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           child: Row(
             children: [
               IconButton(
-                icon: Icon(Icons.arrow_back),
+                icon: const Icon(Icons.arrow_back),
                 onPressed: () {
                   setState(() => _selectedCategory = null);
                 },
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _selectedCategory ?? '',
@@ -496,13 +449,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Anbieter suchen...',
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear),
+                      icon: const Icon(Icons.clear),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {});
@@ -512,7 +465,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             ),
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
 
         // Filter
         Padding(
@@ -527,11 +480,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                       style: Theme.of(context).textTheme.titleMedium),
                   TextButton(
                     onPressed: _resetFilters,
-                    child: Text('Zurücksetzen'),
+                    child: const Text('Zurücksetzen'),
                   ),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text('Max. Preis: €${_maxPrice.toStringAsFixed(0)}/Stunde'),
               Slider(
                 value: _maxPrice,
@@ -542,7 +495,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                   setState(() => _maxPrice = value);
                 },
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text('Min. Bewertung: ${_minRating.toStringAsFixed(1)} ⭐'),
               Slider(
                 value: _minRating,
@@ -553,7 +506,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                   setState(() => _minRating = value);
                 },
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -565,19 +518,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.search_off, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text('Keine Angebote gefunden'),
-                      SizedBox(height: 8),
+                      const Icon(Icons.search_off, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      const Text('Keine Angebote gefunden'),
+                      const SizedBox(height: 8),
                       TextButton(
                         onPressed: _resetFilters,
-                        child: Text('Filter zurücksetzen'),
+                        child: const Text('Filter zurücksetzen'),
                       ),
                     ],
                   ),
                 )
               : ListView.builder(
-                  padding: EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(bottom: 16),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final provider = filtered[index];
@@ -600,13 +553,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Kategorie suchen...',
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear),
+                      icon: const Icon(Icons.clear),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {});
@@ -616,17 +569,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             ),
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         
         // Kategorien als Grid
         Expanded(
           child: categories.isEmpty
-              ? Center(
+              ? const Center(
                   child: Text('Keine Kategorien verfügbar'),
                 )
               : GridView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     childAspectRatio: 0.9,
                     crossAxisSpacing: 12,
@@ -654,13 +607,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Kategorie suchen...',
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear),
+                      icon: const Icon(Icons.clear),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {});
@@ -670,17 +623,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             ),
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         
         // Kategorien als Grid
         Expanded(
           child: categories.isEmpty
-              ? Center(
+              ? const Center(
                   child: Text('Keine Kategorien verfügbar'),
                 )
               : GridView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     childAspectRatio: 0.9,
                     crossAxisSpacing: 12,
@@ -729,18 +682,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 48, color: Colors.blue.shade600),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               category,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               '${providers.length} Anbieter',
               style: TextStyle(
@@ -756,7 +709,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
 
   Widget _buildProviderCard(Provider provider) {
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -771,22 +724,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                 // Foto
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    provider.photo,
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 80,
-                        height: 80,
-                        color: Colors.grey[300],
-                        child: Icon(Icons.person),
-                      );
-                    },
-                  ),
+                  child: _buildProviderPhoto(provider, size: 80),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 // Info
                 Expanded(
                   child: Column(
@@ -797,19 +737,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                           Expanded(
                             child: Text(
                               provider.name,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                           if (provider.verified)
-                            Icon(Icons.verified,
+                            const Icon(Icons.verified,
                                 color: Colors.blue, size: 20),
                         ],
                       ),
                       Text(
-                        '${provider.category}',
+                        provider.category,
                         style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -820,18 +760,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                           '${provider.age} Jahre alt',
                           style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                         ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.star, size: 16, color: Colors.amber),
-                          SizedBox(width: 4),
+                          const Icon(Icons.star, size: 16, color: Colors.amber),
+                          const SizedBox(width: 4),
                           Text(
                             '${provider.rating} (${provider.reviews})',
-                            style: TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ],
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       if (provider.price > 0)
                         Text(
                           '€${provider.price.toStringAsFixed(0)} ${provider.priceUnit}',
@@ -846,7 +786,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                 ),
               ],
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             // Beschreibung
             Text(
               provider.description,
@@ -854,14 +794,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, color: Colors.grey[700]),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             // Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
-                  icon: Icon(Icons.message),
-                  label: Text('Kontakt'),
+                  icon: const Icon(Icons.message),
+                  label: const Text('Kontakt'),
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Kontakt zu ${provider.name}')),
@@ -869,8 +809,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                   },
                 ),
                 OutlinedButton.icon(
-                  icon: Icon(Icons.info),
-                  label: Text('Details'),
+                  icon: const Icon(Icons.info),
+                  label: const Text('Details'),
                   onPressed: () {
                     _showProviderDetails(provider);
                   },
@@ -887,7 +827,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -897,29 +837,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
               Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    provider.photo,
-                    width: 120,
-                    height: 120,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 120,
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: Icon(Icons.person, size: 60),
-                      );
-                    },
-                  ),
+                  child: _buildProviderPhoto(provider, size: 120),
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Center(
                 child: Column(
                   children: [
                     Text(
                       provider.name,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                     if (provider.age > 0)
@@ -930,7 +857,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                   ],
                 ),
               ),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               // Details
               _detailRow('Bereich', provider.category),
               _detailRow('Spezialisierung', provider.subcategory),
@@ -940,19 +867,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
               if (provider.languages.isNotEmpty)
                 _detailRow('Sprachen', provider.languages.join(', ')),
               _detailRow('Erreichbarkeit', provider.availability),
-              SizedBox(height: 16),
-              Text(
+              const SizedBox(height: 16),
+              const Text(
                 'Beschreibung',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(provider.description),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  icon: Icon(Icons.message),
-                  label: Text('Jetzt kontaktieren'),
+                  icon: const Icon(Icons.message),
+                  label: const Text('Jetzt kontaktieren'),
                   onPressed: () {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -979,11 +906,37 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           Text(label, style: TextStyle(color: Colors.grey[600])),
           Expanded(
             child: Text(value,
-                style: TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(fontWeight: FontWeight.w500),
                 textAlign: TextAlign.right),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProviderPhoto(Provider provider, {required double size}) {
+    if (provider.photo.isEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        color: Colors.grey[300],
+        child: Icon(Icons.person, size: size / 2),
+      );
+    }
+
+    return Image.network(
+      provider.photo,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: size,
+          height: size,
+          color: Colors.grey[300],
+          child: Icon(Icons.person, size: size / 2),
+        );
+      },
     );
   }
 }

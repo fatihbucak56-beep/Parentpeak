@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/participation_service.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/ui/meetup_chat_screen.dart';
@@ -16,7 +17,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   final _participationService = ParticipationService();
   bool _hasRequested = false;
   bool _isApproved = false;
+  bool _isDeclined = false;
   bool _isLoading = false;
+
+  String get _currentUserId =>
+      AuthService.instance.currentUser?.uid ?? 'user_demo_001';
 
   @override
   void initState() {
@@ -25,32 +30,33 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> _checkParticipationStatus() async {
-    const userId = 'user_demo_001';
     final participation = await _participationService.getParticipationByUserAndEvent(
-      userId: userId,
+      userId: _currentUserId,
       eventId: widget.event.id,
     );
 
     if (!mounted) return;
     setState(() {
-      _isApproved = participation != null;
-      _hasRequested = true;
+      _isApproved = participation?.status == ParticipationStatus.approved;
+      _isDeclined = participation?.status == ParticipationStatus.declined;
+      _hasRequested = participation?.status == ParticipationStatus.pending ||
+          participation?.status == ParticipationStatus.approved;
     });
   }
 
   Future<void> _requestParticipation() async {
-    const userId = 'user_demo_001';
     setState(() => _isLoading = true);
 
     try {
       await _participationService.requestParticipation(
         eventId: widget.event.id,
-        userId: userId,
+        userId: _currentUserId,
       );
 
       if (!mounted) return;
       setState(() {
         _hasRequested = true;
+        _isDeclined = false;
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -82,13 +88,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               width: double.infinity,
               height: 220,
               decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: NetworkImage(widget.event.photoUrl),
-                  fit: BoxFit.cover,
-                ),
+                gradient: widget.event.photoUrl.isEmpty
+                    ? const LinearGradient(
+                        colors: [Color(0xFFDBEAFE), Color(0xFFE0F2FE)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                image: widget.event.photoUrl.isEmpty
+                    ? null
+                    : DecorationImage(
+                        image: NetworkImage(widget.event.photoUrl),
+                        fit: BoxFit.cover,
+                      ),
               ),
               child: Stack(
                 children: [
+                  if (widget.event.photoUrl.isEmpty)
+                    const Center(
+                      child: Icon(
+                        Icons.celebration_rounded,
+                        size: 56,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
                   Positioned(
                     top: 16,
                     right: 16,
@@ -253,6 +276,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       text: 'Anfrage ausstehend',
                       bgColor: const Color(0xFFFEF3C7),
                       textColor: const Color(0xFF92400E),
+                    )
+                  else if (_isDeclined)
+                    _buildStatusBanner(
+                      icon: Icons.info_outline_rounded,
+                      text: 'Anfrage wurde abgelehnt',
+                      bgColor: const Color(0xFFFEE2E2),
+                      textColor: const Color(0xFF991B1B),
                     )
                   else
                     SizedBox(

@@ -2,13 +2,14 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 
 class GeminiAIService {
-  static const String modelName = 'gemini-2.0-flash';
+  final String _modelName;
+  final String? _apiKey;
 
   late final GenerativeModel _model;
-  String? _apiKey;
 
-  GeminiAIService({String? apiKey}) {
-    _apiKey = apiKey;
+  GeminiAIService({String? apiKey, String? modelName})
+      : _apiKey = apiKey,
+        _modelName = modelName ?? APIConfig.getGeminiModelName() {
     _initializeModel();
   }
 
@@ -19,7 +20,7 @@ class GeminiAIService {
     }
 
     _model = GenerativeModel(
-      model: modelName,
+      model: _modelName,
       apiKey: _apiKey!,
       systemInstruction: Content.text(APIConfig.parentAssistantSystemPrompt),
     );
@@ -28,7 +29,7 @@ class GeminiAIService {
   /// Sende eine Nachricht an Gemini und erhalte einen Stream der Antwort
   Stream<String> chatWithStreaming(String userMessage) async* {
     try {
-      print('DEBUG: Sende Nachricht mit Modell: $modelName');
+      print('DEBUG: Sende Nachricht mit Modell: $_modelName');
       print('DEBUG: API-Key Länge: ${_apiKey?.length}');
 
       final content = [
@@ -43,7 +44,7 @@ class GeminiAIService {
         }
       }
     } catch (e) {
-      print('ERROR: $e');
+      print('ERROR: $_modelName -> $e');
       yield 'Fehler: $e';
     }
   }

@@ -98,7 +98,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(accept ? 'Einladung angenommen' : 'Einladung abgelehnt'),
+        content: Text(accept ? 'Zusage gespeichert.' : 'Absage gespeichert.'),
       ),
     );
   }
@@ -119,8 +119,8 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
         SnackBar(
           content: Text(
             _eventService.isInviteInputExpired(input)
-                ? 'Dieser Einladungscode ist abgelaufen.'
-                : 'Ungültiger Einladungscode oder Link.',
+                ? 'Dieser Code ist abgelaufen.'
+                : 'Code oder Link konnte nicht gefunden werden.',
           ),
         ),
       );
@@ -131,7 +131,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Event per Code hinzugefügt.')),
+      const SnackBar(content: Text('Du bist jetzt dabei.')),
     );
   }
 
@@ -146,7 +146,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Event-Einladungen'),
+        title: const Text('Einladungen'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -171,14 +171,14 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Einladungen auf einen Blick',
+                          'Deine Einladungen',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Nimm Einladungen an, trete per Code bei und behalte deine Zusagen als Gastgeber im Blick.',
+                          'Gemeinsam loslegen.',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -192,7 +192,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                             Expanded(
                               child: _CountPill(
                                 icon: Icons.mark_email_unread_rounded,
-                                label: 'Offen',
+                                label: 'Ausstehend',
                                 value: pending.length.toString(),
                                 color: const Color(0xFFF59E0B),
                               ),
@@ -201,7 +201,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                             Expanded(
                               child: _CountPill(
                                 icon: Icons.check_circle_outline_rounded,
-                                label: 'Angenommen',
+                                label: 'Zugesagt',
                                 value: accepted.length.toString(),
                                 color: const Color(0xFF16A34A),
                               ),
@@ -210,7 +210,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                             Expanded(
                               child: _CountPill(
                                 icon: Icons.celebration_rounded,
-                                label: 'Eigene Events',
+                                label: 'Meine Events',
                                 value: _hostedInviteEvents.length.toString(),
                                 color: const Color(0xFF4F46E5),
                               ),
@@ -232,7 +232,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Per Code oder Link beitreten',
+                          'Mit Code starten',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 8),
@@ -244,7 +244,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                                 textCapitalization: TextCapitalization.characters,
                                 decoration: const InputDecoration(
                                   hintText:
-                                      'z. B. PP-AB12 oder parentpeak://invite?code=PP-AB12',
+                                      'Code oder Link einfügen',
                                   isDense: true,
                                 ),
                               ),
@@ -252,7 +252,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                             const SizedBox(width: 8),
                             FilledButton(
                               onPressed: _joinByCode,
-                              child: const Text('Beitreten'),
+                              child: const Text('Starten'),
                             ),
                           ],
                         ),
@@ -261,7 +261,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                   ),
                   const SizedBox(height: 18),
                   _SectionHeader(
-                    title: 'Offene Einladungen',
+                    title: 'Ausstehend',
                     subtitle: pending.isEmpty
                         ? 'Nichts offen'
                         : '${pending.length} offen',
@@ -270,7 +270,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                   if (pending.isEmpty)
                     const _EmptyTile(
                       icon: Icons.inbox_rounded,
-                      text: 'Keine offenen Einladungen.',
+                      text: 'Gerade ist alles beantwortet.',
                     )
                   else
                     ...pending.map(
@@ -289,7 +289,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                     ),
                   const SizedBox(height: 18),
                   _SectionHeader(
-                    title: 'Angenommene Einladungen',
+                    title: 'Zugesagt',
                     subtitle: accepted.isEmpty
                         ? 'Noch keine'
                         : '${accepted.length} aktiv',
@@ -298,7 +298,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                   if (accepted.isEmpty)
                     const _EmptyTile(
                       icon: Icons.check_circle_outline_rounded,
-                      text: 'Noch keine angenommenen Einladungen.',
+                      text: 'Noch keine aktiven Zusagen.',
                     )
                   else
                     ...accepted.map(
@@ -316,7 +316,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                     ),
                   const SizedBox(height: 20),
                   _SectionHeader(
-                    title: 'Als Gastgeber: Zusagen',
+                    title: 'Als Gastgeber',
                     subtitle: _hostedInviteEvents.isEmpty
                         ? 'Keine Events'
                         : '${_hostedInviteEvents.length} Events',
@@ -325,7 +325,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
                   if (_hostedInviteEvents.isEmpty)
                     const _EmptyTile(
                       icon: Icons.celebration_outlined,
-                      text: 'Keine eigenen Invite-Only-Events vorhanden.',
+                      text: 'Keine eigenen privaten Events vorhanden.',
                     )
                   else
                     ..._hostedInviteEvents.map((event) {
@@ -537,14 +537,14 @@ class _PendingInviteRow extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: onDecline,
-                  child: const Text('Ablehnen'),
+                  child: const Text('Absagen'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: FilledButton(
                   onPressed: onAccept,
-                  child: const Text('Annehmen'),
+                  child: const Text('Zusagen'),
                 ),
               ),
             ],

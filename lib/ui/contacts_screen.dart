@@ -65,7 +65,7 @@ class _ContactsScreenState extends State<ContactsScreen> with LanguageChangeMixi
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            theme.colorScheme.primary.withOpacity(0.03),
+            theme.colorScheme.primary.withValues(alpha: 0.03),
             theme.brightness == Brightness.dark ? Colors.grey[900]! : Colors.white
           ],
         ),
@@ -126,7 +126,7 @@ class _ContactsScreenState extends State<ContactsScreen> with LanguageChangeMixi
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: (contact['color'] as Color).withOpacity(0.2),
+                  color: (contact['color'] as Color).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(

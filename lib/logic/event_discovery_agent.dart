@@ -46,7 +46,7 @@ class EventDiscoveryAgent {
 Du bist ein Familien-Event-Assistent für die Parentpeak-App in Deutschland.
 
 Aufgabe:
-Erstelle eine Liste von 10 konkreten und realistischen Aktivitäten, Events oder
+Erstelle eine Liste von 8 konkreten und realistischen Aktivitäten, Events oder
 Angeboten für Eltern mit Kindern in und um "$cleanCity" ($radiusHint).
 Zielgruppe: $agesText.
 
@@ -113,16 +113,13 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
 
   List<DiscoveredEvent> _parseAgentResponse(String raw, String city) {
     try {
-      // JSON-Block aus der Antwort extrahieren
-      final start = raw.indexOf('[');
-      final end = raw.lastIndexOf(']');
-      if (start == -1 || end == -1 || end <= start) {
+      final repairedJson = _extractAndRepairJsonArray(raw);
+      if (repairedJson == null || repairedJson.isEmpty) {
         debugPrint('EventDiscoveryAgent: Kein gültiges JSON-Array gefunden.');
         return _fallbackEvents(city);
       }
 
-      final jsonStr = raw.substring(start, end + 1);
-      final list = jsonDecode(jsonStr) as List<dynamic>;
+      final list = jsonDecode(repairedJson) as List<dynamic>;
 
       return list.map((item) {
         final map = item as Map<String, dynamic>;
@@ -164,6 +161,38 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       debugPrint('EventDiscoveryAgent: JSON-Parsing fehlgeschlagen: $e');
       return _fallbackEvents(city);
     }
+  }
+
+  String? _extractAndRepairJsonArray(String raw) {
+    var text = raw.trim();
+    if (text.isEmpty) return null;
+
+    // Entfernt optionale Markdown-Codefences.
+    text = text.replaceAll(RegExp(r'^```(?:json)?\s*'), '');
+    text = text.replaceAll(RegExp(r'\s*```$'), '');
+
+    final start = text.indexOf('[');
+    if (start == -1) return null;
+
+    final end = text.lastIndexOf(']');
+    var jsonChunk = end != -1 && end > start
+        ? text.substring(start, end + 1)
+        : text.substring(start);
+
+    // Repariert abgeschnittene Antworten (fehlende schließende Klammern).
+    final openBraces = '{'.allMatches(jsonChunk).length;
+    final closeBraces = '}'.allMatches(jsonChunk).length;
+    if (openBraces > closeBraces) {
+      jsonChunk += '}' * (openBraces - closeBraces);
+    }
+
+    final openBrackets = '['.allMatches(jsonChunk).length;
+    final closeBrackets = ']'.allMatches(jsonChunk).length;
+    if (openBrackets > closeBrackets) {
+      jsonChunk += ']' * (openBrackets - closeBrackets);
+    }
+
+    return jsonChunk.trim();
   }
 
   DiscoveredEventCategory _parseCategory(String raw) {

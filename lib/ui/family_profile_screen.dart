@@ -4,6 +4,7 @@ import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/contacts_screen.dart';
 import 'package:trusted_circle_demo/ui/device_management_screen.dart';
+import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
 import 'package:trusted_circle_demo/widgets/ala_rengin_flag_painter.dart';
 
 class FamilyProfileScreen extends StatefulWidget {
@@ -163,7 +164,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   // Special handling for Kurdish languages to show Ala rengin flag
                   Widget flagWidget;
                   if (code == 'ku' || code == 'ckb') {
-                    flagWidget = AlaRenginFlag(width: 32, height: 20);
+                    flagWidget = const AlaRenginFlag(width: 32, height: 20);
                   } else {
                     flagWidget = Text(lang['flag'] ?? '🌐',
                         style: const TextStyle(fontSize: 28));
@@ -186,11 +187,11 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                         : null,
                     selected: isSelected,
                     selectedTileColor:
-                        Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                     onTap: () async {
                       // Nutze den globalen languageService und warte auf das Ergebnis
                       await languageService.setLanguage(code);
-                      if (mounted) {
+                      if (context.mounted) {
                         Navigator.pop(context);
                       }
                     },
@@ -279,7 +280,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           height: 200,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [primary.withOpacity(0.8), accent.withOpacity(0.6)],
+              colors: [primary.withValues(alpha: 0.8), accent.withValues(alpha: 0.6)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -341,7 +342,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                       child: Container(
                         width: 80,
                         decoration: BoxDecoration(
-                          color: primary.withOpacity(0.2),
+                          color: primary.withValues(alpha: 0.2),
                           border: Border.all(color: primary, width: 2),
                           borderRadius: BorderRadius.circular(25),
                         ),
@@ -357,7 +358,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 32,
-                        backgroundColor: primary.withOpacity(0.3),
+                        backgroundColor: primary.withValues(alpha: 0.3),
                         child: Text(
                           _familyMembers[index][0],
                           style: const TextStyle(
@@ -392,13 +393,13 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(25),
-          side: BorderSide(color: primary.withOpacity(0.2), width: 1),
+          side: BorderSide(color: primary.withValues(alpha: 0.2), width: 1),
         ),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(25),
             gradient: LinearGradient(
-              colors: [primary.withOpacity(0.1), accent.withOpacity(0.1)],
+              colors: [primary.withValues(alpha: 0.1), accent.withValues(alpha: 0.1)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -408,7 +409,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             leading: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: primary.withOpacity(0.2),
+                color: primary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child:
@@ -455,7 +456,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               return FilterChip(
                 label: Text(interest),
                 onSelected: (selected) {},
-                backgroundColor: const Color(0xFFBDB2FF).withOpacity(0.2),
+                backgroundColor: const Color(0xFFBDB2FF).withValues(alpha: 0.2),
                 labelStyle: const TextStyle(
                   color: Color(0xFFBDB2FF),
                   fontWeight: FontWeight.w600,
@@ -485,7 +486,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(25),
-              side: BorderSide(color: primary.withOpacity(0.1), width: 1),
+              side: BorderSide(color: primary.withValues(alpha: 0.1), width: 1),
             ),
             child: Column(
               children: [
@@ -500,7 +501,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
 
                       // Special handling for Kurdish languages to show Ala rengin flag
                       if (code == 'ku' || code == 'ckb') {
-                        return AlaRenginFlag(width: 24, height: 15);
+                        return const AlaRenginFlag(width: 24, height: 15);
                       } else {
                         final flagValue = currentLang['flag']!;
                         return Text(flagValue,
@@ -515,7 +516,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   trailing: const Icon(Icons.arrow_forward_ios, size: 18),
                   onTap: _showLanguageSelector,
                 ),
-                Divider(height: 1, color: primary.withOpacity(0.1)),
+                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
                 SwitchListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -530,7 +531,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                         value ? ThemeMode.dark : ThemeMode.light);
                   },
                 ),
-                Divider(height: 1, color: primary.withOpacity(0.1)),
+                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
                 SwitchListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -544,7 +545,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     );
                   },
                 ),
-                Divider(height: 1, color: primary.withOpacity(0.1)),
+                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
                 ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -558,7 +559,29 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     );
                   },
                 ),
-                Divider(height: 1, color: primary.withOpacity(0.1)),
+                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
+                ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  tileColor: const Color(0xFFF1F5FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  leading:
+                      const Icon(Icons.shield_rounded, color: Color(0xFF4F46E5)),
+                  title: const Text('Sicherheit'),
+                  subtitle: const Text('Schutz, Notfalltipps und Richtlinien'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SafetyGuideScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
                 ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -576,7 +599,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     );
                   },
                 ),
-                Divider(height: 1, color: primary.withOpacity(0.1)),
+                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
                 ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -624,7 +647,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(25),
-              side: BorderSide(color: primaryColor.withOpacity(0.1), width: 1),
+              side: BorderSide(color: primaryColor.withValues(alpha: 0.1), width: 1),
             ),
             child: Column(
               children: [
@@ -641,7 +664,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     );
                   },
                 ),
-                Divider(height: 1, color: primaryColor.withOpacity(0.1)),
+                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
                 ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -655,7 +678,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     );
                   },
                 ),
-                Divider(height: 1, color: primaryColor.withOpacity(0.1)),
+                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
                 ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -669,7 +692,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                     );
                   },
                 ),
-                Divider(height: 1, color: primaryColor.withOpacity(0.1)),
+                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
                 ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

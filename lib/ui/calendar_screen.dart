@@ -33,9 +33,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     '10 Termine',
     'Datum wählen'
   ];
-  String _recurrenceEndMode = 'Kein Ende';
+  final String _recurrenceEndMode = 'Kein Ende';
   DateTime? _recurrenceEndDate;
-  int _recurrenceCount = 5;
+  final int _recurrenceCount = 5;
 
   late DateTime _focusedDay;
   late DateTime _selectedDay;
@@ -58,6 +58,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Future<void> _loadEvents() async {
     final saved = await _calendarService.fetchEvents();
+    final syncError = _calendarService.lastSyncError;
     if (!mounted) return;
 
     if (saved.isEmpty) {
@@ -65,7 +66,9 @@ class _CalendarScreenState extends State<CalendarScreen>
       await _calendarService.seedIfEmpty(
         _events.map((e) => e.toJson()).toList(),
       );
-      setState(() {});
+      setState(() {
+        _syncError = syncError;
+      });
       return;
     }
 
@@ -73,7 +76,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       _events
         ..clear()
         ..addAll(saved.map(_CalendarEvent.fromJson));
-      _syncError = _calendarService.lastSyncError;
+      _syncError = null;
     });
   }
 
@@ -263,7 +266,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: person,
+                  initialValue: person,
                   decoration: const InputDecoration(labelText: 'Für wen?'),
                   items: _personColors.keys
                       .map((p) => DropdownMenuItem(value: p, child: Text(p)))
@@ -294,7 +297,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: recurrence,
+                  initialValue: recurrence,
                   decoration: const InputDecoration(labelText: 'Wiederholung'),
                   items: _recurrenceOptions
                       .map((p) => DropdownMenuItem(value: p, child: Text(p)))
@@ -305,7 +308,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  value: reminder,
+                  initialValue: reminder,
                   decoration: const InputDecoration(labelText: 'Erinnerung'),
                   items: _reminderOptions
                       .map((m) => DropdownMenuItem(
@@ -319,7 +322,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: endMode,
+                  initialValue: endMode,
                   decoration: const InputDecoration(labelText: 'Endet'),
                   items: _recurrenceEndOptions
                       .map((p) => DropdownMenuItem(value: p, child: Text(p)))
@@ -433,6 +436,12 @@ class _CalendarScreenState extends State<CalendarScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5EFE7),
+      appBar: AppBar(
+        title: const Text('Kalender'),
+        backgroundColor: const Color(0xFFF5EFE7),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -488,7 +497,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
@@ -569,7 +578,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -617,7 +626,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     return ChoiceChip(
       selected: selected,
       label: Text(label),
-      selectedColor: color.withOpacity(0.15),
+      selectedColor: color.withValues(alpha: 0.15),
       labelStyle: TextStyle(
         color: selected ? color : const Color(0xFF4A5568),
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
@@ -672,7 +681,7 @@ class _MonthGrid extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -680,9 +689,9 @@ class _MonthGrid extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               Text('Mo'),
               Text('Di'),
               Text('Mi'),
@@ -721,14 +730,14 @@ class _MonthGrid extends StatelessWidget {
                     color: isSelected
                         ? const Color(0xFF4CAF50)
                         : isToday
-                            ? const Color(0xFF4CAF50).withOpacity(0.1)
+                            ? const Color(0xFF4CAF50).withValues(alpha: 0.1)
                             : Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isSelected
                           ? const Color(0xFF4CAF50)
                           : isToday
-                              ? const Color(0xFF4CAF50).withOpacity(0.4)
+                              ? const Color(0xFF4CAF50).withValues(alpha: 0.4)
                               : Colors.grey[200]!,
                       width: isSelected ? 1.4 : 1,
                     ),
@@ -766,9 +775,9 @@ class _MonthGrid extends StatelessWidget {
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: isSelected
-                                          ? Colors.white.withOpacity(0.2)
+                                          ? Colors.white.withValues(alpha: 0.2)
                                           : const Color(0xFF4CAF50)
-                                              .withOpacity(0.12),
+                                              .withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
@@ -817,7 +826,7 @@ class _EventCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -848,7 +857,7 @@ class _EventCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.12),
+                            color: color.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -956,7 +965,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

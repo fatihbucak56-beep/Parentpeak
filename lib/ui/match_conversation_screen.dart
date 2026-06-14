@@ -6,7 +6,8 @@ class MatchConversationScreen extends StatefulWidget {
   final String profileName;
 
   @override
-  State<MatchConversationScreen> createState() => _MatchConversationScreenState();
+  State<MatchConversationScreen> createState() =>
+      _MatchConversationScreenState();
 }
 
 class _MatchConversationScreenState extends State<MatchConversationScreen> {
@@ -17,7 +18,7 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
   void initState() {
     super.initState();
     _messages.add(
-      _Msg(
+      const _Msg(
         text:
             'Hi! Schoen, dass wir gematcht haben. Wollen wir uns fuer einen Spielplatz-Treff austauschen?',
         isMe: false,
@@ -73,7 +74,7 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
                     msg.isMe ? Alignment.centerRight : Alignment.centerLeft;
                 final color = msg.isMe
                     ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.surfaceVariant;
+                    : theme.colorScheme.surfaceContainerHighest;
 
                 return Align(
                   alignment: align,

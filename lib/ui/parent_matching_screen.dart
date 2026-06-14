@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
+import 'package:trusted_circle_demo/logic/parent_matching_backend_service.dart';
 import 'package:trusted_circle_demo/ui/match_conversation_screen.dart';
 
 class ParentMatchingScreen extends StatefulWidget {
@@ -29,7 +31,9 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     'Empathie'
   };
 
-  final List<_ParentProfile> _allProfiles = _seedProfiles();
+  final ParentMatchingBackendService _service =
+      BackendServiceFactory.createParentMatchingService();
+  final List<_ParentProfile> _allProfiles = [];
   final List<_ParentProfile> _likedProfiles = [];
   final List<_ParentProfile> _matchedProfiles = [];
   final Set<String> _blockedProfileIds = {};
@@ -47,7 +51,23 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   @override
   void initState() {
     super.initState();
-    _restoreState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _loadProfiles();
+    await _restoreState();
+  }
+
+  Future<void> _loadProfiles() async {
+    final rawProfiles = await _service.fetchProfiles();
+    final parsed = rawProfiles.map(_profileFromMap).toList();
+    if (!mounted) return;
+    setState(() {
+      _allProfiles
+        ..clear()
+        ..addAll(parsed);
+    });
   }
 
   Future<void> _restoreState() async {
@@ -76,9 +96,9 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       final blockedIds =
           (decoded['blockedIds'] as List?)?.map((e) => e.toString()).toSet() ??
               <String>{};
-        final reportedIds =
+      final reportedIds =
           (decoded['reportedIds'] as List?)?.map((e) => e.toString()).toSet() ??
-            <String>{};
+              <String>{};
 
       if (!mounted) return;
       setState(() {
@@ -208,9 +228,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         profile.interests.toSet().intersection(_myInterests).length;
     final languagesMatch =
         profile.languages.toSet().intersection(_myLanguages).length;
-    final valuesMatch = profile.valuesFocus.toSet().intersection(_myValues).length;
+    final valuesMatch =
+        profile.valuesFocus.toSet().intersection(_myValues).length;
 
-    final base = (interestsMatch * 18) + (languagesMatch * 16) + (valuesMatch * 14);
+    final base =
+        (interestsMatch * 18) + (languagesMatch * 16) + (valuesMatch * 14);
     return min(98, max(45, base));
   }
 
@@ -234,19 +256,21 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         profile.interests.toSet().intersection(_myInterests).toList();
     final sharedLanguages =
         profile.languages.toSet().intersection(_myLanguages).toList();
-    final sharedValues = profile.valuesFocus.toSet().intersection(_myValues).toList();
+    final sharedValues =
+        profile.valuesFocus.toSet().intersection(_myValues).toList();
 
     if (sharedInterests.isNotEmpty) {
-      reasons.add('Gemeinsame Interessen: ${sharedInterests.take(2).join(', ')}');
+      reasons
+          .add('Gemeinsame Interessen: ${sharedInterests.take(2).join(', ')}');
     }
     if (sharedLanguages.isNotEmpty) {
       reasons.add('Sprache passt: ${sharedLanguages.take(2).join(', ')}');
     }
     if (sharedValues.isNotEmpty) {
-      reasons.add('Aehnliche Werte: ${sharedValues.take(2).join(', ')}');
+      reasons.add('Ähnliche Werte: ${sharedValues.take(2).join(', ')}');
     }
     if (reasons.isEmpty) {
-      reasons.add('Passende Familienphase und Offenheit fuer Austausch');
+      reasons.add('Passende Familienphase und Offenheit für Austausch');
     }
     return reasons;
   }
@@ -265,7 +289,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       _matchedProfiles.add(profile);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Neuer Match mit ${profile.name} ($score%)'),
+          content: Text('Neue Verbindung mit ${profile.name} ($score%)'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -273,6 +297,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
 
     _moveNext();
     _persistState();
+    _service.sendAction(profileId: profile.id, action: 'like');
   }
 
   void _reportCurrent() {
@@ -289,10 +314,13 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Profil ${profile.name} wurde gemeldet und ausgeblendet.'),
+        content:
+            Text('Profil ${profile.name} wurde gemeldet und ausgeblendet.'),
         duration: const Duration(seconds: 2),
       ),
     );
+
+    _service.sendAction(profileId: profile.id, action: 'report');
   }
 
   void _blockCurrent() {
@@ -313,6 +341,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+
+    _service.sendAction(profileId: profile.id, action: 'block');
   }
 
   void _openSafetyInfo() {
@@ -335,25 +365,27 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
               const ListTile(
                 leading: Icon(Icons.flag_outlined),
                 title: Text('Profile melden'),
-                subtitle: Text('Unpassende Inhalte koennen jederzeit gemeldet werden.'),
+                subtitle: Text(
+                  'Unpassende Inhalte können jederzeit gemeldet werden.'),
               ),
               const ListTile(
                 leading: Icon(Icons.block_rounded),
                 title: Text('Profile blockieren'),
-                subtitle: Text('Blockierte Profile werden nicht mehr angezeigt.'),
+                subtitle:
+                    Text('Blockierte Profile werden nicht mehr angezeigt.'),
               ),
               ListTile(
                 leading: const Icon(Icons.verified_user_outlined),
                 title: const Text('Aktueller Status'),
                 subtitle: Text(
-                    '${_matchedProfiles.length} Matches, ${_blockedProfileIds.length} blockierte Profile, ${_reportedProfileIds.length} gemeldete Profile'),
+                    '${_matchedProfiles.length} Verbindungen, ${_blockedProfileIds.length} blockierte Profile, ${_reportedProfileIds.length} gemeldete Profile'),
               ),
               if (_reportedProfileIds.isNotEmpty)
                 ListTile(
                   leading: const Icon(Icons.inventory_2_outlined),
                   title: const Text('Safety-Queue'),
                   subtitle: Text(
-                      '${_reportedProfileIds.length} Profile in Pruefung (lokal markiert)'),
+                      '${_reportedProfileIds.length} Profile in Prüfung (lokal markiert)'),
                 ),
             ],
           ),
@@ -470,10 +502,10 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                         options: const [
                           'Deutsch',
                           'Englisch',
-                          'Tuerkisch',
+                          'Türkisch',
                           'Arabisch',
                           'Kurdisch',
-                          'Franzoesisch'
+                          'Französisch'
                         ],
                         selected: _languageFilter,
                       ),
@@ -504,13 +536,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                       const SizedBox(height: 14),
                       buildFilterGroup(
                         title: 'Kinderalter',
-                        options: const [
-                          '0-2',
-                          '3-5',
-                          '6-9',
-                          '10-13',
-                          '14+'
-                        ],
+                        options: const ['0-2', '3-5', '6-9', '10-13', '14+'],
                         selected: _childAgeFilter,
                       ),
                       const SizedBox(height: 16),
@@ -572,17 +598,17 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
             Row(
               children: [
                 _StatPill(
-                  icon: Icons.favorite_border,
-                  label: 'Likes',
+                  icon: Icons.group_add_rounded,
+                  label: 'Interesse',
                   value: _likedProfiles.length,
-                  color: const Color(0xFFEC4899),
+                  color: const Color(0xFF0EA5A4),
                 ),
                 const SizedBox(width: 8),
                 _StatPill(
-                  icon: Icons.bolt_rounded,
-                  label: 'Matches',
+                  icon: Icons.handshake_rounded,
+                  label: 'Verbindungen',
                   value: _matchedProfiles.length,
-                  color: const Color(0xFF7C3AED),
+                  color: const Color(0xFF2563EB),
                 ),
                 const Spacer(),
                 Text(
@@ -596,11 +622,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer.withOpacity(0.45),
+                color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Nur fuer Freundschaft, Playdates und Eltern-Austausch.',
+                'Nur für Freundschaft, Playdates und Eltern-Austausch.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -643,8 +669,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: profile == null ? null : _likeCurrent,
-                    icon: const Icon(Icons.favorite_rounded),
-                    label: const Text('Matchen'),
+                    icon: const Icon(Icons.handshake_rounded),
+                    label: const Text('Verbinden'),
                   ),
                 ),
               ],
@@ -655,7 +681,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Wrap(
@@ -668,7 +694,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                             ),
                             label: Text(p.name),
                             onDeleted: () => _openMatchChat(p),
-                            deleteIcon: const Icon(Icons.chat_bubble_outline_rounded),
+                            deleteIcon:
+                                const Icon(Icons.chat_bubble_outline_rounded),
                           ))
                       .toList(),
                 ),
@@ -698,7 +725,7 @@ class _StatPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -753,7 +780,7 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: Colors.white.withOpacity(0.25),
+                  backgroundColor: Colors.white.withValues(alpha: 0.25),
                   child: Text(profile.name[0],
                       style: const TextStyle(
                           color: Colors.white,
@@ -780,7 +807,7 @@ class _ProfileCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(profile.city,
                           style: TextStyle(
-                              color: Colors.white.withOpacity(0.95),
+                            color: Colors.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w500)),
                     ],
                   ),
@@ -789,7 +816,7 @@ class _ProfileCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text('$compatibility%',
@@ -860,8 +887,7 @@ class _TagSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title,
-            style:
-                const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
@@ -901,7 +927,7 @@ class _MatchQualityRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Match-Qualitaet',
+          'Match-Qualität',
           style: Theme.of(context)
               .textTheme
               .bodyMedium
@@ -942,9 +968,9 @@ class _QualityPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.45)),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
       ),
       child: Text(
         '$label $score%',
@@ -971,7 +997,7 @@ class _EmptyMatchState extends StatelessWidget {
         children: [
           const Icon(Icons.search_off_rounded, size: 56),
           const SizedBox(height: 10),
-          const Text('Keine Profile fuer die aktuellen Filter.'),
+          const Text('Keine Profile für die aktuellen Filter.'),
           const SizedBox(height: 10),
           OutlinedButton(onPressed: onReset, child: const Text('Filter reset')),
         ],
@@ -1019,16 +1045,16 @@ class _VerificationBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (level) {
       _VerificationLevel.basic => ('Basis', Colors.white70),
-      _VerificationLevel.checked => ('Geprueft', Color(0xFF93C5FD)),
-      _VerificationLevel.recommended => ('Empfohlen', Color(0xFFFDE68A)),
+      _VerificationLevel.checked => ('Geprüft', const Color(0xFF93C5FD)),
+      _VerificationLevel.recommended => ('Empfohlen', const Color(0xFFFDE68A)),
     };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.18),
+        color: Colors.black.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.8)),
+        border: Border.all(color: color.withValues(alpha: 0.8)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1036,79 +1062,45 @@ class _VerificationBadge extends StatelessWidget {
           Icon(Icons.verified_rounded, color: color, size: 15),
           const SizedBox(width: 4),
           Text(label,
-              style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w700, fontSize: 11)),
         ],
       ),
     );
   }
 }
 
-List<_ParentProfile> _seedProfiles() {
-  return const [
-    _ParentProfile(
-      id: 'p1',
-      name: 'Miriam',
-      age: 34,
-      city: 'Berlin',
-      bio: 'Ich suche Eltern fuer gemeinsame Wochenendaktivitaeten und ehrlichen Austausch.',
-      interests: ['Spielplatz', 'Outdoor', 'Familienzeit', 'Bildung'],
-      languages: ['Deutsch', 'Englisch'],
-      valuesFocus: ['Gewaltfrei', 'Empathie', 'Inklusion'],
-      childAges: ['3-5', '6-9'],
-      familyForm: 'Kernfamilie',
-      verificationLevel: _VerificationLevel.recommended,
-    ),
-    _ParentProfile(
-      id: 'p2',
-      name: 'Sibel',
-      age: 37,
-      city: 'Koeln',
-      bio: 'Alleinerziehend, offen fuer neue Freundschaften mit Eltern in aehnlicher Situation.',
-      interests: ['Gesundheit', 'Bildung', 'Kreativ'],
-      languages: ['Deutsch', 'Tuerkisch'],
-      valuesFocus: ['Respekt', 'Offenheit', 'Empathie'],
-      childAges: ['6-9', '10-13'],
-      familyForm: 'Alleinerziehend',
-      verificationLevel: _VerificationLevel.checked,
-    ),
-    _ParentProfile(
-      id: 'p3',
-      name: 'Jonas',
-      age: 40,
-      city: 'Hamburg',
-      bio: 'Wir sind eine Patchwork-Familie und suchen entspannte Eltern fuer Spieltreffen.',
-      interests: ['Sport', 'Outdoor', 'Spielplatz'],
-      languages: ['Deutsch'],
-      valuesFocus: ['Gewaltfrei', 'Tradition', 'Respekt'],
-      childAges: ['0-2', '3-5'],
-      familyForm: 'Patchwork',
-      verificationLevel: _VerificationLevel.basic,
-    ),
-    _ParentProfile(
-      id: 'p4',
-      name: 'Lina',
-      age: 32,
-      city: 'Muenchen',
-      bio: 'Ich liebe Lernideen fuer Kinder und suche Eltern fuer kleine Bildungsprojekte.',
-      interests: ['Bildung', 'Kreativ', 'Familienzeit'],
-      languages: ['Deutsch', 'Franzoesisch', 'Englisch'],
-      valuesFocus: ['Inklusion', 'Offenheit', 'Empathie'],
-      childAges: ['6-9'],
-      familyForm: 'Kernfamilie',
-      verificationLevel: _VerificationLevel.recommended,
-    ),
-    _ParentProfile(
-      id: 'p5',
-      name: 'Baran',
-      age: 35,
-      city: 'Dortmund',
-      bio: 'Vater von zwei Kids, interessiert an gewaltfreier Kommunikation und Community.',
-      interests: ['Gesundheit', 'Familienzeit', 'Sport'],
-      languages: ['Deutsch', 'Kurdisch'],
-      valuesFocus: ['Gewaltfrei', 'Respekt', 'Empathie'],
-      childAges: ['3-5', '10-13'],
-      familyForm: 'Kernfamilie',
-      verificationLevel: _VerificationLevel.checked,
-    ),
-  ];
+_ParentProfile _profileFromMap(Map<String, dynamic> raw) {
+  _VerificationLevel parseVerificationLevel(String? value) {
+    switch (value?.toLowerCase().trim()) {
+      case 'checked':
+        return _VerificationLevel.checked;
+      case 'recommended':
+        return _VerificationLevel.recommended;
+      default:
+        return _VerificationLevel.basic;
+    }
+  }
+
+  List<String> toStringList(dynamic value) {
+    if (value is List) {
+      return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    }
+    return const [];
+  }
+
+  return _ParentProfile(
+    id: (raw['id'] ?? DateTime.now().microsecondsSinceEpoch.toString()).toString(),
+    name: (raw['name'] ?? 'Unbekannt').toString(),
+    age: (raw['age'] is num) ? (raw['age'] as num).toInt() : int.tryParse('${raw['age']}') ?? 30,
+    city: (raw['city'] ?? 'Unbekannt').toString(),
+    bio: (raw['bio'] ?? '').toString(),
+    interests: toStringList(raw['interests']),
+    languages: toStringList(raw['languages']),
+    valuesFocus: toStringList(raw['valuesFocus']),
+    childAges: toStringList(raw['childAges']),
+    familyForm: (raw['familyForm'] ?? 'Kernfamilie').toString(),
+    verificationLevel:
+        parseVerificationLevel(raw['verificationLevel']?.toString()),
+  );
 }

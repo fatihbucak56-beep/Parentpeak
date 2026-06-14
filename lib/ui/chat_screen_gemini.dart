@@ -233,13 +233,13 @@ class _ChatScreenGeminiState extends State<ChatScreenGemini> {
               gradient: LinearGradient(
                 colors: [
                   theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacity(0.7)
+                  theme.colorScheme.primary.withValues(alpha: 0.7)
                 ],
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.3),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -380,7 +380,7 @@ class _ChatScreenGeminiState extends State<ChatScreenGemini> {
                           backgroundColor: (isUser
                                   ? Colors.white
                                   : Colors.grey[300])!
-                              .withOpacity(0.5),
+                              .withValues(alpha: 0.5),
                           valueColor: AlwaysStoppedAnimation<Color>(
                             isUser ? Colors.white : Colors.grey[600]!,
                           ),

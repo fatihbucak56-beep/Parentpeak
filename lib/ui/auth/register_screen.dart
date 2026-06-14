@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -24,18 +23,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
-  void _insertIntoEmail(String value) {
-    final currentText = _emailCtrl.text;
-    final selection = _emailCtrl.selection;
-
-    final start = selection.start >= 0 ? selection.start : currentText.length;
-    final end = selection.end >= 0 ? selection.end : currentText.length;
-
-    final updated = currentText.replaceRange(start, end, value);
-    _emailCtrl.value = TextEditingValue(
-      text: updated,
-      selection: TextSelection.collapsed(offset: start + value.length),
-    );
+  void _clearError() {
+    if (_errorMessage == null) return;
+    setState(() => _errorMessage = null);
   }
 
   @override
@@ -60,87 +50,170 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _errorMessage = null;
     });
 
-    final result = await AuthService.instance.register(
-      email: _emailCtrl.text.trim(),
-      password: _passCtrl.text,
-      displayName: _nameCtrl.text.trim(),
-    );
+    try {
+      final result = await AuthService.instance.register(
+        email: _emailCtrl.text.trim().toLowerCase(),
+        password: _passCtrl.text,
+        displayName: _nameCtrl.text.trim(),
+      );
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-    if (result.success) {
-      widget.onRegisterSuccess?.call();
-      if (mounted) Navigator.of(context).pop();
-    } else {
-      setState(() => _errorMessage = result.errorMessage);
+      if (result.success) {
+        widget.onRegisterSuccess?.call();
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        setState(
+          () => _errorMessage = result.errorMessage ??
+              'Registrierung fehlgeschlagen. Bitte erneut versuchen.',
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'Technischer Fehler bei der Registrierung. Bitte erneut versuchen.';
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final width = MediaQuery.of(context).size.width;
+    final cardPadding = width < 380 ? 18.0 : 24.0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Konto erstellen'),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 8),
-              _buildTrialBanner(theme),
-              const SizedBox(height: 24),
-              _buildForm(theme),
-              const SizedBox(height: 20),
-              if (_errorMessage != null) ...[
-                _buildError(theme),
-                const SizedBox(height: 16),
-              ],
-              _buildTerms(theme),
-              const SizedBox(height: 20),
-              _buildRegisterButton(theme),
-              const SizedBox(height: 32),
-              _buildPasswordHints(theme),
-              const SizedBox(height: 24),
-            ],
+      backgroundColor: const Color(0xFFF4F7F6),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -130,
+            right: -60,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x664FC3B4), Color(0x004FC3B4)],
+                ),
+              ),
+            ),
           ),
-        ),
+          Positioned(
+            bottom: -120,
+            left: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x55FFA970), Color(0x00FFA970)],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 26),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildTrialBanner(theme),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: EdgeInsets.all(cardPadding),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.96),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFDCE9E6)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF103A35).withValues(alpha: 0.08),
+                              blurRadius: 24,
+                              offset: const Offset(0, 12),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Konto erstellen',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF122220),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'In 2 Minuten startklar fur deinen Familienalltag.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF5A6B68),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _buildForm(theme),
+                            const SizedBox(height: 14),
+                            if (_errorMessage != null) ...[
+                              _buildError(theme),
+                              const SizedBox(height: 12),
+                            ],
+                            _buildTerms(theme),
+                            const SizedBox(height: 16),
+                            _buildRegisterButton(theme),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPasswordHints(theme),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildTrialBanner(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.12),
-            theme.colorScheme.tertiary.withValues(alpha: 0.08),
-          ],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0C1B1F), Color(0xFF14504E), Color(0xFF2A8A7F)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.star_rounded,
-              color: theme.colorScheme.primary,
+              color: Colors.white,
               size: 24,
             ),
           ),
@@ -153,14 +226,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   '14 Tage kostenlos',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.primary,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Alle Funktionen, keine Kreditkarte nötig.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ],
@@ -180,12 +253,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: _nameCtrl,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.words,
-            decoration: InputDecoration(
+            onChanged: (_) => _clearError(),
+            decoration: _fieldDecoration(
               labelText: 'Dein Name',
               prefixIcon: const Icon(Icons.person_outline_rounded),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Name ist erforderlich.';
@@ -200,16 +271,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             autocorrect: false,
             enableSuggestions: false,
             textCapitalization: TextCapitalization.none,
-            autofillHints: const [AutofillHints.username, AutofillHints.email],
-            onTap: () {
-              SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-            },
-            decoration: InputDecoration(
+            autofillHints: const [AutofillHints.email],
+            onChanged: (_) => _clearError(),
+            decoration: _fieldDecoration(
               labelText: 'E-Mail-Adresse',
               prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'E-Mail ist erforderlich.';
@@ -219,29 +285,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 8,
-              children: [
-                ActionChip(
-                  label: const Text('@ einfügen'),
-                  onPressed: () => _insertIntoEmail('@'),
-                ),
-                ActionChip(
-                  label: const Text('.com einfügen'),
-                  onPressed: () => _insertIntoEmail('.com'),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 14),
           TextFormField(
             controller: _passCtrl,
             obscureText: _obscurePass,
             textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
+            onChanged: (_) => _clearError(),
+            decoration: _fieldDecoration(
               labelText: 'Passwort',
               prefixIcon: const Icon(Icons.lock_outline_rounded),
               suffixIcon: IconButton(
@@ -250,9 +300,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : Icons.visibility_off_outlined),
                 onPressed: () =>
                     setState(() => _obscurePass = !_obscurePass),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
               ),
             ),
             validator: (v) {
@@ -271,7 +318,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             obscureText: _obscureConfirm,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
+            onChanged: (_) => _clearError(),
+            decoration: _fieldDecoration(
               labelText: 'Passwort bestätigen',
               prefixIcon: const Icon(Icons.lock_rounded),
               suffixIcon: IconButton(
@@ -280,9 +328,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : Icons.visibility_off_outlined),
                 onPressed: () =>
                     setState(() => _obscureConfirm = !_obscureConfirm),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
               ),
             ),
             validator: (v) {
@@ -297,23 +342,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  InputDecoration _fieldDecoration({
+    required String labelText,
+    required Widget prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: const Color(0xFFF7FAF9),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD6E3E0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD6E3E0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF1F7A71), width: 1.4),
+      ),
+    );
+  }
+
   Widget _buildError(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFFFFF4F1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD1C3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline_rounded,
-              color: theme.colorScheme.onErrorContainer, size: 20),
+          const Icon(Icons.error_outline_rounded,
+              color: Color(0xFFB14D2F), size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _errorMessage!,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
+                color: const Color(0xFF8C3E28),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -323,47 +396,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildTerms(ThemeData theme) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Checkbox(
-          value: _agreedToTerms,
-          onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: RichText(
-              text: TextSpan(
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAF9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFDDE9E6)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Checkbox(
+            value: _agreedToTerms,
+            onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            activeColor: const Color(0xFF166A61),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: RichText(
+                text: TextSpan(
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF546663),
+                  ),
+                  children: const [
+                    TextSpan(text: 'Ich akzeptiere die '),
+                    TextSpan(
+                      text: 'Nutzungsbedingungen',
+                      style: TextStyle(
+                        color: Color(0xFF145D55),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextSpan(text: ' und '),
+                    TextSpan(
+                      text: 'Datenschutzrichtlinie',
+                      style: TextStyle(
+                        color: Color(0xFF145D55),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextSpan(text: ' von Parentpeak.'),
+                  ],
                 ),
-                children: [
-                  const TextSpan(text: 'Ich akzeptiere die '),
-                  TextSpan(
-                    text: 'Nutzungsbedingungen',
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const TextSpan(text: ' und '),
-                  TextSpan(
-                    text: 'Datenschutzrichtlinie',
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const TextSpan(text: ' von Parentpeak.'),
-                ],
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -373,6 +455,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF166A61),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -398,8 +481,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE1ECEA)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,7 +506,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   Icon(Icons.check_circle_outline_rounded,
                       size: 16,
-                      color: theme.colorScheme.onSurfaceVariant),
+                      color: const Color(0xFF5E6F6B)),
                   const SizedBox(width: 8),
                   Text(hint, style: theme.textTheme.bodySmall),
                 ],

@@ -1,4 +1,5 @@
-import 'dart:convert';
+import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 
 class Provider {
   final String id;
@@ -83,6 +84,98 @@ class Provider {
 }
 
 class MarketplaceService {
+  static dynamic get _apiClient => BackendServiceFactory.createApiClient();
+
+  static bool get _isBackendEnabled => _apiClient != null;
+
+  static String _inferCategoryGroup(Map<String, dynamic> json) {
+    final explicit = json['categoryGroup']?.toString();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+
+    final category = (json['category'] ?? '').toString().toLowerCase();
+    final subcategory = (json['subcategory'] ?? '').toString().toLowerCase();
+
+    const educationHints = [
+      'nachhilfe',
+      'mathe',
+      'mathematik',
+      'englisch',
+      'deutsch',
+      'physik',
+      'chemie',
+      'biologie',
+      'französisch',
+      'franzoesisch',
+      'spanisch',
+      'latein',
+      'musik',
+      'kunst',
+      'bildung',
+      'lern',
+      'prüfung',
+      'pruefung',
+    ];
+
+    const careHints = [
+      'betreuung',
+      'kleinkinder',
+      'schulkinder',
+      'vorschul',
+      'fahrdienst',
+      'notfallbetreuung',
+      'babysitting',
+    ];
+
+    if (educationHints.any((hint) => category.contains(hint) || subcategory.contains(hint))) {
+      return 'Bildungsangebote';
+    }
+    if (careHints.any((hint) => category.contains(hint) || subcategory.contains(hint))) {
+      return 'Betreuung';
+    }
+    return 'Kaufen & Verkaufen';
+  }
+
+  static String? _inferEducationType(Map<String, dynamic> json) {
+    final explicit = json['educationType']?.toString();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+
+    final subcategory = (json['subcategory'] ?? '').toString().toLowerCase();
+    final categoryGroup = _inferCategoryGroup(json);
+    if (categoryGroup != 'Bildungsangebote') return null;
+    if (subcategory.contains('nachhilfe')) return 'Nachhilfe';
+    return 'Außerschulisch';
+  }
+
+  static Provider _normalizeProvider(Map<String, dynamic> json) {
+    return Provider(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? 'Unbekannt').toString(),
+      category: (json['category'] ?? '').toString(),
+      subcategory: (json['subcategory'] ?? '').toString(),
+      price: (json['price'] as num?)?.toDouble() ??
+          double.tryParse('${json['price']}') ??
+          0,
+      priceUnit: (json['priceUnit'] ?? '€/Stunde').toString(),
+      rating: (json['rating'] as num?)?.toDouble() ??
+          double.tryParse('${json['rating']}') ??
+          0,
+      reviews: (json['reviews'] as num?)?.toInt() ??
+          int.tryParse('${json['reviews']}') ??
+          0,
+      photo: (json['photo'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      location: (json['location'] ?? '').toString(),
+      age: (json['age'] as num?)?.toInt() ?? int.tryParse('${json['age']}') ?? 0,
+      verified: json['verified'] as bool? ?? false,
+      languages: (json['languages'] is List)
+          ? List<String>.from((json['languages'] as List).map((e) => e.toString()))
+          : const [],
+      availability: (json['availability'] ?? '').toString(),
+      categoryGroup: _inferCategoryGroup(json),
+      educationType: _inferEducationType(json),
+    );
+  }
+
   /// Mock-Anbieter Daten (professionelle Kategorien)
   static final List<Provider> _mockProviders = [
     // ============ A) BILDUNGSANGEBOTE ============
@@ -579,29 +672,59 @@ class MarketplaceService {
 
   /// Alle Anbieter abrufen (Mock)
   static Future<List<Provider>> getAllProviders() async {
-    await Future.delayed(Duration(milliseconds: 500));
+    if (_isBackendEnabled) {
+      try {
+        final payload = await _apiClient.getJson(APIConfig.getBackendProvidersPath());
+        if (payload is List) {
+          return payload
+              .whereType<Map>()
+              .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
+              .toList();
+        }
+      } catch (_) {
+        // fallback below
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500));
     return _mockProviders;
   }
 
   /// Anbieter nach Kategorie-Gruppe filtern (A, B, C)
   static Future<List<Provider>> getProvidersByGroup(String group) async {
-    await Future.delayed(Duration(milliseconds: 300));
-    return _mockProviders.where((p) => p.categoryGroup == group).toList();
+    final providers = await getAllProviders();
+    return providers.where((p) => p.categoryGroup == group).toList();
   }
 
   /// Anbieter nach detaillierter Kategorie filtern
   static Future<List<Provider>> getProvidersByCategory(String category) async {
-    await Future.delayed(Duration(milliseconds: 300));
-    return _mockProviders
+    if (_isBackendEnabled) {
+      try {
+        final payload = await _apiClient.getJson(
+          '${APIConfig.getBackendProvidersPath()}/category/${Uri.encodeComponent(category)}',
+        );
+        if (payload is List) {
+          return payload
+              .whereType<Map>()
+              .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
+              .toList();
+        }
+      } catch (_) {
+        // fallback below
+      }
+    }
+
+    final providers = await getAllProviders();
+    return providers
         .where((p) => p.category == category || p.subcategory == category)
         .toList();
   }
 
   /// Alle Kategorien-Gruppen abrufen
   static Future<List<String>> getAllCategoryGroups() async {
-    await Future.delayed(Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 200));
     final groups = <String>{};
-    for (var provider in _mockProviders) {
+    for (final provider in await getAllProviders()) {
       groups.add(provider.categoryGroup);
     }
     return groups.toList();
@@ -609,9 +732,9 @@ class MarketplaceService {
 
   /// Alle Kategorien in einer Gruppe
   static Future<List<String>> getCategoriesByGroup(String group) async {
-    await Future.delayed(Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 200));
     final categories = <String>{};
-    for (var provider in _mockProviders.where((p) => p.categoryGroup == group)) {
+    for (final provider in (await getAllProviders()).where((p) => p.categoryGroup == group)) {
       categories.add(provider.category);
     }
     return categories.toList()..sort();
@@ -619,7 +742,23 @@ class MarketplaceService {
 
   /// Suche nach Text (Mock)
   static Future<List<Provider>> search(String query) async {
-    await Future.delayed(Duration(milliseconds: 300));
+    if (_isBackendEnabled) {
+      try {
+        final payload = await _apiClient.getJson(
+          '${APIConfig.getBackendProviderSearchPath()}?q=${Uri.encodeQueryComponent(query)}',
+        );
+        if (payload is List) {
+          return payload
+              .whereType<Map>()
+              .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
+              .toList();
+        }
+      } catch (_) {
+        // fallback below
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
     final q = query.toLowerCase();
     return _mockProviders
         .where((p) =>
@@ -636,8 +775,23 @@ class MarketplaceService {
     required String comment,
     required String parentName,
   }) async {
-    await Future.delayed(Duration(milliseconds: 500));
-    print('✅ Bewertung hinzugefügt (Mock): Provider=$providerId, Rating=$rating');
+    if (_isBackendEnabled) {
+      try {
+        await _apiClient.postJsonAny(
+          '${APIConfig.getBackendProvidersPath()}/$providerId/review',
+          {
+            'rating': rating,
+            'comment': comment,
+            'parentName': parentName,
+          },
+        );
+        return;
+      } catch (_) {
+        // fallback below
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500));
   }
 
   /// Erweiterte Filter (Mock)
@@ -647,7 +801,32 @@ class MarketplaceService {
     double? minRating,
     String? categoryGroup,
   }) async {
-    await Future.delayed(Duration(milliseconds: 300));
+    if (_isBackendEnabled) {
+      try {
+        final payload = await _apiClient.postJsonAny(
+          APIConfig.getBackendProviderFilterPath(),
+          {
+            'categories': categories,
+            'maxPrice': maxPrice,
+            'minRating': minRating,
+          },
+        );
+        if (payload is List) {
+          var remote = payload
+              .whereType<Map>()
+              .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
+              .toList();
+          if (categoryGroup != null) {
+            remote = remote.where((p) => p.categoryGroup == categoryGroup).toList();
+          }
+          return remote;
+        }
+      } catch (_) {
+        // fallback below
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
     var filtered = _mockProviders;
 
     if (categoryGroup != null) {

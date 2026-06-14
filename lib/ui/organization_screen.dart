@@ -154,13 +154,14 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
         : 'Neuen Einkaufsartikel hinzufügen...';
 
     final openItems = activeItems
-      .where((item) => !(item[completeKey] as bool? ?? false))
-      .toList();
+        .where((item) => !(item[completeKey] as bool? ?? false))
+        .toList();
     final doneItems = activeItems
-      .where((item) => item[completeKey] as bool? ?? false)
-      .toList();
+        .where((item) => item[completeKey] as bool? ?? false)
+        .toList();
 
     final syncError = isTodos ? _todoSyncError : _shoppingSyncError;
+    final hasSyncNotice = syncError != null && syncError.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -195,19 +196,22 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
             },
           ),
           const SizedBox(height: 12),
-          if (syncError != null)
+          if (hasSyncNotice)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Material(
-                color: Colors.amber[100],
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(12),
                 child: ListTile(
-                  leading: const Icon(Icons.cloud_off_rounded),
-                  title: const Text('Server-Sync fehlgeschlagen'),
+                  leading: Icon(
+                    Icons.cloud_done_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: const Text('Lokaler Modus aktiv'),
                   subtitle: Text(syncError),
                   trailing: TextButton(
                     onPressed: _loadData,
-                    child: const Text('Retry'),
+                    child: const Text('Erneut versuchen'),
                   ),
                 ),
               ),
@@ -316,7 +320,8 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                       title: Text(
                         (item[titleKey] ?? '').toString(),
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          decoration: isDone ? TextDecoration.lineThrough : null,
+                          decoration:
+                              isDone ? TextDecoration.lineThrough : null,
                           color: isDone ? Colors.grey : null,
                         ),
                       ),
@@ -363,7 +368,8 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                       title: Text(
                         (item[titleKey] ?? '').toString(),
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          decoration: isDone ? TextDecoration.lineThrough : null,
+                          decoration:
+                              isDone ? TextDecoration.lineThrough : null,
                           color: isDone ? Colors.grey : null,
                         ),
                       ),
@@ -404,7 +410,7 @@ class _SummaryChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

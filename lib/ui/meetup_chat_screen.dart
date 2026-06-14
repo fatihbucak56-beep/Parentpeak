@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/logic/meetup_chat_service.dart';
 import 'package:trusted_circle_demo/models/meetup_chat.dart';
@@ -20,23 +23,44 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
   List<MeetupChatMessage> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  bool _hasAccess = false;
+  Timer? _refreshTimer;
 
-  // Demo User
-  static const String _currentUserId = 'user_demo_001';
-  static const String _currentUserName = 'Du';
-  static const String _currentUserAvatar =
-      'https://via.placeholder.com/50x50?text=You';
+  String get _currentUserId =>
+      AuthService.instance.currentUser?.uid ?? 'user_demo_001';
+  String get _currentUserName =>
+      AuthService.instance.currentUser?.displayName ?? 'Du';
+  String get _currentUserAvatar => '';
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _bootstrap();
     // Lade Nachrichten alle 2 Sekunden (Polling)
     Future.delayed(const Duration(milliseconds: 500), _setupAutoRefresh);
   }
 
+  Future<void> _bootstrap() async {
+    final access = await _chatService.hasAccessToChat(
+      eventId: widget.event.id,
+      userId: _currentUserId,
+      hosterId: widget.event.hosterId,
+    );
+    if (!mounted) return;
+    setState(() => _hasAccess = access);
+    if (!access) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    await _loadMessages();
+  }
+
   void _setupAutoRefresh() {
-    // In echtem System würde WebSocket oder Firebase verwendet
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      if (!mounted || !_hasAccess || _isSending) return;
+      await _loadMessages();
+    });
   }
 
   Future<void> _loadMessages() async {
@@ -135,6 +159,7 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
     if (reason != null && mounted) {
       try {
         await _chatService.reportMessage(
+          eventId: widget.event.id,
           reportedMessageId: message.id,
           reporterId: _currentUserId,
           reason: reason,
@@ -250,6 +275,24 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
+                : !_hasAccess
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.lock_outline_rounded,
+                                  size: 56, color: Colors.grey[400]),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Chat nur für bestätigte Teilnehmer',
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                 : _messages.isEmpty
                     ? Center(
                         child: Column(
@@ -284,57 +327,58 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
                       ),
           ),
           // Input Area
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey[200]!),
+          if (_hasAccess)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(color: Colors.grey[200]!),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Nachricht...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      maxLines: null,
+                      enabled: !_isSending,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FloatingActionButton(
+                    mini: true,
+                    onPressed: (_messageController.text.isEmpty || _isSending)
+                        ? null
+                        : _sendMessage,
+                    child: _isSending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.send),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Nachricht...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    maxLines: null,
-                    enabled: !_isSending,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton(
-                  mini: true,
-                  onPressed: (_messageController.text.isEmpty || _isSending)
-                      ? null
-                      : _sendMessage,
-                  child: _isSending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.send),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -354,9 +398,9 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
             if (!isCurrentUser)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundImage: NetworkImage(message.userAvatarUrl),
+                child: _MessageAvatar(
+                  name: message.userName,
+                  avatarUrl: message.userAvatarUrl,
                 ),
               ),
             Flexible(
@@ -421,9 +465,9 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
             if (isCurrentUser)
               Padding(
                 padding: const EdgeInsets.only(left: 8),
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundImage: NetworkImage(message.userAvatarUrl),
+                child: _MessageAvatar(
+                  name: message.userName,
+                  avatarUrl: message.userAvatarUrl,
                 ),
               ),
           ],
@@ -434,8 +478,31 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+}
+
+class _MessageAvatar extends StatelessWidget {
+  const _MessageAvatar({required this.name, required this.avatarUrl});
+
+  final String name;
+  final String avatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isEmpty ? '?' : name.trim().substring(0, 1).toUpperCase();
+    if (avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundImage: NetworkImage(avatarUrl),
+      );
+    }
+    return CircleAvatar(
+      radius: 16,
+      child: Text(initial),
+    );
   }
 }

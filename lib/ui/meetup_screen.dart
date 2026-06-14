@@ -345,13 +345,30 @@ class _MeetupScreenState extends State<MeetupScreen> {
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  image: DecorationImage(
-                    image: NetworkImage(event.photoUrl),
-                    fit: BoxFit.cover,
-                  ),
+                  gradient: event.photoUrl.isEmpty
+                      ? const LinearGradient(
+                          colors: [Color(0xFFDBEAFE), Color(0xFFE0F2FE)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  image: event.photoUrl.isEmpty
+                      ? null
+                      : DecorationImage(
+                          image: NetworkImage(event.photoUrl),
+                          fit: BoxFit.cover,
+                        ),
                 ),
                 child: Stack(
                   children: [
+                    if (event.photoUrl.isEmpty)
+                      const Center(
+                        child: Icon(
+                          Icons.celebration_rounded,
+                          size: 40,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
                     Positioned(
                       top: 8,
                       right: 8,
@@ -514,11 +531,20 @@ class _MeetupScreenState extends State<MeetupScreen> {
             height: 80,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              image: DecorationImage(
-                image: NetworkImage(event.photoUrl),
-                fit: BoxFit.cover,
-              ),
+              color: event.photoUrl.isEmpty ? const Color(0xFFE0F2FE) : null,
+              image: event.photoUrl.isEmpty
+                  ? null
+                  : DecorationImage(
+                      image: NetworkImage(event.photoUrl),
+                      fit: BoxFit.cover,
+                    ),
             ),
+            child: event.photoUrl.isEmpty
+                ? const Icon(
+                    Icons.celebration_rounded,
+                    color: Color(0xFF2563EB),
+                  )
+                : null,
           ),
           title: Text(event.title),
           subtitle: Column(

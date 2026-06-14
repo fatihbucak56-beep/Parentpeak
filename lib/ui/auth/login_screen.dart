@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/ui/auth/register_screen.dart';
 
@@ -21,18 +21,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
-  void _insertIntoEmail(String value) {
-    final currentText = _emailCtrl.text;
-    final selection = _emailCtrl.selection;
-
-    final start = selection.start >= 0 ? selection.start : currentText.length;
-    final end = selection.end >= 0 ? selection.end : currentText.length;
-
-    final updated = currentText.replaceRange(start, end, value);
-    _emailCtrl.value = TextEditingValue(
-      text: updated,
-      selection: TextSelection.collapsed(offset: start + value.length),
-    );
+  void _clearError() {
+    if (_errorMessage == null) return;
+    setState(() => _errorMessage = null);
   }
 
   @override
@@ -50,67 +41,155 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    final result = await AuthService.instance.login(
-      email: _emailCtrl.text.trim(),
-      password: _passCtrl.text,
-    );
+    try {
+      final result = await AuthService.instance.login(
+        email: _emailCtrl.text.trim().toLowerCase(),
+        password: _passCtrl.text,
+      );
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-    if (result.success) {
-      widget.onLoginSuccess?.call();
-    } else {
-      setState(() => _errorMessage = result.errorMessage);
+      if (result.success) {
+        widget.onLoginSuccess?.call();
+      } else {
+        setState(
+          () => _errorMessage = result.errorMessage ??
+              'Login fehlgeschlagen. Bitte erneut versuchen.',
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Technischer Fehler beim Login. Bitte erneut versuchen.';
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
+    final width = MediaQuery.of(context).size.width;
+    final cardPadding = width < 380 ? 18.0 : 24.0;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.surface,
-                theme.colorScheme.primary.withValues(alpha: 0.025),
-                theme.colorScheme.tertiary.withValues(alpha: 0.035),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+      backgroundColor: const Color(0xFFF4F7F6),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -140,
+            right: -70,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x664FC3B4), Color(0x004FC3B4)],
+                ),
+              ),
             ),
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: size.height * 0.04),
-                _buildHeaderBlock(theme),
-                const SizedBox(height: 18),
-                _buildForm(theme),
-                const SizedBox(height: 14),
-                if (_errorMessage != null) _buildError(theme),
-                if (_errorMessage != null) const SizedBox(height: 14),
-                _buildLoginButton(theme),
-                const SizedBox(height: 16),
-                _buildQuickActionRow(theme),
-                const SizedBox(height: 14),
-                _buildDivider(theme),
-                const SizedBox(height: 14),
-                _buildSocialButtons(theme),
-                const SizedBox(height: 20),
-                _buildRegisterLink(theme),
-                const SizedBox(height: 24),
-              ],
+          Positioned(
+            bottom: -120,
+            left: -50,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x55FFA970), Color(0x00FFA970)],
+                ),
+              ),
             ),
           ),
-        ),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeaderBlock(theme),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: EdgeInsets.all(cardPadding),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.96),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: const Color(0xFFDCE9E6),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF103A35).withValues(alpha: 0.08),
+                              blurRadius: 24,
+                              offset: const Offset(0, 12),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Willkommen zurück',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF122220),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Melde dich an, um deinen Familienbereich zu öffnen.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF5A6B68),
+                                height: 1.35,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _buildForm(theme),
+                            const SizedBox(height: 12),
+                            if (_errorMessage != null) _buildError(theme),
+                            if (_errorMessage != null) const SizedBox(height: 12),
+                            _buildLoginButton(theme),
+                            const SizedBox(height: 14),
+                            _buildDivider(theme),
+                            const SizedBox(height: 14),
+                            _buildSocialButtons(theme),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (kDebugMode) ...[
+                        Align(
+                          alignment: Alignment.center,
+                          child: TextButton.icon(
+                            onPressed: _isLoading
+                                ? null
+                                : () async {
+                                    await AuthService.instance
+                                        .debugSeedSessionForTesting();
+                                    if (!mounted) return;
+                                    widget.onLoginSuccess?.call();
+                                  },
+                            icon: const Icon(Icons.bolt_rounded),
+                            label: const Text('Demo öffnen'),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      _buildRegisterLink(theme),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -148,11 +227,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildHeaderBlock(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(26),
         gradient: const LinearGradient(
-          colors: [Color(0xFF0C1B1F), Color(0xFF0F3C44), Color(0xFF126C69)],
+          colors: [Color(0xFF0C1B1F), Color(0xFF14504E), Color(0xFF2A8A7F)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -168,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _buildLogo(theme),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sicher für Familien.',
+                  'Sicher. Klar. Für Familien gemacht.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.9),
                     fontWeight: FontWeight.w600,
@@ -209,16 +288,11 @@ class _LoginScreenState extends State<LoginScreen> {
             autocorrect: false,
             enableSuggestions: false,
             textCapitalization: TextCapitalization.none,
-            autofillHints: const [AutofillHints.username, AutofillHints.email],
-            onTap: () {
-              SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-            },
-            decoration: InputDecoration(
+            autofillHints: const [AutofillHints.email],
+            onChanged: (_) => _clearError(),
+            decoration: _fieldDecoration(
               labelText: 'E-Mail',
               prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'E-Mail ist erforderlich.';
@@ -228,30 +302,14 @@ class _LoginScreenState extends State<LoginScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 8,
-              children: [
-                ActionChip(
-                  label: const Text('@ einfügen'),
-                  onPressed: () => _insertIntoEmail('@'),
-                ),
-                ActionChip(
-                  label: const Text('.com einfügen'),
-                  onPressed: () => _insertIntoEmail('.com'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           TextFormField(
             controller: _passCtrl,
             obscureText: _obscurePassword,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
+            onChanged: (_) => _clearError(),
+            decoration: _fieldDecoration(
               labelText: 'Passwort',
               prefixIcon: const Icon(Icons.lock_outline_rounded),
               suffixIcon: IconButton(
@@ -262,9 +320,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 onPressed: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
               ),
             ),
             validator: (v) {
@@ -277,23 +332,51 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  InputDecoration _fieldDecoration({
+    required String labelText,
+    required Widget prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: const Color(0xFFF7FAF9),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD6E3E0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD6E3E0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF1F7A71), width: 1.4),
+      ),
+    );
+  }
+
   Widget _buildError(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFFFFF4F1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD1C3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline_rounded,
-              color: theme.colorScheme.onErrorContainer, size: 20),
+          const Icon(Icons.error_outline_rounded,
+              color: Color(0xFFB14D2F), size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _errorMessage!,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
+                color: const Color(0xFF8C3E28),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -308,6 +391,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF166A61),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -333,51 +417,17 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildDivider(ThemeData theme) {
     return Row(
       children: [
-        Expanded(child: Divider(color: theme.colorScheme.outlineVariant)),
+        const Expanded(child: Divider(color: Color(0xFFD5E2DF))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
             'oder',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: const Color(0xFF6B7C79),
             ),
           ),
         ),
-        Expanded(child: Divider(color: theme.colorScheme.outlineVariant)),
-      ],
-    );
-  }
-
-  Widget _buildQuickActionRow(ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _showComingSoon('Passkey'),
-            icon: const Icon(Icons.fingerprint_rounded),
-            label: const Text('Passkey'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _showComingSoon('E-Mail Code'),
-            icon: const Icon(Icons.mark_email_read_outlined),
-            label: const Text('Code'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
+        const Expanded(child: Divider(color: Color(0xFFD5E2DF))),
       ],
     );
   }
@@ -411,30 +461,38 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildRegisterLink(ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Noch kein Konto? ',
-          style: theme.textTheme.bodyMedium,
-        ),
-        GestureDetector(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RegisterScreen(
-                onRegisterSuccess: widget.onLoginSuccess,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE1ECEA)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Noch kein Konto? ',
+            style: theme.textTheme.bodyMedium,
+          ),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RegisterScreen(
+                  onRegisterSuccess: widget.onLoginSuccess,
+                ),
+              ),
+            ),
+            child: Text(
+              'Kostenlos testen',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF135D55),
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          child: Text(
-            'Kostenlos testen',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

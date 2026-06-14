@@ -22,7 +22,10 @@ class ShoppingBackendService {
         await _persist(items);
         return items;
       } catch (e) {
-        lastSyncError = 'Server-Sync fehlgeschlagen: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Server-Sync fehlgeschlagen',
+          error: e,
+        );
       }
     }
 
@@ -33,6 +36,7 @@ class ShoppingBackendService {
     required String name,
     required String category,
   }) async {
+    lastSyncError = null;
     final item = {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
       'name': name,
@@ -57,8 +61,10 @@ class ShoppingBackendService {
           item['id'] = normalized['id'];
         }
       } catch (e) {
-        lastSyncError =
-            'Shopping-Item konnte nicht auf Server gespeichert werden: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Shopping-Item konnte nicht auf Server gespeichert werden',
+          error: e,
+        );
       }
     }
 
@@ -66,6 +72,7 @@ class ShoppingBackendService {
   }
 
   Future<void> updateChecked(String id, bool checked) async {
+    lastSyncError = null;
     final current = await _readLocal();
     final idx = current.indexWhere((i) => i['id'] == id);
     if (idx == -1) return;
@@ -82,13 +89,16 @@ class ShoppingBackendService {
           ShoppingContract.buildUpdatePayload(checked: checked),
         );
       } catch (e) {
-        lastSyncError =
-            'Shopping-Status konnte nicht synchronisiert werden: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Shopping-Status konnte nicht synchronisiert werden',
+          error: e,
+        );
       }
     }
   }
 
   Future<void> deleteItem(String id) async {
+    lastSyncError = null;
     final current = await _readLocal();
     current.removeWhere((i) => i['id'] == id);
     await _persist(current);
@@ -97,10 +107,36 @@ class ShoppingBackendService {
       try {
         await apiClient!.delete(ShoppingContract.itemByIdPath(id));
       } catch (e) {
-        lastSyncError =
-            'Shopping-Item konnte nicht auf Server gelöscht werden: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Shopping-Item konnte nicht auf Server gelöscht werden',
+          error: e,
+        );
       }
     }
+  }
+
+  String _friendlySyncError({
+    required String action,
+    required Object error,
+  }) {
+    final raw = error.toString().toLowerCase();
+
+    if (raw.contains('handshakeexception') ||
+        raw.contains('tls') ||
+        raw.contains('ssl') ||
+        raw.contains('certificate')) {
+      return 'Server-Verbindung aktuell nicht sicher verfuegbar. Daten bleiben lokal gespeichert.';
+    }
+
+    if (raw.contains('socketexception') ||
+        raw.contains('failed host lookup') ||
+        raw.contains('connection refused') ||
+        raw.contains('timed out') ||
+        raw.contains('timeout')) {
+      return 'Keine Verbindung zum Server. Daten bleiben lokal gespeichert.';
+    }
+
+    return '$action: $error';
   }
 
   Future<List<Map<String, dynamic>>> _readLocal() async {

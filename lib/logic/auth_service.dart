@@ -187,10 +187,20 @@ class AuthService {
         _currentUser = user;
         return AuthResult.ok(user);
       } on FirebaseAuthException catch (e) {
-        final mapped = _mapFirebaseError(e);
         debugPrint(
           'AuthService.register(): Firebase signup failed. code=${e.code}',
         );
+        if (_shouldFallbackToLocal(e)) {
+          debugPrint(
+            'AuthService.register(): Falling back to local auth.',
+          );
+          return _registerLocal(
+            email: email,
+            password: password,
+            displayName: displayName,
+          );
+        }
+        final mapped = _mapFirebaseError(e);
         return mapped;
       } catch (_) {
         debugPrint(
@@ -203,54 +213,11 @@ class AuthService {
       }
     }
 
-    // Legacy local fallback
-    final emailError = _validateEmail(email);
-    if (emailError != null) return emailError;
-
-    final passError = _validatePassword(password);
-    if (passError != null) return passError;
-
-    final cleanName = displayName.trim();
-    if (cleanName.isEmpty) {
-      return AuthResult.fail(
-          AuthErrorCode.unknown, 'Bitte gib deinen Namen ein.');
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final db = _loadDb(prefs);
-
-    final emailKey = email.toLowerCase().trim();
-    if (db.containsKey(emailKey)) {
-      return AuthResult.fail(
-        AuthErrorCode.emailAlreadyInUse,
-        'Diese E-Mail-Adresse ist bereits registriert.',
-      );
-    }
-
-    final salt = _generateSalt();
-    final hashedPassword = _hashPassword(password, salt);
-    final uid = _generateUid();
-
-    // Nur Hash + Salt speichern, NIEMALS das Passwort
-    db[emailKey] = {
-      'uid': uid,
-      'passwordHash': hashedPassword,
-      'salt': salt,
-    };
-
-    await prefs.setString(_kUsersDbKey, jsonEncode(db));
-
-    final user = ParentUser(
-      uid: uid,
-      email: emailKey,
-      displayName: cleanName,
-      registeredAt: DateTime.now(),
-      isPremium: false,
+    return _registerLocal(
+      email: email,
+      password: password,
+      displayName: displayName,
     );
-
-    await _persistSession(prefs, user);
-    _currentUser = user;
-    return AuthResult.ok(user);
   }
 
   // ── Login ──────────────────────────────────────────────────────────────────
@@ -296,10 +263,19 @@ class AuthService {
         _currentUser = user;
         return AuthResult.ok(user);
       } on FirebaseAuthException catch (e) {
-        final mapped = _mapFirebaseError(e);
         debugPrint(
           'AuthService.login(): Firebase login failed. code=${e.code}',
         );
+        if (_shouldFallbackToLocal(e)) {
+          debugPrint(
+            'AuthService.login(): Falling back to local auth.',
+          );
+          return _loginLocal(
+            email: email,
+            password: password,
+          );
+        }
+        final mapped = _mapFirebaseError(e);
         return mapped;
       } catch (_) {
         debugPrint(
@@ -312,78 +288,10 @@ class AuthService {
       }
     }
 
-    // Legacy local fallback
-    final emailError = _validateEmail(email);
-    if (emailError != null) return emailError;
-
-    if (password.isEmpty) {
-      return AuthResult.fail(
-          AuthErrorCode.wrongPassword, 'Bitte gib dein Passwort ein.');
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final db = _loadDb(prefs);
-
-    final emailKey = email.toLowerCase().trim();
-    final record = db[emailKey];
-
-    if (record == null) {
-      return AuthResult.fail(
-        AuthErrorCode.userNotFound,
-        'Kein lokales Konto mit dieser E-Mail-Adresse gefunden. Nach Neuinstallation bitte erneut registrieren oder Firebase-Login nutzen.',
-      );
-    }
-
-    final salt = record['salt'] as String;
-    final storedHash = record['passwordHash'] as String;
-    final inputHash = _hashPassword(password, salt);
-
-    if (inputHash != storedHash) {
-      return AuthResult.fail(
-        AuthErrorCode.wrongPassword,
-        'Das Passwort ist nicht korrekt.',
-      );
-    }
-
-    // Session-Daten aus gespeichertem User laden oder neu anlegen
-    final raw = prefs.getString(_kUserKey);
-    ParentUser user;
-    if (raw != null) {
-      try {
-        final stored = ParentUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-        if (stored.email == emailKey) {
-          user = stored;
-        } else {
-          user = ParentUser(
-            uid: record['uid'] as String,
-            email: emailKey,
-            displayName: emailKey.split('@').first,
-            registeredAt: DateTime.now(),
-            isPremium: false,
-          );
-        }
-      } catch (_) {
-        user = ParentUser(
-          uid: record['uid'] as String,
-          email: emailKey,
-          displayName: emailKey.split('@').first,
-          registeredAt: DateTime.now(),
-          isPremium: false,
-        );
-      }
-    } else {
-      user = ParentUser(
-        uid: record['uid'] as String,
-        email: emailKey,
-        displayName: emailKey.split('@').first,
-        registeredAt: DateTime.now(),
-        isPremium: false,
-      );
-    }
-
-    await _persistSession(prefs, user);
-    _currentUser = user;
-    return AuthResult.ok(user);
+    return _loginLocal(
+      email: email,
+      password: password,
+    );
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────────
@@ -539,6 +447,141 @@ class AuthService {
     }
   }
 
+  bool _shouldFallbackToLocal(FirebaseAuthException e) {
+    return e.code == 'internal-error' ||
+        e.code == 'network-request-failed' ||
+        e.code == 'unknown';
+  }
+
+  Future<AuthResult> _registerLocal({
+    required String email,
+    required String password,
+    required String displayName,
+  }) async {
+    final emailError = _validateEmail(email);
+    if (emailError != null) return emailError;
+
+    final passError = _validatePassword(password);
+    if (passError != null) return passError;
+
+    final cleanName = displayName.trim();
+    if (cleanName.isEmpty) {
+      return AuthResult.fail(
+          AuthErrorCode.unknown, 'Bitte gib deinen Namen ein.');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final db = _loadDb(prefs);
+
+    final emailKey = email.toLowerCase().trim();
+    if (db.containsKey(emailKey)) {
+      return AuthResult.fail(
+        AuthErrorCode.emailAlreadyInUse,
+        'Diese E-Mail-Adresse ist bereits registriert.',
+      );
+    }
+
+    final salt = _generateSalt();
+    final hashedPassword = _hashPassword(password, salt);
+    final uid = _generateUid();
+
+    db[emailKey] = {
+      'uid': uid,
+      'passwordHash': hashedPassword,
+      'salt': salt,
+    };
+
+    await prefs.setString(_kUsersDbKey, jsonEncode(db));
+
+    final user = ParentUser(
+      uid: uid,
+      email: emailKey,
+      displayName: cleanName,
+      registeredAt: DateTime.now(),
+      isPremium: false,
+    );
+
+    await _persistSession(prefs, user);
+    _currentUser = user;
+    return AuthResult.ok(user);
+  }
+
+  Future<AuthResult> _loginLocal({
+    required String email,
+    required String password,
+  }) async {
+    final emailError = _validateEmail(email);
+    if (emailError != null) return emailError;
+
+    if (password.isEmpty) {
+      return AuthResult.fail(
+          AuthErrorCode.wrongPassword, 'Bitte gib dein Passwort ein.');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final db = _loadDb(prefs);
+
+    final emailKey = email.toLowerCase().trim();
+    final record = db[emailKey];
+
+    if (record == null) {
+      return AuthResult.fail(
+        AuthErrorCode.userNotFound,
+        'Kein lokales Konto mit dieser E-Mail-Adresse gefunden. Nach Neuinstallation bitte erneut registrieren oder Firebase-Login nutzen.',
+      );
+    }
+
+    final salt = record['salt'] as String;
+    final storedHash = record['passwordHash'] as String;
+    final inputHash = _hashPassword(password, salt);
+
+    if (inputHash != storedHash) {
+      return AuthResult.fail(
+        AuthErrorCode.wrongPassword,
+        'Das Passwort ist nicht korrekt.',
+      );
+    }
+
+    final raw = prefs.getString(_kUserKey);
+    ParentUser user;
+    if (raw != null) {
+      try {
+        final stored = ParentUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        if (stored.email == emailKey) {
+          user = stored;
+        } else {
+          user = ParentUser(
+            uid: record['uid'] as String,
+            email: emailKey,
+            displayName: emailKey.split('@').first,
+            registeredAt: DateTime.now(),
+            isPremium: false,
+          );
+        }
+      } catch (_) {
+        user = ParentUser(
+          uid: record['uid'] as String,
+          email: emailKey,
+          displayName: emailKey.split('@').first,
+          registeredAt: DateTime.now(),
+          isPremium: false,
+        );
+      }
+    } else {
+      user = ParentUser(
+        uid: record['uid'] as String,
+        email: emailKey,
+        displayName: emailKey.split('@').first,
+        registeredAt: DateTime.now(),
+        isPremium: false,
+      );
+    }
+
+    await _persistSession(prefs, user);
+    _currentUser = user;
+    return AuthResult.ok(user);
+  }
+
   Future<void> _persistSession(SharedPreferences prefs, ParentUser user) async {
     await prefs.setString(_kUserKey, jsonEncode(user.toJson()));
   }
@@ -604,5 +647,19 @@ class AuthService {
       );
     }
     return null;
+  }
+
+  Future<void> debugSeedSessionForTesting() async {
+    if (!kDebugMode) return;
+    final user = ParentUser(
+      uid: 'debug_demo_user',
+      email: 'demo@parentpeak.app',
+      displayName: 'Demo Eltern',
+      registeredAt: DateTime.now().subtract(const Duration(days: 2)),
+      isPremium: false,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await _persistSession(prefs, user);
+    _currentUser = user;
   }
 }

@@ -87,7 +87,7 @@ class ProfileSafetyScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Euer sicherer Ort fuer Profil, Hilfe und Schutz.',
+                        'Sicher begleitet durch euren Familienalltag.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),

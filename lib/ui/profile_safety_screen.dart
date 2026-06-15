@@ -25,7 +25,7 @@ class ProfileSafetyScreen extends StatelessWidget {
         : 'Familie';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Familien-Safe')),
+      appBar: AppBar(title: const Text('SafeSpace Familie')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         children: [
@@ -75,7 +75,7 @@ class ProfileSafetyScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Profil & Sicherheit fuer eure Familie, kreativ und klar',
+                        'Profil & Sicherheit fuer eure Familie, modern und vertrauensvoll',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),

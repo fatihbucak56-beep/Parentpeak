@@ -5,6 +5,8 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  # Set FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true to opt into Node.js 24 now
+  # (becomes mandatory 2026-09-16, forced default 2026-06-16)
   pull_request:
   push:
     branches:
@@ -16,6 +18,8 @@ on:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
@@ -37,6 +41,8 @@ jobs:
 
   apple-prepare:
     runs-on: macos-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
@@ -53,6 +59,8 @@ jobs:
   ios-smoke-build:
     runs-on: macos-latest
     needs: apple-prepare
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
 
     steps:
@@ -73,6 +81,8 @@ jobs:
   macos-smoke-build:
     runs-on: macos-latest
     needs: apple-prepare
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
 
     steps:

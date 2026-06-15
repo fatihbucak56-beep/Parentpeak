@@ -9,7 +9,7 @@ import 'package:trusted_circle_demo/logic/background_sync_manager.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/home_screen.dart';
-import 'package:trusted_circle_demo/ui/family_hub_screen.dart';
+import 'package:trusted_circle_demo/ui/profile_safety_screen.dart';
 import 'package:trusted_circle_demo/ui/treasure_handover_screen.dart';
 import 'package:trusted_circle_demo/ui/treasure_upload_screen.dart';
 import 'package:trusted_circle_demo/ui/finance_budget_screen.dart';
@@ -297,7 +297,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
       ),
       LanguageAwareWidget(
           key: ValueKey('family-${languageService.currentLanguage}'),
-          child: FamilyHubScreen(
+          child: ProfileSafetyScreen(
             devices: widget.devices,
             onRevoke: widget.onRevoke,
           )),

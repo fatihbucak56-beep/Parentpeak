@@ -18,7 +18,7 @@ else
   echo "[prepare_apple_build] Flutter config flag not available; skipping SPM toggle."
 fi
 
-flutter pub get
+bash scripts/flutter_repo.sh pub get
 
 if [ -d "ios" ]; then
   echo "[prepare_apple_build] Running CocoaPods install for iOS..."

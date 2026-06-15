@@ -186,8 +186,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                             color: Theme.of(context).colorScheme.primary)
                         : null,
                     selected: isSelected,
-                    selectedTileColor:
-                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    selectedTileColor: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
                     onTap: () async {
                       // Nutze den globalen languageService und warte auf das Ergebnis
                       await languageService.setLanguage(code);
@@ -251,6 +253,9 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     const accentColor = Color(0xFFFFC6FF);
 
     return Scaffold(
+      appBar: AppBar(
+        title: Text(_t('family_profile_title')),
+      ),
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Column(
@@ -280,7 +285,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           height: 200,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [primary.withValues(alpha: 0.8), accent.withValues(alpha: 0.6)],
+              colors: [
+                primary.withValues(alpha: 0.8),
+                accent.withValues(alpha: 0.6)
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -399,7 +407,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(25),
             gradient: LinearGradient(
-              colors: [primary.withValues(alpha: 0.1), accent.withValues(alpha: 0.1)],
+              colors: [
+                primary.withValues(alpha: 0.1),
+                accent.withValues(alpha: 0.1)
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -567,8 +578,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  leading:
-                      const Icon(Icons.shield_rounded, color: Color(0xFF4F46E5)),
+                  leading: const Icon(Icons.shield_rounded,
+                      color: Color(0xFF4F46E5)),
                   title: const Text('Sicherheit'),
                   subtitle: const Text('Schutz, Notfalltipps und Richtlinien'),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 18),
@@ -647,7 +658,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(25),
-              side: BorderSide(color: primaryColor.withValues(alpha: 0.1), width: 1),
+              side: BorderSide(
+                  color: primaryColor.withValues(alpha: 0.1), width: 1),
             ),
             child: Column(
               children: [

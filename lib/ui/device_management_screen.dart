@@ -8,7 +8,9 @@ class DeviceManagementScreen extends StatefulWidget {
   final List<TrustedDevice> devices;
   final Future<bool> Function(String deviceUuid, String deviceName) onRevoke;
 
-  const DeviceManagementScreen({Key? key, required this.devices, required this.onRevoke}) : super(key: key);
+  const DeviceManagementScreen(
+      {Key? key, required this.devices, required this.onRevoke})
+      : super(key: key);
 
   @override
   State<DeviceManagementScreen> createState() => _DeviceManagementScreenState();
@@ -25,16 +27,22 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   }
 
   String _formatDate(BuildContext ctx, DateTime date) {
-    return DateFormat.yMMMd(Localizations.localeOf(ctx).toString()).add_Hm().format(date);
+    return DateFormat.yMMMd(Localizations.localeOf(ctx).toString())
+        .add_Hm()
+        .format(date);
   }
 
   Future<void> _confirmAndRevoke(TrustedDevice device) async {
     if (device.isPriorityApprover) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.cannotRemovePriority)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).cannotRemovePriority)));
       return;
     }
 
-    final confirmed = await showDialog<bool>(context: context, builder: (_) => RevokeConfirmationDialog(deviceName: device.deviceName));
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) =>
+            RevokeConfirmationDialog(deviceName: device.deviceName));
     if (confirmed != true) return;
 
     setState(() => _busy.add(device.deviceUuid));
@@ -42,7 +50,8 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
       final ok = await widget.onRevoke(device.deviceUuid, device.deviceName);
       if (ok) {
         setState(() {
-          final idx = _devices.indexWhere((d) => d.deviceUuid == device.deviceUuid);
+          final idx =
+              _devices.indexWhere((d) => d.deviceUuid == device.deviceUuid);
           if (idx != -1) {
             _devices[idx] = TrustedDevice(
               deviceUuid: device.deviceUuid,
@@ -53,12 +62,15 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
             );
           }
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.deviceRemoved)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).deviceRemoved)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.deviceRemoveError)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).deviceRemoveError)));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Fehler: $e')));
     } finally {
       setState(() => _busy.remove(device.deviceUuid));
     }
@@ -68,6 +80,9 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Vertrauensgeraete'),
+      ),
       backgroundColor: Colors.grey[50],
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -91,14 +106,18 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isRevoked 
-                          ? theme.colorScheme.errorContainer 
-                          : theme.colorScheme.primaryContainer,
+                        color: isRevoked
+                            ? theme.colorScheme.errorContainer
+                            : theme.colorScheme.primaryContainer,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        isRevoked ? Icons.block_rounded : Icons.phone_android_rounded,
-                        color: isRevoked ? theme.colorScheme.error : theme.colorScheme.primary,
+                        isRevoked
+                            ? Icons.block_rounded
+                            : Icons.phone_android_rounded,
+                        color: isRevoked
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.primary,
                         size: 24,
                       ),
                     ),
@@ -121,26 +140,34 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                               ),
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: isRevoked 
-                                    ? theme.colorScheme.errorContainer 
-                                    : Colors.green[50],
+                                  color: isRevoked
+                                      ? theme.colorScheme.errorContainer
+                                      : Colors.green[50],
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      isRevoked ? Icons.block : Icons.check_circle,
+                                      isRevoked
+                                          ? Icons.block
+                                          : Icons.check_circle,
                                       size: 12,
-                                      color: isRevoked ? theme.colorScheme.error : Colors.green[700],
+                                      color: isRevoked
+                                          ? theme.colorScheme.error
+                                          : Colors.green[700],
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
                                       isRevoked ? 'Entfernt' : 'Aktiv',
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: isRevoked ? theme.colorScheme.error : Colors.green[700],
+                                      style:
+                                          theme.textTheme.labelSmall?.copyWith(
+                                        color: isRevoked
+                                            ? theme.colorScheme.error
+                                            : Colors.green[700],
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -152,7 +179,8 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                           if (isRevoked && device.revokedAt != null) ...[
                             const SizedBox(height: 4),
                             Text(
-                              AppLocalizations.of(context)!.removedAt(_formatDate(context, device.revokedAt!)),
+                              AppLocalizations.of(context).removedAt(
+                                  _formatDate(context, device.revokedAt!)),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: Colors.grey[600],
                               ),
@@ -163,15 +191,18 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                             if (_busy.contains(device.deviceUuid))
                               const SizedBox(
                                 height: 32,
-                                child: Center(child: CircularProgressIndicator()),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
                               )
                             else
                               FilledButton.tonal(
                                 key: Key('revoke-${device.deviceUuid}'),
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.errorContainer,
+                                  backgroundColor:
+                                      theme.colorScheme.errorContainer,
                                   foregroundColor: theme.colorScheme.error,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
                                 ),
                                 onPressed: () => _confirmAndRevoke(device),
                                 child: Row(
@@ -179,7 +210,8 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                                   children: [
                                     const Icon(Icons.delete_outline, size: 16),
                                     const SizedBox(width: 8),
-                                    Text(AppLocalizations.of(context)!.removeDevice),
+                                    Text(AppLocalizations.of(context)
+                                        .removeDevice),
                                   ],
                                 ),
                               ),

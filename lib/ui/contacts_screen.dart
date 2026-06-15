@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
 
 class ContactsScreen extends StatefulWidget {
@@ -9,7 +8,8 @@ class ContactsScreen extends StatefulWidget {
   State<ContactsScreen> createState() => _ContactsScreenState();
 }
 
-class _ContactsScreenState extends State<ContactsScreen> with LanguageChangeMixin<ContactsScreen> {
+class _ContactsScreenState extends State<ContactsScreen>
+    with LanguageChangeMixin<ContactsScreen> {
   final List<Map<String, dynamic>> _contacts = [
     {
       'name': 'Dr. Schmidt',
@@ -58,56 +58,67 @@ class _ContactsScreenState extends State<ContactsScreen> with LanguageChangeMixi
     final theme = Theme.of(context);
     final emergency = _contacts.where((c) => c['emergency'] as bool).toList();
     final regular = _contacts.where((c) => !(c['emergency'] as bool)).toList();
-    
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.03),
-            theme.brightness == Brightness.dark ? Colors.grey[900]! : Colors.white
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notfallkontakte'),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.primary.withValues(alpha: 0.03),
+              theme.brightness == Brightness.dark
+                  ? Colors.grey[900]!
+                  : Colors.white
+            ],
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (emergency.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Colors.red[700], size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Notfallkontakte',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red[700],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...emergency
+                  .map((contact) => _buildContactCard(contact, theme, true)),
+              const SizedBox(height: 24),
+            ],
+            if (regular.isNotEmpty) ...[
+              Text(
+                'Wichtige Kontakte',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...regular
+                  .map((contact) => _buildContactCard(contact, theme, false)),
+            ],
           ],
         ),
-      ),
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (emergency.isNotEmpty) ...[
-            Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.red[700], size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Notfallkontakte',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red[700],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...emergency.map((contact) => _buildContactCard(contact, theme, true)),
-            const SizedBox(height: 24),
-          ],
-          if (regular.isNotEmpty) ...[
-            Text(
-              'Wichtige Kontakte',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...regular.map((contact) => _buildContactCard(contact, theme, false)),
-          ],
-        ],
       ),
     );
   }
 
-  Widget _buildContactCard(Map<String, dynamic> contact, ThemeData theme, bool isEmergency) {
+  Widget _buildContactCard(
+      Map<String, dynamic> contact, ThemeData theme, bool isEmergency) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(

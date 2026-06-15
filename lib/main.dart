@@ -300,6 +300,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
           child: ProfileSafetyScreen(
             devices: widget.devices,
             onRevoke: widget.onRevoke,
+            onBack: () => setState(() => _index = 0),
           )),
     ];
 

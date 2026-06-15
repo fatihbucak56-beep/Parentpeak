@@ -11,10 +11,12 @@ class ProfileSafetyScreen extends StatelessWidget {
     super.key,
     required this.devices,
     required this.onRevoke,
+    this.onBack,
   });
 
   final List<TrustedDevice> devices;
   final Future<bool> Function(String deviceUuid, String deviceName) onRevoke;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +27,17 @@ class ProfileSafetyScreen extends StatelessWidget {
         : 'Familie';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('SafeSpace Familie')),
+      appBar: AppBar(
+        leading: Navigator.of(context).canPop()
+            ? const BackButton()
+            : onBack != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    onPressed: onBack,
+                  )
+                : null,
+        title: const Text('Profil & Schutz'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         children: [
@@ -75,7 +87,7 @@ class ProfileSafetyScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Profil & Sicherheit fuer eure Familie, modern und vertrauensvoll',
+                        'Alles Wichtige fuer eure Familie schnell im Blick.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),

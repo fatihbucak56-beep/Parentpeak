@@ -20,7 +20,8 @@ class _CalendarScreenState extends State<CalendarScreen>
   final TextEditingController _titleController = TextEditingController();
   String? _syncError;
   String _filterPerson = 'Alle';
-  final List<int> _reminderOptions = [0, 10, 30, 60];
+  static const int _smartReminderValue = -1;
+  final List<int> _reminderOptions = [_smartReminderValue, 0, 10, 30, 60];
   final List<String> _recurrenceOptions = [
     'Einmalig',
     'Täglich',
@@ -66,6 +67,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       await _calendarService.seedIfEmpty(
         _events.map((e) => e.toJson()).toList(),
       );
+      await _scheduleRemindersFor(_events);
       setState(() {
         _syncError = syncError;
       });
@@ -78,6 +80,8 @@ class _CalendarScreenState extends State<CalendarScreen>
         ..addAll(saved.map(_CalendarEvent.fromJson));
       _syncError = null;
     });
+
+    await _scheduleRemindersFor(_events);
   }
 
   @override
@@ -90,37 +94,41 @@ class _CalendarScreenState extends State<CalendarScreen>
     final now = DateTime.now();
     _events.addAll([
       _CalendarEvent(
+        id: 'demo_${now.millisecondsSinceEpoch}_1',
         title: 'Elternabend',
         start: DateTime(now.year, now.month, now.day, 18, 0),
         end: DateTime(now.year, now.month, now.day, 19, 30),
         person: 'Eltern',
         location: 'Kita Sonnenschein',
         recurrence: 'Einmalig',
-        reminderMinutes: 60,
+        reminderMinutes: _smartReminderValue,
         recurrenceEndMode: 'Kein Ende',
       ),
       _CalendarEvent(
+        id: 'demo_${now.millisecondsSinceEpoch}_2',
         title: 'Impfung Mia',
         start: DateTime(now.year, now.month, now.day + 1, 10, 0),
         end: DateTime(now.year, now.month, now.day + 1, 10, 30),
         person: 'Mia',
         location: 'Kinderarzt',
         recurrence: 'Einmalig',
-        reminderMinutes: 30,
+        reminderMinutes: _smartReminderValue,
         recurrenceEndMode: 'Kein Ende',
       ),
       _CalendarEvent(
+        id: 'demo_${now.millisecondsSinceEpoch}_3',
         title: 'Fußballtraining',
         start: DateTime(now.year, now.month, now.day + 2, 16, 0),
         end: DateTime(now.year, now.month, now.day + 2, 17, 30),
         person: 'Ben',
         location: 'Sporthalle',
         recurrence: 'Wöchentlich',
-        reminderMinutes: 60,
+        reminderMinutes: _smartReminderValue,
         recurrenceEndMode: '5 Termine',
         recurrenceCount: 5,
       ),
       _CalendarEvent(
+        id: 'demo_${now.millisecondsSinceEpoch}_4',
         title: 'Vorschule Ausflug',
         start: DateTime(now.year, now.month, now.day + 3, 9, 0),
         end: DateTime(now.year, now.month, now.day + 3, 13, 0),
@@ -128,7 +136,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         location: 'Naturpark',
         allDay: false,
         recurrence: 'Einmalig',
-        reminderMinutes: 0,
+        reminderMinutes: _smartReminderValue,
         recurrenceEndMode: 'Kein Ende',
       ),
     ]);
@@ -166,6 +174,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (useDate && endDate != null && nextStart.isAfter(endDate)) break;
       list.add(
         base.copyWith(
+          id: '${base.id}_$added',
           start: nextStart,
           end: nextEnd,
         ),
@@ -219,7 +228,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     TimeOfDay start = const TimeOfDay(hour: 10, minute: 0);
     TimeOfDay end = const TimeOfDay(hour: 11, minute: 0);
     String recurrence = 'Einmalig';
-    int reminder = 30;
+    int reminder = _smartReminderValue;
     String endMode = _recurrenceEndMode;
     DateTime? endDate =
         _recurrenceEndDate ?? _selectedDay.add(const Duration(days: 30));
@@ -313,7 +322,13 @@ class _CalendarScreenState extends State<CalendarScreen>
                   items: _reminderOptions
                       .map((m) => DropdownMenuItem(
                             value: m,
-                            child: Text(m == 0 ? 'Keine' : '$m Min vorher'),
+                            child: Text(
+                              m == _smartReminderValue
+                                  ? 'Smart: 1 Woche, 1 Tag, am Termin'
+                                  : m == 0
+                                      ? 'Keine'
+                                      : '$m Min vorher',
+                            ),
                           ))
                       .toList(),
                   onChanged: (v) {
@@ -380,6 +395,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                         end.minute,
                       );
                       final base = _CalendarEvent(
+                        id: 'event_${DateTime.now().millisecondsSinceEpoch}',
                         title: _titleController.text.trim(),
                         start: startDate,
                         end: endDate.isAfter(startDate)
@@ -405,18 +421,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                       setState(() {
                         _syncError = _calendarService.lastSyncError;
                       });
-                      // Erinnerungen planen
-                      for (final e in expanded) {
-                        if (e.reminderMinutes > 0) {
-                          final when = e.start
-                              .subtract(Duration(minutes: e.reminderMinutes));
-                          NotificationService.instance.scheduleReminder(
-                            when,
-                            e.title,
-                            '${e.person}: ${DateFormat.Hm('de').format(e.start)}',
-                          );
-                        }
-                      }
+                      _scheduleRemindersFor(expanded);
                       Navigator.pop(ctx);
                     },
                   ),
@@ -899,6 +904,12 @@ class _EventCard extends StatelessWidget {
                             color: color,
                             icon: Icons.loop_rounded,
                           ),
+                        if (event.reminderMinutes == _CalendarScreenState._smartReminderValue)
+                          const _Badge(
+                            label: 'Smart: 1W • 1T • Heute',
+                            color: Color(0xFF5B7FFF),
+                            icon: Icons.auto_awesome_rounded,
+                          ),
                         if (event.reminderMinutes > 0)
                           _Badge(
                             label: '${event.reminderMinutes} Min vorher',
@@ -988,6 +999,7 @@ class _Badge extends StatelessWidget {
 }
 
 class _CalendarEvent {
+  final String id;
   final String title;
   final DateTime start;
   final DateTime end;
@@ -1001,6 +1013,7 @@ class _CalendarEvent {
   final int? recurrenceCount;
 
   _CalendarEvent({
+    required this.id,
     required this.title,
     required this.start,
     required this.end,
@@ -1015,6 +1028,7 @@ class _CalendarEvent {
   });
 
   _CalendarEvent copyWith({
+    String? id,
     String? title,
     DateTime? start,
     DateTime? end,
@@ -1028,6 +1042,7 @@ class _CalendarEvent {
     int? recurrenceCount,
   }) {
     return _CalendarEvent(
+      id: id ?? this.id,
       title: title ?? this.title,
       start: start ?? this.start,
       end: end ?? this.end,
@@ -1043,17 +1058,25 @@ class _CalendarEvent {
   }
 
   factory _CalendarEvent.fromJson(Map<String, dynamic> json) {
+    final start =
+      DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now();
+    final person = json['person']?.toString() ?? 'Eltern';
+    final title = json['title']?.toString() ?? '';
+    final fallbackId =
+      'legacy_${start.millisecondsSinceEpoch}_${title.hashCode}_${person.hashCode}';
+
     return _CalendarEvent(
-      title: json['title']?.toString() ?? '',
-      start:
-          DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now(),
+      id: json['id']?.toString() ?? fallbackId,
+      title: title,
+      start: start,
       end: DateTime.tryParse(json['end']?.toString() ?? '') ??
           DateTime.now().add(const Duration(hours: 1)),
-      person: json['person']?.toString() ?? 'Eltern',
+      person: person,
       location: json['location']?.toString(),
       allDay: json['allDay'] == true,
       recurrence: json['recurrence']?.toString() ?? 'Einmalig',
-      reminderMinutes: (json['reminderMinutes'] as num?)?.toInt() ?? 0,
+      reminderMinutes:
+        (json['reminderMinutes'] as num?)?.toInt() ?? _CalendarScreenState._smartReminderValue,
       recurrenceEndMode: json['recurrenceEndMode']?.toString() ?? 'Kein Ende',
       recurrenceEndDate: json['recurrenceEndDate'] != null
           ? DateTime.tryParse(json['recurrenceEndDate'].toString())
@@ -1064,6 +1087,7 @@ class _CalendarEvent {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'title': title,
       'start': start.toIso8601String(),
       'end': end.toIso8601String(),
@@ -1076,6 +1100,35 @@ class _CalendarEvent {
       'recurrenceEndDate': recurrenceEndDate?.toIso8601String(),
       'recurrenceCount': recurrenceCount,
     };
+  }
+}
+
+extension on _CalendarScreenState {
+  Future<void> _scheduleRemindersFor(List<_CalendarEvent> events) async {
+    for (final event in events) {
+      final body = '${event.person}: ${DateFormat.Hm('de').format(event.start)}';
+
+      if (event.reminderMinutes == _CalendarScreenState._smartReminderValue) {
+        await NotificationService.instance.scheduleStandardCalendarReminders(
+          eventId: event.id,
+          eventStart: event.start,
+          title: event.title,
+          body: body,
+        );
+        continue;
+      }
+
+      if (event.reminderMinutes > 0) {
+        final when = event.start.subtract(Duration(minutes: event.reminderMinutes));
+        await NotificationService.instance.scheduleEventReminder(
+          eventId: event.id,
+          when: when,
+          title: event.title,
+          body: body,
+          reminderKey: 'custom_${event.reminderMinutes}',
+        );
+      }
+    }
   }
 }
 

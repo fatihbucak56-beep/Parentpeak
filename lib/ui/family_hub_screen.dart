@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/app_profile_settings_screen.dart';
 import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
 import 'package:trusted_circle_demo/ui/organization_screen.dart';
+import 'package:trusted_circle_demo/ui/profile_safety_screen.dart';
 import 'package:trusted_circle_demo/ui/weekly_planner_screen.dart';
 
 class FamilyHubScreen extends StatelessWidget {
@@ -50,11 +50,11 @@ class FamilyHubScreen extends StatelessWidget {
         builder: (_) => const WeeklyPlannerScreen(),
       ),
       _HubAction(
-        title: 'Profil & Einstellungen',
-        subtitle: 'App, Konto, Sicherheit und Familie zentral steuern',
+        title: 'Profil & Sicherheit',
+        subtitle: 'Modern, klar und fokussiert auf Familie und Schutz',
         icon: Icons.shield_rounded,
         color: const Color(0xFF0EA5A4),
-        builder: (_) => AppProfileSettingsScreen(
+        builder: (_) => ProfileSafetyScreen(
           devices: devices,
           onRevoke: onRevoke,
         ),

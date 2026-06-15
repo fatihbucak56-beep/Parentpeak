@@ -1,0 +1,91 @@
+name: Flutter Analyze
+
+concurrency:
+  group: flutter-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter Pub Get
+        run: bash scripts/flutter_repo.sh pub get
+
+      - name: Run Analyzer (CI-safe)
+        run: bash scripts/ci_flutter_analyze.sh
+
+      - name: Verify Backend Security Baseline
+        run: bash scripts/verify_backend_security_baseline.sh
+
+  apple-prepare:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Apple Build Preparation (CocoaPods fallback)
+        run: bash scripts/prepare_apple_build.sh
+
+  ios-smoke-build:
+    runs-on: macos-latest
+    needs: apple-prepare
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Prepare Apple Build
+        run: bash scripts/prepare_apple_build.sh
+
+      - name: iOS Smoke Build (no codesign)
+        run: bash scripts/flutter_repo.sh build ios --no-codesign
+
+  macos-smoke-build:
+    runs-on: macos-latest
+    needs: apple-prepare
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Prepare Apple Build
+        run: bash scripts/prepare_apple_build.sh
+
+      - name: macOS Smoke Build
+        run: bash scripts/flutter_repo.sh build macos

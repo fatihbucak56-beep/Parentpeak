@@ -18,6 +18,33 @@
 
 Das Backend läuft dann auf: **http://localhost:3000**
 
+## Produktions-Hardening
+
+Für produktionsnahe Nutzung setze folgende Umgebungsvariablen vor dem Start:
+
+- `BACKEND_API_TOKEN`: Erwarteter Bearer-Token für Schreibzugriffe
+- `REQUIRE_AUTH_FOR_WRITES=1`: Aktiviert Auth-Pflicht für `POST/PUT/PATCH/DELETE`
+- `CORS_ALLOWED_ORIGINS`: Kommagetrennte Origin-Allowlist
+- `WRITE_RATE_LIMIT_WINDOW_MS`: Zeitfenster für Write-Rate-Limit (ms)
+- `WRITE_RATE_LIMIT_MAX`: Max. Schreibanfragen pro Fenster und Client
+
+Beispiel:
+
+```bash
+export BACKEND_API_TOKEN="..."
+export REQUIRE_AUTH_FOR_WRITES=1
+export CORS_ALLOWED_ORIGINS="https://parentpeak.de,https://www.parentpeak.de"
+node server.js
+```
+
+Schneller Smoke-Test gegen eine laufende Instanz:
+
+```bash
+BACKEND_BASE_URL=https://api.example.com \
+BACKEND_API_TOKEN=... \
+bash scripts/backend_security_smoke_test.sh
+```
+
 ## API Endpoints
 
 ### 📋 Alle Anbieter abrufen

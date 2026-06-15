@@ -8,9 +8,9 @@ Voraussetzungen:
 - Ein Android‑Emulator oder Gerät
 
 Starten:
-1. `flutter pub get`
+1. `bash scripts/flutter_repo.sh pub get`
 2. `.env` aus `.env.example` anlegen und `ABACUS_API_KEY` ersetzen (oder Platzhalter belassen für Demo)
-3. `flutter run` um die App zu starten
+3. `bash scripts/flutter_repo.sh run` um die App zu starten
 
 Wichtige .env Variablen:
 - `GEMINI_API_KEY`: API Key fuer den Paedagogik-Chat
@@ -19,6 +19,11 @@ Wichtige .env Variablen:
 - `BACKEND_FAMILY_ID`: Familienkontext fuer Requests (z. B. `demo-family-001`)
 - `BACKEND_API_VERSION`: Version des Request-Schemas (Standard: `v1`)
 - `BACKEND_TODOS_PATH`, `BACKEND_SHOPPING_PATH`, `BACKEND_CALENDAR_EVENTS_PATH`, `BACKEND_HEALTH_PATH`: optionale Endpoint-Overrides
+
+Backend-Hardening (Produktion):
+- `REQUIRE_AUTH_FOR_WRITES=1`: Schuetzt Schreibzugriffe (POST/PUT/PATCH/DELETE) per Bearer-Token.
+- `CORS_ALLOWED_ORIGINS`: Kommagetrennte Origin-Allowlist, z. B. `https://parentpeak.de,https://www.parentpeak.de`.
+- `WRITE_RATE_LIMIT_WINDOW_MS` und `WRITE_RATE_LIMIT_MAX`: Begrenzen Schreibanfragen pro Zeitfenster.
 
 Screenshots:
 - Starte die App im Emulator und nutze `flutter screenshot` oder `adb exec-out screencap -p > screen.png` um Bilder zu erzeugen.
@@ -51,15 +56,49 @@ Apple Build Hinweis (iOS/macOS)
 Einige Plugins (z. B. `printing`, `flutter_tts`) melden aktuell in Flutter nur eine
 SPM-Warnung. Um Builds stabil zu halten, nutze den CocoaPods-Workflow:
 
+Standard fuer lokale Flutter-Kommandos im Repo:
+1. `bash scripts/flutter_repo.sh <flutter-kommando>`
+
+Beispiele:
+	- `bash scripts/flutter_repo.sh analyze`
+	- `bash scripts/flutter_repo.sh run -d ios`
+	- `bash scripts/flutter_repo.sh build macos`
+
 1. `bash scripts/prepare_apple_build.sh`
 2. Danach normal bauen, z. B.:
-	- `flutter build ios --no-codesign`
-	- `flutter build macos`
+	- `bash scripts/flutter_repo.sh build ios --no-codesign`
+	- `bash scripts/flutter_repo.sh build macos`
 
 Was das Script macht:
 - Deaktiviert Flutter-Swift-Package-Manager-Plugin-Integration (falls von deiner Flutter-Version unterstuetzt)
 - Fuehrt `flutter pub get` aus
 - Fuehrt `pod install --repo-update` fuer iOS und macOS aus
+
+CI Hinweis (Analyzer)
+---------------------
+
+Fuer CI wird ein robuster Analyzer-Wrapper verwendet:
+1. `bash scripts/ci_flutter_analyze.sh`
+
+Der Wrapper bricht bei echten Analyzer-Problemen weiterhin ab, toleriert aber die bekannten
+SPM-Plugin-Hinweise von Flutter, solange keine Analyzer-Issues vorliegen.
+
+Zusaetzlich prueft CI das Backend-Sicherheits-Baseline-Profil:
+1. `bash scripts/verify_backend_security_baseline.sh`
+
+Weitere Details und Migrationskriterien stehen in:
+- `docs/SPM_PLUGIN_STATUS.md`
+
+Security Smoke Test (gegen laufendes Backend)
+---------------------------------------------
+
+Mit diesem Script kannst du nach Deployments schnell die wichtigsten Security-Pfade validieren:
+1. `BACKEND_BASE_URL=https://api.example.com bash scripts/backend_security_smoke_test.sh`
+
+Optional:
+- `BACKEND_API_TOKEN=...` fuer authentifizierten Write-Test
+- `EXPECT_WRITE_AUTH=0` falls Write-Auth in der Zielumgebung bewusst deaktiviert ist
+- `SMOKE_ORIGIN=https://parentpeak.de` um CORS mit echter Origin zu testen
 
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------

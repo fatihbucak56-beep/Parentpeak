@@ -19,7 +19,7 @@ class FamilyHubScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('ElternKompass'),
+        title: const Text('Profil'),
         elevation: 0,
       ),
       body: ListView(

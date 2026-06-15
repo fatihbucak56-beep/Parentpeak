@@ -9,7 +9,11 @@ import 'package:trusted_circle_demo/logic/background_sync_manager.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/home_screen.dart';
-import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
+import 'package:trusted_circle_demo/ui/family_hub_screen.dart';
+import 'package:trusted_circle_demo/ui/treasure_handover_screen.dart';
+import 'package:trusted_circle_demo/ui/treasure_upload_screen.dart';
+import 'package:trusted_circle_demo/ui/finance_budget_screen.dart';
+import 'package:trusted_circle_demo/ui/kettenbrecher_dashboard.dart';
 import 'package:trusted_circle_demo/ui/auth/login_screen.dart';
 import 'package:trusted_circle_demo/ui/auth/paywall_screen.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
@@ -24,6 +28,10 @@ final themeService = ThemeService();
 final languageService = LanguageService();
 // Global key for DemoApp state access
 final GlobalKey<DemoAppState> demoAppKey = GlobalKey<DemoAppState>();
+
+// Development shortcut: skips auth gate and opens the app shell directly.
+const bool _debugBypassAuthGate =
+  bool.fromEnvironment('PP_DEBUG_SKIP_LOGIN', defaultValue: true);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -288,7 +296,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
       ),
       LanguageAwareWidget(
           key: ValueKey('family-${languageService.currentLanguage}'),
-          child: FamilyProfileScreen(
+          child: FamilyHubScreen(
             devices: widget.devices,
             onRevoke: widget.onRevoke,
           )),
@@ -315,9 +323,9 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
               label: 'Home',
             ),
             NavigationDestination(
-              icon: Icon(Icons.family_restroom_outlined),
-              selectedIcon: Icon(Icons.family_restroom_rounded),
-              label: 'Familie',
+              icon: Icon(Icons.nest_cam_wired_stand_outlined),
+              selectedIcon: Icon(Icons.nest_cam_wired_stand_rounded),
+              label: 'FamilienHub',
             ),
           ],
         ),
@@ -346,6 +354,19 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  bool get _allowWebQueryBypass {
+    if (!kIsWeb) return false;
+    final value = Uri.base.queryParameters['pp_debug_skip_login']?.trim();
+    return value == '1' || value?.toLowerCase() == 'true';
+  }
+
+  String? get _debugScreen {
+    if (!_allowWebQueryBypass) return null;
+    final value = Uri.base.queryParameters['pp_debug_screen']?.trim().toLowerCase();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
   void _refresh() {
     if (mounted) {
       setState(() {});
@@ -354,6 +375,31 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (_debugBypassAuthGate && (kDebugMode || _allowWebQueryBypass)) {
+      final debugScreen = _debugScreen;
+      if (debugScreen != null) {
+        switch (debugScreen) {
+          case 'treasure_handover':
+            return const TreasureHandoverScreen();
+          case 'treasure_upload':
+            return const TreasureUploadScreen();
+          case 'finance':
+            return const FinanceBudgetScreen();
+          case 'kettenbrecher':
+            return const KettenbrecherDashboard();
+          case 'home':
+            break;
+          default:
+            break;
+        }
+      }
+      return ParentpeakAppShell(
+        devices: widget.devices,
+        onRevoke: widget.onRevoke,
+        startupInviteInput: widget.startupInviteInput,
+      );
+    }
+
     final user = AuthService.instance.currentUser;
 
     // Nicht eingeloggt → Login

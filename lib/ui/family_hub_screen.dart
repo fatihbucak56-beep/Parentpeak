@@ -50,8 +50,8 @@ class FamilyHubScreen extends StatelessWidget {
         builder: (_) => const WeeklyPlannerScreen(),
       ),
       _HubAction(
-        title: 'Profil & Sicherheit',
-        subtitle: 'Modern, klar und fokussiert auf Familie und Schutz',
+        title: 'Familien-Safe',
+        subtitle: 'Profil & Sicherheit modern und klar organisiert',
         icon: Icons.shield_rounded,
         color: const Color(0xFF0EA5A4),
         builder: (_) => ProfileSafetyScreen(

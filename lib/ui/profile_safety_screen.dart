@@ -25,7 +25,7 @@ class ProfileSafetyScreen extends StatelessWidget {
         : 'Familie';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil & Sicherheit')),
+      appBar: AppBar(title: const Text('Familien-Safe')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         children: [
@@ -75,7 +75,7 @@ class ProfileSafetyScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Ein moderner, sicherer Bereich fuer eure Familie',
+                        'Profil & Sicherheit fuer eure Familie, kreativ und klar',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
@@ -91,7 +91,8 @@ class ProfileSafetyScreen extends StatelessWidget {
             icon: Icons.family_restroom_rounded,
             color: const Color(0xFF2563EB),
             title: 'Familienprofil',
-            subtitle: 'Mitglieder, Sprache, Interessen und Kontodetails pflegen',
+            subtitle:
+                'Mitglieder, Sprache, Interessen und Kontodetails pflegen',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(

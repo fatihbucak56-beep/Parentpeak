@@ -19,7 +19,7 @@ class FamilyHubScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('FamilienHub'),
+        title: const Text('ElternKompass'),
         elevation: 0,
       ),
       body: ListView(
@@ -60,7 +60,7 @@ class FamilyHubScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'Euer Familien-Nest',
+                      'Ruhepunkt fuer Eltern',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
@@ -70,7 +70,7 @@ class FamilyHubScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Alle Kernbereiche fuer den Familienalltag an einem Ort: klar, schnell und stressfrei.',
+                  'Hier startet alles Wichtige fuer euren Alltag: Profil, Schutz und schnelle Hilfe in einem Klick.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.92),
                     height: 1.3,
@@ -80,7 +80,7 @@ class FamilyHubScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          _SafeSpaceButton(
+          _ProfileCompassButton(
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -98,8 +98,8 @@ class FamilyHubScreen extends StatelessWidget {
   }
 }
 
-class _SafeSpaceButton extends StatelessWidget {
-  const _SafeSpaceButton({required this.onTap});
+class _ProfileCompassButton extends StatelessWidget {
+  const _ProfileCompassButton({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -150,30 +150,76 @@ class _SafeSpaceButton extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'SafeSpace Familie',
+                      'Profil & Schutz',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF0F172A),
-                        fontSize: 22,
+                        fontSize: 24,
                       ),
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Euer moderner Profil- und Sicherheitsbereich',
+                      'Familienprofil, Sicherheit und Notfallkontakte klar gebuendelt.',
                       style: TextStyle(
                         color: Color(0xFF475569),
                         fontSize: 14,
                       ),
                     ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _MiniPill(label: 'Profil'),
+                        SizedBox(width: 6),
+                        _MiniPill(label: 'Sicherheit'),
+                        SizedBox(width: 6),
+                        _MiniPill(label: 'Notfall'),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.arrow_forward_rounded,
-                color: Color(0xFF0F766E),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F766E),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'Start',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniPill extends StatelessWidget {
+  const _MiniPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF0F766E),
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
         ),
       ),
     );

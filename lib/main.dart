@@ -31,7 +31,9 @@ final GlobalKey<DemoAppState> demoAppKey = GlobalKey<DemoAppState>();
 
 // Development shortcut: skips auth gate and opens the app shell directly.
 const bool _debugBypassAuthGate =
-  bool.fromEnvironment('PP_DEBUG_SKIP_LOGIN', defaultValue: true);
+    bool.fromEnvironment('PP_DEBUG_SKIP_LOGIN', defaultValue: true);
+const String _debugStartTab =
+    String.fromEnvironment('PP_DEBUG_START_TAB', defaultValue: 'home');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,8 +59,7 @@ void main() async {
         'Konfigurationshinweis: Fehlende Secrets (${missingSecrets.join(', ')}).');
   }
   if (!kReleaseMode && releaseConfigIssues.isNotEmpty) {
-    debugPrint(
-        'Konfigurationshinweis: ${releaseConfigIssues.join('; ')}');
+    debugPrint('Konfigurationshinweis: ${releaseConfigIssues.join('; ')}');
   }
 
   await BackgroundSyncManager.initialize();
@@ -261,7 +262,7 @@ class ParentpeakAppShell extends StatefulWidget {
 }
 
 class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
-  int _index = 0;
+  int _index = _debugStartTab == 'family' ? 1 : 0;
 
   @override
   void initState() {
@@ -325,7 +326,7 @@ class _ParentpeakAppShellState extends State<ParentpeakAppShell> {
             NavigationDestination(
               icon: Icon(Icons.nest_cam_wired_stand_outlined),
               selectedIcon: Icon(Icons.nest_cam_wired_stand_rounded),
-              label: 'FamilienHub',
+              label: 'ElternKompass',
             ),
           ],
         ),
@@ -362,7 +363,8 @@ class _AuthGateState extends State<AuthGate> {
 
   String? get _debugScreen {
     if (!_allowWebQueryBypass) return null;
-    final value = Uri.base.queryParameters['pp_debug_screen']?.trim().toLowerCase();
+    final value =
+        Uri.base.queryParameters['pp_debug_screen']?.trim().toLowerCase();
     if (value == null || value.isEmpty) return null;
     return value;
   }
@@ -424,5 +426,3 @@ class _AuthGateState extends State<AuthGate> {
     );
   }
 }
-
-

@@ -3,10 +3,19 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Pool } = require('pg');
+const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
 
+const databaseUrl = (process.env.DATABASE_URL || '').trim();
+const useDatabaseSsl = /render\.com/i.test(databaseUrl);
+const prismaPool = new Pool({
+  connectionString: databaseUrl,
+  ssl: useDatabaseSsl ? { rejectUnauthorized: false } : undefined,
+});
+const prismaAdapter = new PrismaPg(prismaPool);
 const app = express();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter });
 const PORT = Number.parseInt(process.env.PORT || '3000', 10);
 const backendApiToken = (process.env.BACKEND_API_TOKEN || '').trim();
 const requireAuthForWrites =
@@ -151,7 +160,7 @@ app.use(
   }),
 );
 
-app.post('/payments/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/payments/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripeWebhookSecret) {
     return res.status(503).json({ error: 'STRIPE_WEBHOOK_SECRET fehlt' });
   }
@@ -199,7 +208,7 @@ app.post('/payments/stripe/webhook', express.raw({ type: 'application/json' }), 
     return res.status(400).json({ error: 'Stripe event ohne payment reference' });
   }
 
-  const result = applyProviderTransactionStatusUpdate({
+  const result = await applyProviderTransactionStatusUpdate({
     provider: 'stripe',
     providerTransactionRef,
     targetStatus,
@@ -616,6 +625,94 @@ function mapShoppingRecordToApiItem(record) {
   };
 }
 
+function buildLocalEmail(identifier) {
+  const safeIdentifier = (identifier || 'user')
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '_');
+  return `${safeIdentifier}@parentpeak.local`;
+}
+
+async function ensureBackendUser(userId, displayName) {
+  const trimmedUserId = (userId || DEMO_USER_ID).toString().trim() || DEMO_USER_ID;
+  const [firstName, ...restName] = (displayName || trimmedUserId).toString().split(' ');
+
+  await prisma.user.upsert({
+    where: { id: trimmedUserId },
+    update: {},
+    create: {
+      id: trimmedUserId,
+      email: buildLocalEmail(trimmedUserId),
+      passwordHash: 'demo',
+      passwordSalt: 'demo',
+      firstName: firstName || 'Demo',
+      lastName: restName.join(' ') || 'User',
+    },
+  });
+
+  return trimmedUserId;
+}
+
+async function ensurePaymentContext(eventId, hosterId) {
+  const trimmedEventId = (eventId || '').toString().trim();
+  const trimmedHosterId = await ensureBackendUser(hosterId || DEMO_USER_ID, hosterId || 'Demo Host');
+  const sourceEvent = events.find(item => item.id === trimmedEventId);
+
+  await prisma.event.upsert({
+    where: { id: trimmedEventId },
+    update: {},
+    create: {
+      id: trimmedEventId,
+      hosterId: trimmedHosterId,
+      title: sourceEvent?.title || `Event ${trimmedEventId}`,
+      description: sourceEvent?.description || 'Automatisch fuer Payment-Persistenz angelegt',
+      startDate: sourceEvent?.eventDate ? new Date(sourceEvent.eventDate) : new Date(),
+      location: sourceEvent?.location || '',
+      status: sourceEvent?.status === 'active' ? 'upcoming' : (sourceEvent?.status || 'upcoming'),
+      eventType: sourceEvent?.category || 'generic',
+      maxParticipants: Number.isFinite(Number(sourceEvent?.maxParticipants))
+        ? Number(sourceEvent.maxParticipants)
+        : null,
+    },
+  });
+
+  return { eventId: trimmedEventId, hosterId: trimmedHosterId };
+}
+
+function normalizeStoredPaymentStatus(value) {
+  if (value === 'succeeded') return 'completed';
+  return normalizePaymentStatus(value) || 'pending';
+}
+
+function getPaymentAuditDetails(record) {
+  if (!record?.auditDetails || typeof record.auditDetails !== 'object') {
+    return {};
+  }
+  return record.auditDetails;
+}
+
+function mapPaymentRecordToApiItem(record) {
+  const audit = getPaymentAuditDetails(record);
+  const status = normalizeStoredPaymentStatus(record.status);
+  return {
+    id: record.id,
+    mode: audit.mode || 'prisma',
+    eventId: record.eventId,
+    hosterId: audit.hosterId || record.userId,
+    amount: Number(record.amount),
+    status,
+    paymentMethod: audit.paymentMethod || 'stripe',
+    providerTransactionRef: audit.providerTransactionRef || record.stripePaymentIntentId || null,
+    providerVerified: Boolean(record.verifiedAt) || audit.providerVerified === true,
+    stripePaymentIntentId: record.stripePaymentIntentId || null,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    completedAt: audit.completedAt || (status === 'completed' ? (record.verifiedAt || record.updatedAt) : null),
+    failedAt: audit.failedAt || null,
+    refundedAt: record.refundedAt || audit.refundedAt || null,
+  };
+}
+
 function asIsoDate(value) {
   if (!value) return null;
   const parsed = new Date(value);
@@ -649,7 +746,7 @@ function canTransitionPaymentStatus(fromStatus, toStatus) {
   return transitions[fromStatus]?.has(toStatus) === true;
 }
 
-function updateEventPaymentDateIfCompleted(transaction) {
+async function updateEventPaymentDateIfCompleted(transaction) {
   if (!transaction || transaction.status !== 'completed') {
     return;
   }
@@ -660,9 +757,20 @@ function updateEventPaymentDateIfCompleted(transaction) {
       paymentDate: transaction.completedAt || new Date().toISOString(),
     };
   }
+
+  try {
+    await prisma.event.update({
+      where: { id: transaction.eventId },
+      data: {
+        updatedAt: new Date(),
+      },
+    });
+  } catch (_) {
+    // Ignore DB event update failures here; payment persistence remains primary.
+  }
 }
 
-function applyTransactionStatusUpdateByIndex(index, targetStatus) {
+async function applyTransactionStatusUpdateByIndex(index, targetStatus) {
   const current = paymentTransactions[index];
   if (!canTransitionPaymentStatus(current.status, targetStatus)) {
     return {
@@ -684,11 +792,45 @@ function applyTransactionStatusUpdateByIndex(index, targetStatus) {
   };
 
   paymentTransactions[index] = updated;
-  updateEventPaymentDateIfCompleted(updated);
+  await updateEventPaymentDateIfCompleted(updated);
   return { ok: true, item: updated };
 }
 
-function applyProviderTransactionStatusUpdate({
+async function applyTransactionStatusUpdateByRecord(record, targetStatus) {
+  const currentStatus = normalizeStoredPaymentStatus(record.status);
+  if (!canTransitionPaymentStatus(currentStatus, targetStatus)) {
+    return {
+      ok: false,
+      code: 'invalid_transition',
+      httpStatus: 409,
+      error: `Statuswechsel ${currentStatus} -> ${targetStatus} nicht erlaubt`,
+    };
+  }
+
+  const audit = getPaymentAuditDetails(record);
+  const nowIso = new Date().toISOString();
+  const nextAudit = {
+    ...audit,
+    completedAt: targetStatus === 'completed' ? (audit.completedAt || nowIso) : audit.completedAt || null,
+    failedAt: targetStatus === 'failed' ? nowIso : audit.failedAt || null,
+    refundedAt: targetStatus === 'refunded' ? nowIso : audit.refundedAt || null,
+  };
+
+  const updated = await prisma.paymentTransaction.update({
+    where: { id: record.id },
+    data: {
+      status: targetStatus,
+      refundedAt: targetStatus === 'refunded' ? new Date(nowIso) : record.refundedAt,
+      auditDetails: nextAudit,
+    },
+  });
+
+  const mapped = mapPaymentRecordToApiItem(updated);
+  await updateEventPaymentDateIfCompleted(mapped);
+  return { ok: true, item: mapped };
+}
+
+async function applyProviderTransactionStatusUpdate({
   provider,
   providerTransactionRef,
   targetStatus,
@@ -713,6 +855,63 @@ function applyProviderTransactionStatusUpdate({
     };
   }
 
+  try {
+    let record = null;
+
+    if (transactionId) {
+      record = await prisma.paymentTransaction.findUnique({ where: { id: transactionId } });
+    }
+
+    if (!record && provider === 'stripe' && providerTransactionRef) {
+      record = await prisma.paymentTransaction.findFirst({
+        where: { stripePaymentIntentId: providerTransactionRef },
+      });
+    }
+
+    if (!record && providerTransactionRef) {
+      record = await prisma.paymentTransaction.findFirst({
+        where: { idempotencyKey: `${provider}:${providerTransactionRef}` },
+      });
+    }
+
+    if (!record) {
+      return {
+        ok: false,
+        code: 'not_found',
+        httpStatus: 404,
+        error: 'Transaktion nicht gefunden',
+      };
+    }
+
+    const statusUpdate = await applyTransactionStatusUpdateByRecord(record, targetStatus);
+    if (!statusUpdate.ok) {
+      return statusUpdate;
+    }
+
+    const currentRecord = await prisma.paymentTransaction.findUnique({ where: { id: record.id } });
+    const currentAudit = getPaymentAuditDetails(currentRecord);
+    const nowIso = new Date().toISOString();
+    const enhanced = await prisma.paymentTransaction.update({
+      where: { id: record.id },
+      data: {
+        verifiedAt: verified ? new Date(nowIso) : currentRecord.verifiedAt,
+        verifiedByType: verified ? 'webhook' : currentRecord.verifiedByType,
+        auditDetails: {
+          ...currentAudit,
+          providerVerified: currentAudit.providerVerified === true || verified,
+          providerEventStatus: targetStatus,
+          providerEventReceivedAt: nowIso,
+          providerTransactionRef: currentAudit.providerTransactionRef || providerTransactionRef,
+          paymentMethod: currentAudit.paymentMethod || provider,
+        },
+      },
+    });
+
+    return { ok: true, item: mapPaymentRecordToApiItem(enhanced) };
+  } catch (error) {
+    console.error('Prisma payment provider update fallback:', error?.message || error);
+  }
+
   const index = paymentTransactions.findIndex(item => {
     if (transactionId && item.id === transactionId) {
       return true;
@@ -732,7 +931,7 @@ function applyProviderTransactionStatusUpdate({
     };
   }
 
-  const statusUpdate = applyTransactionStatusUpdateByIndex(index, targetStatus);
+  const statusUpdate = await applyTransactionStatusUpdateByIndex(index, targetStatus);
   if (!statusUpdate.ok) {
     return statusUpdate;
   }
@@ -1789,7 +1988,7 @@ app.post('/payments/paypal/initiate', (req, res) => {
   });
 });
 
-app.post('/payments/confirm', (req, res) => {
+app.post('/payments/confirm', async (req, res) => {
   const body = req.body || {};
   const amount = parsePositiveNumber(body.amount);
   const eventId = (body.eventId || '').toString();
@@ -1828,29 +2027,62 @@ app.post('/payments/confirm', (req, res) => {
 
   const nowIso = new Date().toISOString();
 
-  const transaction = {
-    id: generateId('txn'),
-    mode: 'mock_backend',
-    eventId,
-    hosterId,
-    amount,
-    status: normalizedStatus,
-    paymentMethod,
-    providerTransactionRef: providerTransactionRef || null,
-    providerVerified,
-    stripePaymentIntentId: body.stripePaymentIntentId || null,
-    createdAt: nowIso,
-    completedAt: normalizedStatus === 'completed' ? nowIso : null,
-  };
+  try {
+    const context = await ensurePaymentContext(eventId, hosterId);
+    const stripePaymentIntentId = paymentMethod === 'stripe'
+      ? ((body.stripePaymentIntentId || providerTransactionRef || `pi_mock_${Date.now()}`).toString())
+      : `alt_${paymentMethod}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-  paymentTransactions.unshift(transaction);
+    const created = await prisma.paymentTransaction.create({
+      data: {
+        eventId: context.eventId,
+        userId: context.hosterId,
+        amount,
+        currency: (body.currency || 'EUR').toString(),
+        stripePaymentIntentId,
+        idempotencyKey: (body.idempotencyKey || `${paymentMethod}:${providerTransactionRef || stripePaymentIntentId}`).toString(),
+        status: normalizedStatus,
+        verifiedAt: providerVerified ? new Date(nowIso) : null,
+        verifiedByType: providerVerified ? 'api' : null,
+        auditDetails: {
+          mode: 'mock_backend',
+          hosterId: context.hosterId,
+          paymentMethod,
+          providerTransactionRef: providerTransactionRef || null,
+          providerVerified,
+          completedAt: normalizedStatus === 'completed' ? nowIso : null,
+          failedAt: normalizedStatus === 'failed' ? nowIso : null,
+        },
+      },
+    });
 
-  updateEventPaymentDateIfCompleted(transaction);
+    const item = mapPaymentRecordToApiItem(created);
+    await updateEventPaymentDateIfCompleted(item);
+    return res.status(201).json({ item });
+  } catch (error) {
+    console.error('POST /payments/confirm fallback (in-memory):', error?.message || error);
+    const transaction = {
+      id: generateId('txn'),
+      mode: 'mock_backend',
+      eventId,
+      hosterId,
+      amount,
+      status: normalizedStatus,
+      paymentMethod,
+      providerTransactionRef: providerTransactionRef || null,
+      providerVerified,
+      stripePaymentIntentId: body.stripePaymentIntentId || null,
+      createdAt: nowIso,
+      completedAt: normalizedStatus === 'completed' ? nowIso : null,
+    };
 
-  res.status(201).json({ item: transaction });
+    paymentTransactions.unshift(transaction);
+    await updateEventPaymentDateIfCompleted(transaction);
+    return res.status(201).json({ item: transaction });
+  }
 });
 
-app.post('/payments/provider-events', (req, res) => {
+app.post('/payments/provider-events', async (req, res) => {
   if (!allowClientProviderEvents) {
     return res.status(403).json({
       error: 'Client Provider-Events sind deaktiviert',
@@ -1868,7 +2100,7 @@ app.post('/payments/provider-events', (req, res) => {
     return res.status(400).json({ error: 'Ungueltiger payment status' });
   }
 
-  const result = applyProviderTransactionStatusUpdate({
+  const result = await applyProviderTransactionStatusUpdate({
     provider,
     providerTransactionRef,
     targetStatus,
@@ -1883,80 +2115,164 @@ app.post('/payments/provider-events', (req, res) => {
   return res.json({ item: result.item });
 });
 
-app.get('/payments/transactions', (req, res) => {
-  let items = [...paymentTransactions];
-  if (req.query.hosterId) {
-    items = items.filter(item => item.hosterId === req.query.hosterId);
-  }
-  res.json({ items });
-});
-
-app.get('/payments/transactions/:id', (req, res) => {
-  const item = paymentTransactions.find(transaction => transaction.id === req.params.id);
-  if (!item) {
-    return res.status(404).json({ error: 'Transaktion nicht gefunden' });
-  }
-  res.json({ item });
-});
-
-app.get('/payments/host/:hosterId', (req, res) => {
-  const items = paymentTransactions.filter(
-    transaction => transaction.hosterId === req.params.hosterId,
-  );
-  res.json({ items });
-});
-
-app.post('/payments/transactions/:id/refund', (req, res) => {
-  const index = paymentTransactions.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Transaktion nicht gefunden' });
-  }
-
-  if (paymentTransactions[index].status !== 'completed') {
-    return res.status(409).json({
-      error: 'Rueckerstattung nur fuer completed-Transaktionen erlaubt',
+app.get('/payments/transactions', async (req, res) => {
+  try {
+    const hosterId = (req.query.hosterId || '').toString().trim();
+    const items = await prisma.paymentTransaction.findMany({
+      where: hosterId
+        ? {
+            OR: [
+              { userId: hosterId },
+              { auditDetails: { path: ['hosterId'], equals: hosterId } },
+            ],
+          }
+        : undefined,
+      orderBy: { createdAt: 'desc' },
     });
+    return res.json({ items: items.map(mapPaymentRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /payments/transactions fallback (in-memory):', error?.message || error);
+    let items = [...paymentTransactions];
+    if (req.query.hosterId) {
+      items = items.filter(item => item.hosterId === req.query.hosterId);
+    }
+    return res.json({ items });
   }
-
-  paymentTransactions[index] = {
-    ...paymentTransactions[index],
-    status: 'refunded',
-    refundedAt: new Date().toISOString(),
-  };
-
-  res.json({ item: paymentTransactions[index] });
 });
 
-app.post('/payments/transactions/:id/status', (req, res) => {
-  const index = paymentTransactions.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+app.get('/payments/transactions/:id', async (req, res) => {
+  try {
+    const item = await prisma.paymentTransaction.findUnique({ where: { id: req.params.id } });
+    if (!item) {
+      return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+    }
+    return res.json({ item: mapPaymentRecordToApiItem(item) });
+  } catch (error) {
+    console.error('GET /payments/transactions/:id fallback (in-memory):', error?.message || error);
+    const item = paymentTransactions.find(transaction => transaction.id === req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+    }
+    return res.json({ item });
   }
+});
 
+app.get('/payments/host/:hosterId', async (req, res) => {
+  try {
+    const hosterId = (req.params.hosterId || '').toString().trim();
+    const items = await prisma.paymentTransaction.findMany({
+      where: {
+        OR: [
+          { userId: hosterId },
+          { auditDetails: { path: ['hosterId'], equals: hosterId } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ items: items.map(mapPaymentRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /payments/host/:hosterId fallback (in-memory):', error?.message || error);
+    const items = paymentTransactions.filter(
+      transaction => transaction.hosterId === req.params.hosterId,
+    );
+    return res.json({ items });
+  }
+});
+
+app.post('/payments/transactions/:id/refund', async (req, res) => {
+  try {
+    const current = await prisma.paymentTransaction.findUnique({ where: { id: req.params.id } });
+    if (!current) {
+      return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+    }
+
+    const mapped = mapPaymentRecordToApiItem(current);
+    if (mapped.status !== 'completed') {
+      return res.status(409).json({
+        error: 'Rueckerstattung nur fuer completed-Transaktionen erlaubt',
+      });
+    }
+
+    const updated = await prisma.paymentTransaction.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'refunded',
+        refundedAt: new Date(),
+        auditDetails: {
+          ...getPaymentAuditDetails(current),
+          refundedAt: new Date().toISOString(),
+        },
+      },
+    });
+    return res.json({ item: mapPaymentRecordToApiItem(updated) });
+  } catch (error) {
+    console.error('POST /payments/transactions/:id/refund fallback (in-memory):', error?.message || error);
+    const index = paymentTransactions.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+    }
+
+    if (paymentTransactions[index].status !== 'completed') {
+      return res.status(409).json({
+        error: 'Rueckerstattung nur fuer completed-Transaktionen erlaubt',
+      });
+    }
+
+    paymentTransactions[index] = {
+      ...paymentTransactions[index],
+      status: 'refunded',
+      refundedAt: new Date().toISOString(),
+    };
+
+    return res.json({ item: paymentTransactions[index] });
+  }
+});
+
+app.post('/payments/transactions/:id/status', async (req, res) => {
   const targetStatus = normalizePaymentStatus(req.body.status);
   if (targetStatus == null) {
     return res.status(400).json({ error: 'Ungueltiger Zielstatus' });
   }
 
-  const current = paymentTransactions[index];
-  if (!canTransitionPaymentStatus(current.status, targetStatus)) {
-    return res.status(409).json({
-      error: `Statuswechsel ${current.status} -> ${targetStatus} nicht erlaubt`,
-    });
+  try {
+    const current = await prisma.paymentTransaction.findUnique({ where: { id: req.params.id } });
+    if (!current) {
+      return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+    }
+
+    const result = await applyTransactionStatusUpdateByRecord(current, targetStatus);
+    if (!result.ok) {
+      return res.status(result.httpStatus).json({ error: result.error });
+    }
+
+    return res.json({ item: result.item });
+  } catch (error) {
+    console.error('POST /payments/transactions/:id/status fallback (in-memory):', error?.message || error);
+    const index = paymentTransactions.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+    }
+
+    const current = paymentTransactions[index];
+    if (!canTransitionPaymentStatus(current.status, targetStatus)) {
+      return res.status(409).json({
+        error: `Statuswechsel ${current.status} -> ${targetStatus} nicht erlaubt`,
+      });
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = {
+      ...current,
+      status: targetStatus,
+      updatedAt: nowIso,
+      completedAt: targetStatus === 'completed' ? (current.completedAt || nowIso) : current.completedAt,
+      failedAt: targetStatus === 'failed' ? nowIso : current.failedAt,
+      refundedAt: targetStatus === 'refunded' ? nowIso : current.refundedAt,
+    };
+
+    paymentTransactions[index] = updated;
+    return res.json({ item: updated });
   }
-
-  const nowIso = new Date().toISOString();
-  const updated = {
-    ...current,
-    status: targetStatus,
-    updatedAt: nowIso,
-    completedAt: targetStatus === 'completed' ? (current.completedAt || nowIso) : current.completedAt,
-    failedAt: targetStatus === 'failed' ? nowIso : current.failedAt,
-    refundedAt: targetStatus === 'refunded' ? nowIso : current.refundedAt,
-  };
-
-  paymentTransactions[index] = updated;
-  return res.json({ item: updated });
 });
 
 // Health Check

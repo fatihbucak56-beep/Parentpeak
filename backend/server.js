@@ -529,8 +529,12 @@ function canViewerSeeEvent(event, viewerUserId) {
   if (event.visibility === 'privateOnly') return false;
 
   if (event.visibility === 'familyCircle') {
-    const keyA = [event.hosterId, viewerUserId].sort().join('::');
-    return keyA === 'host_001::host_demo_001' || keyA === 'host_002::host_demo_001';
+    return familyRequests.some(
+      request =>
+        request.status === 'accepted' &&
+        ((request.fromUserId === viewerUserId && request.toUserId === event.hosterId) ||
+          (request.toUserId === viewerUserId && request.fromUserId === event.hosterId)),
+    );
   }
 
   if (event.visibility === 'inviteOnly') {
@@ -1804,31 +1808,113 @@ app.get('/family/contacts', (req, res) => {
   res.json({ contacts: filtered });
 });
 
-app.get('/family/requests', (req, res) => {
-  const userId = req.query.userId;
-  const requests = userId
-    ? familyRequests.filter(r => r.toUserId === userId)
-    : familyRequests;
-  res.json({ requests });
+app.get('/family/requests', async (req, res) => {
+  const userId = (req.query.userId || '').toString().trim();
+
+  try {
+    const requests = await prisma.familyRequest.findMany({
+      where: userId ? { toUserId: userId } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ requests });
+  } catch (error) {
+    console.error('GET /family/requests fallback (in-memory):', error?.message || error);
+    const requests = userId
+      ? familyRequests.filter(r => r.toUserId === userId)
+      : familyRequests;
+    return res.json({ requests });
+  }
 });
 
-app.put('/family/requests/:id', (req, res) => {
-  const index = familyRequests.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Anfrage nicht gefunden' });
+app.post('/family/requests', async (req, res) => {
+  const fromUserId = (req.body.fromUserId || '').toString().trim();
+  const toUserId = (req.body.toUserId || '').toString().trim();
+  const status = (req.body.status || 'pending').toString().trim();
+
+  if (!fromUserId || !toUserId) {
+    return res.status(400).json({ error: 'fromUserId und toUserId sind erforderlich' });
+  }
+  if (fromUserId === toUserId) {
+    return res.status(400).json({ error: 'fromUserId und toUserId dürfen nicht identisch sein' });
+  }
+  if (!['pending', 'accepted', 'declined'].includes(status)) {
+    return res.status(400).json({ error: 'Ungültiger Status' });
   }
 
+  try {
+    const item = await prisma.familyRequest.create({
+      data: {
+        fromUserId,
+        toUserId,
+        status,
+      },
+    });
+
+    familyRequests.unshift({
+      id: item.id,
+      fromUserId: item.fromUserId,
+      toUserId: item.toUserId,
+      status: item.status,
+      sentAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    });
+
+    return res.status(201).json({ item });
+  } catch (error) {
+    console.error('POST /family/requests fallback (in-memory):', error?.message || error);
+    const item = {
+      id: generateId('req'),
+      fromUserId,
+      toUserId,
+      status,
+      sentAt: new Date().toISOString(),
+      updatedAt: null,
+    };
+    familyRequests.unshift(item);
+    return res.status(201).json({ item });
+  }
+});
+
+app.put('/family/requests/:id', async (req, res) => {
   const status = req.body.status;
   if (!['pending', 'accepted', 'declined'].includes(status)) {
     return res.status(400).json({ error: 'Ungültiger Status' });
   }
 
-  familyRequests[index] = {
-    ...familyRequests[index],
-    status,
-    updatedAt: new Date().toISOString(),
-  };
-  res.json({ item: familyRequests[index] });
+  try {
+    const item = await prisma.familyRequest.update({
+      where: { id: req.params.id },
+      data: { status },
+    });
+
+    const index = familyRequests.findIndex(entry => entry.id === req.params.id);
+    if (index !== -1) {
+      familyRequests[index] = {
+        ...familyRequests[index],
+        status: item.status,
+        updatedAt: item.updatedAt,
+      };
+    }
+
+    return res.json({ item });
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden' });
+    }
+
+    console.error('PUT /family/requests/:id fallback (in-memory):', error?.message || error);
+    const index = familyRequests.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden' });
+    }
+
+    familyRequests[index] = {
+      ...familyRequests[index],
+      status,
+      updatedAt: new Date().toISOString(),
+    };
+    return res.json({ item: familyRequests[index] });
+  }
 });
 
 // 14. Events (Prisma-first with in-memory fallback)
@@ -1880,6 +1966,50 @@ app.get('/events/discover', async (req, res) => {
     const records = await prisma.event.findMany({
       orderBy: { createdAt: 'desc' },
     });
+    const candidateHostIds = [...new Set(records.map(item => item.hosterId).filter(Boolean))].filter(
+      hostId => hostId !== viewerUserId,
+    );
+    const acceptedFamilyLinks = candidateHostIds.length
+      ? await prisma.familyRequest.findMany({
+          where: {
+            status: 'accepted',
+            OR: [
+              {
+                fromUserId: viewerUserId,
+                toUserId: { in: candidateHostIds },
+              },
+              {
+                toUserId: viewerUserId,
+                fromUserId: { in: candidateHostIds },
+              },
+            ],
+          },
+          select: {
+            fromUserId: true,
+            toUserId: true,
+          },
+        })
+      : [];
+    const familyHostIds = new Set();
+    for (const request of acceptedFamilyLinks) {
+      if (request.fromUserId === viewerUserId) {
+        familyHostIds.add(request.toUserId);
+      } else {
+        familyHostIds.add(request.fromUserId);
+      }
+    }
+
+    // Keep existing in-memory accepted links as compatibility fallback during partial migrations.
+    for (const request of familyRequests) {
+      if (!request || request.status !== 'accepted') continue;
+      if (request.fromUserId === viewerUserId) {
+        familyHostIds.add(request.toUserId);
+      }
+      if (request.toUserId === viewerUserId) {
+        familyHostIds.add(request.fromUserId);
+      }
+    }
+
     const countMap = await buildParticipantCountMap(records.map(item => item.id));
     let items = records
       .map(item => mapEventRecordToApiItem(item, { currentParticipants: countMap.get(item.id) || 0 }))
@@ -1888,8 +2018,7 @@ app.get('/events/discover', async (req, res) => {
         if (event.hosterId === viewerUserId) return true;
         if (event.visibility === 'privateOnly') return false;
         if (event.visibility === 'familyCircle') {
-          const keyA = [event.hosterId, viewerUserId].sort().join('::');
-          return keyA === 'host_001::host_demo_001' || keyA === 'host_002::host_demo_001';
+          return familyHostIds.has(event.hosterId);
         }
         if (event.visibility === 'inviteOnly') {
           return acceptedInviteEventIds.has(event.id);

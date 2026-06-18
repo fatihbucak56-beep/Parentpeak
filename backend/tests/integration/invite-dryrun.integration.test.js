@@ -279,6 +279,7 @@ test('discover enforces public, familyCircle, privateOnly and inviteOnly visibil
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   const viewerUserId = 'host_demo_001';
   const publicHostUser = `it_discover_public_host_${suffix}`;
+  const familyHostUser = `it_discover_family_host_${suffix}`;
   const privateHostUser = `it_discover_private_host_${suffix}`;
   const inviteHostUser = `it_discover_invite_host_${suffix}`;
 
@@ -299,8 +300,15 @@ test('discover enforces public, familyCircle, privateOnly and inviteOnly visibil
     const publicEventId = publicEvent.payload?.item?.id;
     createdEventIds.push(publicEventId);
 
+    const familyLink = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: familyHostUser,
+      toUserId: viewerUserId,
+      status: 'accepted',
+    });
+    assert.equal(familyLink.response.status, 201);
+
     const familyEvent = await postJson(server.baseUrl, '/events', {
-      hosterId: 'host_001',
+      hosterId: familyHostUser,
       title: `IT Discover Family ${suffix}`,
       visibility: 'familyCircle',
       eventDate: '2026-07-05T11:00:00.000Z',
@@ -384,6 +392,7 @@ test('discover enforces public, familyCircle, privateOnly and inviteOnly visibil
       }
 
       await postJson(server.baseUrl, '/account/delete-data', { userId: publicHostUser });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: familyHostUser });
       await postJson(server.baseUrl, '/account/delete-data', { userId: privateHostUser });
       await postJson(server.baseUrl, '/account/delete-data', { userId: inviteHostUser });
     }

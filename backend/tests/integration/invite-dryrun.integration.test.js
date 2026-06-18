@@ -110,6 +110,16 @@ async function postJson(baseUrl, route, body) {
   return { response, payload };
 }
 
+async function putJson(baseUrl, route, body) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json();
+  return { response, payload };
+}
+
 async function getJson(baseUrl, route) {
   const response = await fetch(`${baseUrl}${route}`);
   const payload = await response.json();
@@ -395,6 +405,93 @@ test('discover enforces public, familyCircle, privateOnly and inviteOnly visibil
       await postJson(server.baseUrl, '/account/delete-data', { userId: familyHostUser });
       await postJson(server.baseUrl, '/account/delete-data', { userId: privateHostUser });
       await postJson(server.baseUrl, '/account/delete-data', { userId: inviteHostUser });
+    }
+
+    await stopServer(server?.child);
+  }
+});
+
+test('family request lifecycle controls familyCircle discover access and blocks duplicates', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const viewerUserId = `it_family_viewer_${suffix}`;
+  const familyHostUser = `it_family_host_${suffix}`;
+
+  let server;
+  const createdEventIds = [];
+
+  try {
+    server = startServer(3029);
+    await waitForHealth(server.baseUrl);
+
+    const familyEvent = await postJson(server.baseUrl, '/events', {
+      hosterId: familyHostUser,
+      title: `IT Family Lifecycle ${suffix}`,
+      visibility: 'familyCircle',
+      eventDate: '2026-07-07T11:00:00.000Z',
+    });
+    assert.equal(familyEvent.response.status, 201);
+    const familyEventId = familyEvent.payload?.item?.id;
+    createdEventIds.push(familyEventId);
+
+    const discoverBeforeLink = await getJson(
+      server.baseUrl,
+      `/events/discover?viewerUserId=${viewerUserId}`,
+    );
+    assert.equal(discoverBeforeLink.response.status, 200);
+    const beforeIds = new Set((discoverBeforeLink.payload?.items || []).map(item => item.id));
+    assert.ok(!beforeIds.has(familyEventId));
+
+    const createPending = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: familyHostUser,
+      toUserId: viewerUserId,
+      status: 'pending',
+    });
+    assert.equal(createPending.response.status, 201);
+    const requestId = createPending.payload?.item?.id;
+    assert.ok(requestId);
+
+    const duplicatePendingReverse = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: viewerUserId,
+      toUserId: familyHostUser,
+      status: 'pending',
+    });
+    assert.equal(duplicatePendingReverse.response.status, 409);
+
+    const markAccepted = await putJson(server.baseUrl, `/family/requests/${requestId}`, {
+      status: 'accepted',
+    });
+    assert.equal(markAccepted.response.status, 200);
+
+    const duplicateAfterAccepted = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: viewerUserId,
+      toUserId: familyHostUser,
+      status: 'accepted',
+    });
+    assert.equal(duplicateAfterAccepted.response.status, 409);
+
+    const discoverAfterAccepted = await getJson(
+      server.baseUrl,
+      `/events/discover?viewerUserId=${viewerUserId}`,
+    );
+    assert.equal(discoverAfterAccepted.response.status, 200);
+    const afterIds = new Set((discoverAfterAccepted.payload?.items || []).map(item => item.id));
+    assert.ok(afterIds.has(familyEventId));
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    if (server) {
+      for (const eventId of createdEventIds) {
+        if (!eventId) continue;
+        try {
+          await deletePath(server.baseUrl, `/events/item/${eventId}`);
+        } catch (_) {
+          // Ignore cleanup errors in tests.
+        }
+      }
+
+      await postJson(server.baseUrl, '/account/delete-data', { userId: viewerUserId });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: familyHostUser });
     }
 
     await stopServer(server?.child);

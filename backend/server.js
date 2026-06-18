@@ -1842,6 +1842,29 @@ app.post('/family/requests', async (req, res) => {
   }
 
   try {
+    const existing = await prisma.familyRequest.findFirst({
+      where: {
+        OR: [
+          {
+            fromUserId,
+            toUserId,
+          },
+          {
+            fromUserId: toUserId,
+            toUserId: fromUserId,
+          },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing && ['pending', 'accepted'].includes(existing.status)) {
+      return res.status(409).json({
+        error: 'Anfrage existiert bereits',
+        existingRequestId: existing.id,
+      });
+    }
+
     const item = await prisma.familyRequest.create({
       data: {
         fromUserId,
@@ -1862,6 +1885,26 @@ app.post('/family/requests', async (req, res) => {
     return res.status(201).json({ item });
   } catch (error) {
     console.error('POST /family/requests fallback (in-memory):', error?.message || error);
+
+    const existing = familyRequests
+      .filter(
+        request =>
+          (request.fromUserId === fromUserId && request.toUserId === toUserId) ||
+          (request.fromUserId === toUserId && request.toUserId === fromUserId),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.sentAt || 0).getTime() -
+          new Date(a.updatedAt || a.sentAt || 0).getTime(),
+      )[0];
+
+    if (existing && ['pending', 'accepted'].includes(existing.status)) {
+      return res.status(409).json({
+        error: 'Anfrage existiert bereits',
+        existingRequestId: existing.id,
+      });
+    }
+
     const item = {
       id: generateId('req'),
       fromUserId,

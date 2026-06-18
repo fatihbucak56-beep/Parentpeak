@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = Number.parseInt(process.env.PORT || '3000', 10);
@@ -13,6 +14,14 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
+const stripeWebhookSecret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim();
+const stripeWebhookToleranceSec = Number.parseInt(
+  process.env.STRIPE_WEBHOOK_TOLERANCE_SEC || '300',
+  10,
+);
+const allowClientProviderEvents =
+  (process.env.ALLOW_CLIENT_PROVIDER_EVENTS ||
+    (process.env.NODE_ENV === 'production' ? '0' : '1')) === '1';
 
 const writeRateWindowMs = Number.parseInt(
   process.env.WRITE_RATE_LIMIT_WINDOW_MS || `${15 * 60 * 1000}`,
@@ -36,6 +45,70 @@ function getClientIp(req) {
     return xff.split(',')[0].trim();
   }
   return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function parseStripeSignatureHeader(headerValue) {
+  if (!headerValue || typeof headerValue !== 'string') {
+    return { timestamp: null, signatures: [] };
+  }
+
+  let timestamp = null;
+  const signatures = [];
+
+  for (const part of headerValue.split(',')) {
+    const [key, value] = part.split('=');
+    if (!key || !value) continue;
+    const trimmedKey = key.trim();
+    const trimmedValue = value.trim();
+
+    if (trimmedKey === 't') {
+      const parsed = Number.parseInt(trimmedValue, 10);
+      if (Number.isFinite(parsed)) {
+        timestamp = parsed;
+      }
+    }
+
+    if (trimmedKey === 'v1' && trimmedValue) {
+      signatures.push(trimmedValue);
+    }
+  }
+
+  return { timestamp, signatures };
+}
+
+function verifyStripeWebhookSignature({ rawBody, signatureHeader, secret, toleranceSec }) {
+  const { timestamp, signatures } = parseStripeSignatureHeader(signatureHeader);
+  if (!timestamp || signatures.length === 0 || !secret) {
+    return false;
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - timestamp) > toleranceSec) {
+    return false;
+  }
+
+  const payloadToSign = `${timestamp}.${rawBody}`;
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payloadToSign, 'utf8')
+    .digest('hex');
+
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  for (const candidate of signatures) {
+    try {
+      const candidateBuffer = Buffer.from(candidate, 'hex');
+      if (
+        candidateBuffer.length === expectedBuffer.length &&
+        crypto.timingSafeEqual(candidateBuffer, expectedBuffer)
+      ) {
+        return true;
+      }
+    } catch (_) {
+      // Ignore malformed signature fragments.
+    }
+  }
+
+  return false;
 }
 
 // Middleware
@@ -73,6 +146,79 @@ app.use(
     maxAge: 600,
   }),
 );
+
+app.post('/payments/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  if (!stripeWebhookSecret) {
+    return res.status(503).json({ error: 'STRIPE_WEBHOOK_SECRET fehlt' });
+  }
+
+  const signatureHeader = req.headers['stripe-signature'];
+  const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
+  const isValid = verifyStripeWebhookSignature({
+    rawBody,
+    signatureHeader,
+    secret: stripeWebhookSecret,
+    toleranceSec: stripeWebhookToleranceSec,
+  });
+
+  if (!isValid) {
+    return res.status(400).json({ error: 'Ungueltige Stripe-Signatur' });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(rawBody);
+  } catch (_) {
+    return res.status(400).json({ error: 'Ungueltiges Stripe-Webhook-JSON' });
+  }
+
+  const eventType = (event?.type || '').toString();
+  const obj = event?.data?.object || {};
+  let targetStatus = null;
+
+  if (eventType === 'payment_intent.succeeded') {
+    targetStatus = 'completed';
+  } else if (eventType === 'payment_intent.payment_failed') {
+    targetStatus = 'failed';
+  } else if (eventType === 'charge.refunded') {
+    targetStatus = 'refunded';
+  }
+
+  if (!targetStatus) {
+    return res.json({ received: true, ignored: true, reason: 'event_not_mapped' });
+  }
+
+  const providerTransactionRef =
+    (obj?.payment_intent || obj?.id || '').toString().trim();
+
+  if (!providerTransactionRef) {
+    return res.status(400).json({ error: 'Stripe event ohne payment reference' });
+  }
+
+  const result = applyProviderTransactionStatusUpdate({
+    provider: 'stripe',
+    providerTransactionRef,
+    targetStatus,
+    verified: true,
+  });
+
+  if (!result.ok) {
+    if (result.code === 'not_found') {
+      return res.status(202).json({
+        received: true,
+        pending: true,
+        reason: 'transaction_not_found',
+      });
+    }
+    return res.status(result.httpStatus).json({ error: result.error });
+  }
+
+  return res.json({
+    received: true,
+    transactionId: result.item.id,
+    status: result.item.status,
+  });
+});
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -345,6 +491,7 @@ const eventInviteExpiresAt = {};
 const paymentTransactions = [];
 const eventChatMessages = {};
 const eventChatReports = [];
+const userEntitlements = new Map();
 
 function generateInviteCode(eventId) {
   const suffix = (eventId || '').slice(-4).toUpperCase() || '0000';
@@ -384,7 +531,311 @@ function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 }
 
+function asIsoDate(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+function parsePositiveNumber(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return amount;
+}
+
+function normalizePaymentStatus(value) {
+  const raw = (value || '').toString().trim().toLowerCase();
+  if (!raw) return 'completed';
+  const allowed = new Set(['initiated', 'pending', 'completed', 'failed', 'refunded']);
+  if (!allowed.has(raw)) return null;
+  return raw;
+}
+
+function canTransitionPaymentStatus(fromStatus, toStatus) {
+  if (fromStatus === toStatus) return true;
+  const transitions = {
+    initiated: new Set(['pending', 'completed', 'failed']),
+    pending: new Set(['completed', 'failed', 'refunded']),
+    completed: new Set(['refunded']),
+    failed: new Set([]),
+    refunded: new Set([]),
+  };
+  return transitions[fromStatus]?.has(toStatus) === true;
+}
+
+function updateEventPaymentDateIfCompleted(transaction) {
+  if (!transaction || transaction.status !== 'completed') {
+    return;
+  }
+  const eventIndex = events.findIndex(event => event.id === transaction.eventId);
+  if (eventIndex !== -1) {
+    events[eventIndex] = {
+      ...events[eventIndex],
+      paymentDate: transaction.completedAt || new Date().toISOString(),
+    };
+  }
+}
+
+function applyTransactionStatusUpdateByIndex(index, targetStatus) {
+  const current = paymentTransactions[index];
+  if (!canTransitionPaymentStatus(current.status, targetStatus)) {
+    return {
+      ok: false,
+      code: 'invalid_transition',
+      httpStatus: 409,
+      error: `Statuswechsel ${current.status} -> ${targetStatus} nicht erlaubt`,
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const updated = {
+    ...current,
+    status: targetStatus,
+    updatedAt: nowIso,
+    completedAt: targetStatus === 'completed' ? (current.completedAt || nowIso) : current.completedAt,
+    failedAt: targetStatus === 'failed' ? nowIso : current.failedAt,
+    refundedAt: targetStatus === 'refunded' ? nowIso : current.refundedAt,
+  };
+
+  paymentTransactions[index] = updated;
+  updateEventPaymentDateIfCompleted(updated);
+  return { ok: true, item: updated };
+}
+
+function applyProviderTransactionStatusUpdate({
+  provider,
+  providerTransactionRef,
+  targetStatus,
+  verified,
+  transactionId,
+}) {
+  if (!provider || !providerTransactionRef) {
+    return {
+      ok: false,
+      code: 'invalid_payload',
+      httpStatus: 400,
+      error: 'provider und providerTransactionRef sind erforderlich',
+    };
+  }
+
+  if ((targetStatus === 'completed' || targetStatus === 'refunded') && !verified) {
+    return {
+      ok: false,
+      code: 'verification_required',
+      httpStatus: 409,
+      error: `${targetStatus} nur mit verified=true erlaubt`,
+    };
+  }
+
+  const index = paymentTransactions.findIndex(item => {
+    if (transactionId && item.id === transactionId) {
+      return true;
+    }
+    return (
+      item.paymentMethod === provider &&
+      (item.providerTransactionRef || '') === providerTransactionRef
+    );
+  });
+
+  if (index === -1) {
+    return {
+      ok: false,
+      code: 'not_found',
+      httpStatus: 404,
+      error: 'Transaktion nicht gefunden',
+    };
+  }
+
+  const statusUpdate = applyTransactionStatusUpdateByIndex(index, targetStatus);
+  if (!statusUpdate.ok) {
+    return statusUpdate;
+  }
+
+  const nowIso = new Date().toISOString();
+  const enhanced = {
+    ...statusUpdate.item,
+    providerVerified: paymentTransactions[index].providerVerified || verified,
+    providerEventStatus: targetStatus,
+    providerEventReceivedAt: nowIso,
+  };
+  paymentTransactions[index] = enhanced;
+
+  return { ok: true, item: enhanced };
+}
+
+function ensureEntitlement(userId, options = {}) {
+  const existing = userEntitlements.get(userId);
+  const nowIso = new Date().toISOString();
+  const registeredAtHint = asIsoDate(options.registeredAt);
+  const isPremiumHint = options.isPremium === true;
+
+  if (!existing) {
+    const created = {
+      userId,
+      registeredAt: registeredAtHint || nowIso,
+      isPremium: isPremiumHint,
+      updatedAt: nowIso,
+    };
+    userEntitlements.set(userId, created);
+    return created;
+  }
+
+  if (registeredAtHint) {
+    existing.registeredAt = existing.registeredAt && existing.registeredAt < registeredAtHint
+      ? existing.registeredAt
+      : registeredAtHint;
+  }
+
+  if (isPremiumHint) {
+    existing.isPremium = true;
+  }
+
+  existing.updatedAt = nowIso;
+  userEntitlements.set(userId, existing);
+  return existing;
+}
+
+function buildEntitlementStatus(record) {
+  const trialDays = 14;
+  const now = new Date();
+  const registeredAt = new Date(record.registeredAt);
+  const trialEndsAt = new Date(registeredAt.getTime() + trialDays * 24 * 60 * 60 * 1000);
+  const trialMillisRemaining = trialEndsAt.getTime() - now.getTime();
+  const trialDaysRemaining = Math.max(0, Math.ceil(trialMillisRemaining / (24 * 60 * 60 * 1000)));
+  const trialActive = trialMillisRemaining > 0;
+  const hasFullAccess = Boolean(record.isPremium) || trialActive;
+
+  return {
+    userId: record.userId,
+    isPremium: Boolean(record.isPremium),
+    trialActive,
+    trialDaysRemaining,
+    trialEndsAt: trialEndsAt.toISOString(),
+    hasFullAccess,
+    source: 'server',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function removeMatching(list, predicate) {
+  if (!Array.isArray(list) || list.length === 0) return 0;
+  const originalLength = list.length;
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    if (predicate(list[i])) {
+      list.splice(i, 1);
+    }
+  }
+  return originalLength - list.length;
+}
+
+function deleteAccountDataByUserId(userId) {
+  let removed = 0;
+
+  if (userEntitlements.delete(userId)) {
+    removed += 1;
+  }
+
+  removed += removeMatching(familyContacts, item => item.userId === userId);
+  removed += removeMatching(
+    familyRequests,
+    item => item.fromUserId === userId || item.toUserId === userId,
+  );
+
+  const removedEventIds = [];
+  removed += removeMatching(events, item => {
+    const shouldRemove = item.hosterId === userId;
+    if (shouldRemove && item.id) {
+      removedEventIds.push(item.id);
+      delete eventInviteCodes[item.id];
+      delete eventInviteExpiresAt[item.id];
+      delete eventChatMessages[item.id];
+    }
+    return shouldRemove;
+  });
+
+  removed += removeMatching(
+    eventInvitations,
+    item =>
+      item.invitedUserId === userId ||
+      item.hostUserId === userId ||
+      removedEventIds.includes(item.eventId),
+  );
+
+  removed += removeMatching(
+    eventParticipations,
+    item => item.userId === userId || removedEventIds.includes(item.eventId),
+  );
+
+  removed += removeMatching(
+    paymentTransactions,
+    item => item.userId === userId || item.hostUserId === userId,
+  );
+
+  removed += removeMatching(eventChatReports, item => item.userId === userId);
+
+  for (const [eventId, messages] of Object.entries(eventChatMessages)) {
+    if (!Array.isArray(messages)) continue;
+    const before = messages.length;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i]?.userId === userId) {
+        messages.splice(i, 1);
+      }
+    }
+    removed += before - messages.length;
+    if (messages.length === 0) {
+      delete eventChatMessages[eventId];
+    }
+  }
+
+  removed += removeMatching(parentMatchingActions, item => item.userId === userId);
+
+  return removed;
+}
+
 // Routes
+
+app.post('/account/delete-data', (req, res) => {
+  const userId = (req.body.userId || '').toString().trim();
+  if (!userId) {
+    return res.status(400).json({ error: 'userId ist erforderlich' });
+  }
+
+  const removedEntries = deleteAccountDataByUserId(userId);
+  return res.json({ ok: true, userId, removedEntries });
+});
+
+app.get('/entitlements/:userId/status', (req, res) => {
+  const userId = (req.params.userId || '').toString().trim();
+  if (!userId) {
+    return res.status(400).json({ error: 'userId ist erforderlich' });
+  }
+
+  const hintPremium = `${req.query.isPremium || ''}`.toLowerCase() === 'true';
+  const record = ensureEntitlement(userId, {
+    registeredAt: req.query.registeredAt,
+    isPremium: hintPremium,
+  });
+  const item = buildEntitlementStatus(record);
+  return res.json({ item });
+});
+
+app.post('/entitlements/:userId/activate-premium', (req, res) => {
+  const userId = (req.params.userId || '').toString().trim();
+  if (!userId) {
+    return res.status(400).json({ error: 'userId ist erforderlich' });
+  }
+
+  const record = ensureEntitlement(userId, {
+    registeredAt: req.body.registeredAt,
+    isPremium: true,
+  });
+  record.isPremium = true;
+  record.updatedAt = new Date().toISOString();
+  userEntitlements.set(userId, record);
+
+  return res.status(201).json({ item: buildEntitlementStatus(record) });
+});
 
 // 0. Weekly Impulse abrufen
 app.get('/api/weekly-impulse', (req, res) => {
@@ -1090,12 +1541,23 @@ app.get('/events/:id/chat/access', (req, res) => {
 // 18. Payments
 app.post('/payments/stripe/initiate', (req, res) => {
   const body = req.body || {};
+  const amount = parsePositiveNumber(body.amount);
+  const eventId = (body.eventId || '').toString();
+  const hosterId = (body.hosterId || '').toString();
+
+  if (!eventId || !hosterId || amount == null) {
+    return res.status(400).json({
+      error: 'eventId, hosterId und amount > 0 sind erforderlich',
+    });
+  }
+
   res.status(201).json({
     item: {
       provider: 'stripe',
-      eventId: body.eventId || null,
-      hosterId: body.hosterId || null,
-      amount: Number(body.amount || 0),
+      mode: 'mock_backend',
+      eventId,
+      hosterId,
+      amount,
       clientSecret: `pi_mock_${Date.now()}`,
       status: 'requires_payment_method',
     },
@@ -1104,12 +1566,23 @@ app.post('/payments/stripe/initiate', (req, res) => {
 
 app.post('/payments/paypal/initiate', (req, res) => {
   const body = req.body || {};
+  const amount = parsePositiveNumber(body.amount);
+  const eventId = (body.eventId || '').toString();
+  const hosterId = (body.hosterId || '').toString();
+
+  if (!eventId || !hosterId || amount == null) {
+    return res.status(400).json({
+      error: 'eventId, hosterId und amount > 0 sind erforderlich',
+    });
+  }
+
   res.status(201).json({
     item: {
       provider: 'paypal',
-      eventId: body.eventId || null,
-      hosterId: body.hosterId || null,
-      amount: Number(body.amount || 0),
+      mode: 'mock_backend',
+      eventId,
+      hosterId,
+      amount,
       approvalUrl: `https://paypal.com/mock/approve/${Date.now()}`,
       token: `mock_token_${Date.now()}`,
       status: 'approval_pending',
@@ -1119,29 +1592,96 @@ app.post('/payments/paypal/initiate', (req, res) => {
 
 app.post('/payments/confirm', (req, res) => {
   const body = req.body || {};
+  const amount = parsePositiveNumber(body.amount);
+  const eventId = (body.eventId || '').toString();
+  const hosterId = (body.hosterId || '').toString();
+  const paymentMethod = (body.paymentMethod || 'stripe').toString();
+  const allowedMethods = new Set(['stripe', 'paypal', 'apple_iap', 'google_play']);
+  const normalizedStatus = normalizePaymentStatus(body.status || 'pending');
+  const providerVerified = body.providerVerified === true;
+  const providerTransactionRef = (body.providerTransactionRef || '').toString().trim();
+
+  if (!eventId || !hosterId || amount == null) {
+    return res.status(400).json({
+      error: 'eventId, hosterId und amount > 0 sind erforderlich',
+    });
+  }
+
+  if (!allowedMethods.has(paymentMethod)) {
+    return res.status(400).json({ error: 'Unbekannte paymentMethod' });
+  }
+
+  if (normalizedStatus == null) {
+    return res.status(400).json({ error: 'Ungueltiger payment status' });
+  }
+
+  if (normalizedStatus === 'completed' && !providerVerified) {
+    return res.status(409).json({
+      error: 'completed ist nur mit verifiziertem Provider-Event erlaubt',
+    });
+  }
+
+  if ((paymentMethod === 'stripe' || paymentMethod === 'paypal') && !providerTransactionRef) {
+    return res.status(400).json({
+      error: 'providerTransactionRef ist fuer Stripe/PayPal erforderlich',
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+
   const transaction = {
     id: generateId('txn'),
-    eventId: body.eventId || '',
-    hosterId: body.hosterId || 'host_demo_001',
-    amount: Number(body.amount || 0),
-    status: body.status || 'completed',
-    paymentMethod: body.paymentMethod || 'stripe',
+    mode: 'mock_backend',
+    eventId,
+    hosterId,
+    amount,
+    status: normalizedStatus,
+    paymentMethod,
+    providerTransactionRef: providerTransactionRef || null,
+    providerVerified,
     stripePaymentIntentId: body.stripePaymentIntentId || null,
-    createdAt: new Date().toISOString(),
-    completedAt: new Date().toISOString(),
+    createdAt: nowIso,
+    completedAt: normalizedStatus === 'completed' ? nowIso : null,
   };
 
   paymentTransactions.unshift(transaction);
 
-  const eventIndex = events.findIndex(event => event.id === transaction.eventId);
-  if (eventIndex !== -1) {
-    events[eventIndex] = {
-      ...events[eventIndex],
-      paymentDate: transaction.completedAt,
-    };
-  }
+  updateEventPaymentDateIfCompleted(transaction);
 
   res.status(201).json({ item: transaction });
+});
+
+app.post('/payments/provider-events', (req, res) => {
+  if (!allowClientProviderEvents) {
+    return res.status(403).json({
+      error: 'Client Provider-Events sind deaktiviert',
+    });
+  }
+
+  const body = req.body || {};
+  const targetStatus = normalizePaymentStatus(body.status);
+  const provider = (body.provider || '').toString().trim().toLowerCase();
+  const providerTransactionRef = (body.providerTransactionRef || '').toString().trim();
+  const transactionId = (body.transactionId || '').toString().trim();
+  const verified = body.verified === true;
+
+  if (targetStatus == null) {
+    return res.status(400).json({ error: 'Ungueltiger payment status' });
+  }
+
+  const result = applyProviderTransactionStatusUpdate({
+    provider,
+    providerTransactionRef,
+    targetStatus,
+    verified,
+    transactionId,
+  });
+
+  if (!result.ok) {
+    return res.status(result.httpStatus).json({ error: result.error });
+  }
+
+  return res.json({ item: result.item });
 });
 
 app.get('/payments/transactions', (req, res) => {
@@ -1173,6 +1713,12 @@ app.post('/payments/transactions/:id/refund', (req, res) => {
     return res.status(404).json({ error: 'Transaktion nicht gefunden' });
   }
 
+  if (paymentTransactions[index].status !== 'completed') {
+    return res.status(409).json({
+      error: 'Rueckerstattung nur fuer completed-Transaktionen erlaubt',
+    });
+  }
+
   paymentTransactions[index] = {
     ...paymentTransactions[index],
     status: 'refunded',
@@ -1180,6 +1726,38 @@ app.post('/payments/transactions/:id/refund', (req, res) => {
   };
 
   res.json({ item: paymentTransactions[index] });
+});
+
+app.post('/payments/transactions/:id/status', (req, res) => {
+  const index = paymentTransactions.findIndex(item => item.id === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+  }
+
+  const targetStatus = normalizePaymentStatus(req.body.status);
+  if (targetStatus == null) {
+    return res.status(400).json({ error: 'Ungueltiger Zielstatus' });
+  }
+
+  const current = paymentTransactions[index];
+  if (!canTransitionPaymentStatus(current.status, targetStatus)) {
+    return res.status(409).json({
+      error: `Statuswechsel ${current.status} -> ${targetStatus} nicht erlaubt`,
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+  const updated = {
+    ...current,
+    status: targetStatus,
+    updatedAt: nowIso,
+    completedAt: targetStatus === 'completed' ? (current.completedAt || nowIso) : current.completedAt,
+    failedAt: targetStatus === 'failed' ? nowIso : current.failedAt,
+    refundedAt: targetStatus === 'refunded' ? nowIso : current.refundedAt,
+  };
+
+  paymentTransactions[index] = updated;
+  return res.json({ item: updated });
 });
 
 // Health Check

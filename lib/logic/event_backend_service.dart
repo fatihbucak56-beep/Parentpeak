@@ -1,4 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/models/event_invitation.dart';
@@ -20,12 +24,19 @@ class EventBackendService {
   String get _eventsPath => APIConfig.getBackendEventsPath();
   String get _invitationsPath => APIConfig.getBackendEventInvitationsPath();
 
-  Future<List<MeetupEvent>> fetchEvents({String? status, String? hostUserId}) async {
+  Future<List<MeetupEvent>> fetchEvents({
+    String? status,
+    String? hostUserId,
+    int limit = 50,
+    int offset = 0,
+  }) async {
     if (_apiClient == null) return [];
     try {
       final query = <String, String>{
         if (status != null && status.isNotEmpty) 'status': status,
         if (hostUserId != null && hostUserId.isNotEmpty) 'hostUserId': hostUserId,
+        'limit': limit.toString(),
+        'offset': offset.toString(),
       };
       final payload = await _apiClient!.getJson(_appendQuery(_eventsPath, query));
       return _parseEventList(payload);
@@ -40,6 +51,8 @@ class EventBackendService {
     required double viewerLatitude,
     required double viewerLongitude,
     List<AgeGroup>? ageGroups,
+    int limit = 50,
+    int offset = 0,
   }) async {
     if (_apiClient == null) return [];
     try {
@@ -47,6 +60,8 @@ class EventBackendService {
         'viewerUserId': viewerUserId,
         'viewerLatitude': viewerLatitude.toString(),
         'viewerLongitude': viewerLongitude.toString(),
+        'limit': limit.toString(),
+        'offset': offset.toString(),
       };
       if (ageGroups != null && ageGroups.isNotEmpty) {
         query['ageGroups'] = ageGroups.map((e) => e.name).join(',');
@@ -91,6 +106,52 @@ class EventBackendService {
     } catch (e) {
       lastSyncError = 'Event konnte nicht gelöscht werden: $e';
       return false;
+    }
+  }
+
+  Future<MeetupEvent?> updateEvent(
+    String id,
+    Map<String, dynamic> fields, {
+    String? requestingUserId,
+  }) async {
+    if (_apiClient == null) return null;
+    try {
+      final body = <String, dynamic>{
+        ...fields,
+        if (requestingUserId != null) 'requestingUserId': requestingUserId,
+      };
+      final payload = await _apiClient!.putJson('$_eventsPath/item/$id', body);
+      return _parseSingleEvent(payload);
+    } catch (e) {
+      lastSyncError = 'Event konnte nicht aktualisiert werden: $e';
+      return null;
+    }
+  }
+
+  /// Uploads an image file and returns the public URL, or null on failure.
+  Future<String?> uploadImage(File imageFile) async {
+    if (_apiClient == null) return null;
+    try {
+      final baseUrl = _apiClient!.baseUrl;
+      final uri = Uri.parse('$baseUrl/uploads/image');
+      final request = http.MultipartRequest('POST', uri);
+      if (_apiClient!.authToken != null && _apiClient!.authToken!.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer ${_apiClient!.authToken}';
+      }
+      request.files.add(
+        await http.MultipartFile.fromPath('image', imageFile.path),
+      );
+      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final body = await streamed.stream.bytesToString();
+      if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
+        final decoded = jsonDecode(body) as Map<String, dynamic>;
+        return decoded['url']?.toString();
+      }
+      lastSyncError = 'Bild-Upload fehlgeschlagen: ${streamed.statusCode}';
+      return null;
+    } catch (e) {
+      lastSyncError = 'Bild-Upload fehlgeschlagen: $e';
+      return null;
     }
   }
 
@@ -379,7 +440,9 @@ class EventBackendService {
       try {
         final decoded = jsonDecode(payload);
         if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('EventBackendService._extractMap jsonDecode failed: $e');
+      }
     }
 
     return null;

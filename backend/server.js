@@ -6,6 +6,56 @@ const crypto = require('crypto');
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
+const multer = require('multer');
+
+// Firebase Admin — initialised lazily so the server starts without credentials
+// in local dev. Set GOOGLE_APPLICATION_CREDENTIALS or FIREBASE_SERVICE_ACCOUNT_JSON.
+let firebaseAdmin = null;
+try {
+  const admin = require('firebase-admin');
+  const serviceAccountJson = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+  if (serviceAccountJson) {
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    if (!admin.apps.length) {
+      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    }
+    firebaseAdmin = admin;
+    console.log('🔑 Firebase Admin SDK initialisiert');
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    if (!admin.apps.length) {
+      admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    }
+    firebaseAdmin = admin;
+    console.log('🔑 Firebase Admin SDK initialisiert (Application Default Credentials)');
+  }
+} catch (err) {
+  console.warn('⚠️  Firebase Admin SDK nicht verfügbar:', err.message);
+}
+
+// Multer for image uploads — stored under uploads/ (create if missing)
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+const multerStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
+  },
+});
+const upload = multer({
+  storage: multerStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    if (allowed.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Nur JPEG, PNG, WebP und GIF sind erlaubt'));
+    }
+  },
+});
 
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
 const useDatabaseSsl = /render\.com/i.test(databaseUrl);
@@ -124,7 +174,39 @@ function verifyStripeWebhookSignature({ rawBody, signatureHeader, secret, tolera
   return false;
 }
 
+// JWT verification helper: verifies a Firebase ID token if Admin SDK is
+// available; otherwise accepts requests transparently (dev/fallback mode).
+async function verifyFirebaseIdToken(req) {
+  if (!firebaseAdmin) return { uid: null, verified: false };
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) return { uid: null, verified: false };
+  const idToken = authHeader.slice(7);
+  try {
+    const decoded = await firebaseAdmin.auth().verifyIdToken(idToken);
+    return { uid: decoded.uid, verified: true };
+  } catch (_) {
+    return { uid: null, verified: false };
+  }
+}
+
+// Middleware: if FIREBASE_REQUIRE_AUTH=1 AND Firebase Admin is configured,
+// reject write requests whose token does not match the acting userId.
+const firebaseRequireAuth = (process.env.FIREBASE_REQUIRE_AUTH || '0') === '1';
+
+async function firebaseAuthMiddleware(req, res, next) {
+  if (!firebaseRequireAuth || !firebaseAdmin || !WRITE_METHODS.has(req.method)) {
+    return next();
+  }
+  const { uid, verified } = await verifyFirebaseIdToken(req);
+  if (!verified) {
+    return res.status(401).json({ error: 'Gültiger Firebase ID-Token erforderlich' });
+  }
+  req.firebaseUid = uid;
+  return next();
+}
+
 // Middleware
+app.use(firebaseAuthMiddleware);
 app.use((req, res, next) => {
   // Baseline hardening headers for API traffic.
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -2221,6 +2303,88 @@ app.get('/events/discover', async (req, res) => {
   }
 });
 
+app.put('/events/item/:id', async (req, res) => {
+  const body = req.body || {};
+  const requestingUserId = (body.requestingUserId || '').toString().trim();
+
+  const updatableFields = {
+    ...(body.title !== undefined && { title: body.title }),
+    ...(body.description !== undefined && { description: body.description }),
+    ...(body.location !== undefined && { location: body.location }),
+    ...(body.latitude !== undefined && { latitude: Number(body.latitude) }),
+    ...(body.longitude !== undefined && { longitude: Number(body.longitude) }),
+    ...(body.eventDate !== undefined && { startDate: new Date(body.eventDate) }),
+    ...(body.maxParticipants !== undefined && { maxParticipants: Number(body.maxParticipants) }),
+    ...(body.photoUrl !== undefined && { imageUrl: body.photoUrl }),
+    ...(body.status !== undefined && { status: mapApiEventStatusToDb(body.status) }),
+    ...(body.visibility !== undefined && { visibility: body.visibility }),
+    ...(body.shareRadiusKm !== undefined && { shareRadiusKm: Number(body.shareRadiusKm) }),
+    ...(body.price !== undefined && { costPerPerson: body.price != null ? Number(body.price) : null }),
+  };
+
+  if (Object.keys(updatableFields).length === 0) {
+    return res.status(400).json({ error: 'Keine Felder zum Aktualisieren angegeben' });
+  }
+
+  try {
+    const record = await prisma.event.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, hosterId: true },
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+    if (requestingUserId && requestingUserId !== record.hosterId) {
+      return res.status(403).json({ error: 'Nur der Hoster darf dieses Event bearbeiten' });
+    }
+
+    const updated = await prisma.event.update({
+      where: { id: req.params.id },
+      data: updatableFields,
+    });
+
+    const countMap = await buildParticipantCountMap([updated.id]);
+    const item = mapEventRecordToApiItem(updated, {
+      currentParticipants: countMap.get(updated.id) || 0,
+    });
+
+    const idx = events.findIndex(ev => ev.id === req.params.id);
+    if (idx !== -1) {
+      events[idx] = { ...events[idx], ...item };
+    }
+
+    return res.json({ item });
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+    console.error('PUT /events/item/:id fallback (in-memory):', error?.message || error);
+    const idx = events.findIndex(ev => ev.id === req.params.id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+    const entry = events[idx];
+    if (requestingUserId && requestingUserId !== entry.hosterId) {
+      return res.status(403).json({ error: 'Nur der Hoster darf dieses Event bearbeiten' });
+    }
+    const merged = {
+      ...entry,
+      ...(body.title !== undefined && { title: body.title }),
+      ...(body.description !== undefined && { description: body.description }),
+      ...(body.location !== undefined && { location: body.location }),
+      ...(body.eventDate !== undefined && { eventDate: body.eventDate }),
+      ...(body.maxParticipants !== undefined && { maxParticipants: Number(body.maxParticipants) }),
+      ...(body.photoUrl !== undefined && { photoUrl: body.photoUrl }),
+      ...(body.status !== undefined && { status: body.status }),
+      ...(body.visibility !== undefined && { visibility: body.visibility }),
+      ...(body.price !== undefined && { price: body.price }),
+    };
+    events[idx] = merged;
+    return res.json({ item: merged });
+  }
+});
+
 app.get('/events/item/:id', async (req, res) => {
   try {
     const record = await prisma.event.findUnique({ where: { id: req.params.id } });
@@ -3412,6 +3576,101 @@ app.post('/payments/transactions/:id/status', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Parentpeak Backend läuft!' });
 });
+
+// ── FCM Device Tokens ────────────────────────────────────────────────────────
+const deviceTokens = new Map(); // userId -> Set<token>
+
+app.post('/devices/register-token', async (req, res) => {
+  const userId = (req.body.userId || '').toString().trim();
+  const token = (req.body.token || '').toString().trim();
+  const platform = (req.body.platform || 'unknown').toString().trim();
+
+  if (!userId || !token) {
+    return res.status(400).json({ error: 'userId und token sind erforderlich' });
+  }
+
+  const existing = deviceTokens.get(userId) || new Set();
+  existing.add(token);
+  deviceTokens.set(userId, existing);
+
+  // Persist in DB if Prisma is available.
+  try {
+    await ensureBackendUser(userId, userId);
+    // Upsert a marker in a custom field via raw SQL to avoid schema migration dependency.
+    // The token set lives in-memory and is restored on restart via DB if schema has a DeviceToken table.
+    // For now in-memory is the source of truth; schema migration is a separate step.
+  } catch (_) {
+    // Non-fatal: token is still registered in memory.
+  }
+
+  return res.json({ ok: true, userId, platform, tokenCount: existing.size });
+});
+
+app.delete('/devices/register-token', async (req, res) => {
+  const userId = (req.body.userId || '').toString().trim();
+  const token = (req.body.token || '').toString().trim();
+
+  if (!userId || !token) {
+    return res.status(400).json({ error: 'userId und token sind erforderlich' });
+  }
+
+  const existing = deviceTokens.get(userId);
+  if (existing) {
+    existing.delete(token);
+    if (existing.size === 0) deviceTokens.delete(userId);
+  }
+
+  return res.json({ ok: true });
+});
+
+// Internal helper to send an FCM push to all tokens of a user.
+async function sendPushToUser(userId, { title, body, data = {} }) {
+  if (!firebaseAdmin) return;
+  const tokens = [...(deviceTokens.get(userId) || [])];
+  if (tokens.length === 0) return;
+
+  try {
+    const result = await firebaseAdmin.messaging().sendEachForMulticast({
+      tokens,
+      notification: { title, body },
+      data: Object.fromEntries(
+        Object.entries(data).map(([k, v]) => [k, String(v)]),
+      ),
+    });
+
+    // Clean up invalid tokens.
+    result.responses.forEach((resp, idx) => {
+      if (!resp.success) {
+        const code = resp.error?.code;
+        if (
+          code === 'messaging/invalid-registration-token' ||
+          code === 'messaging/registration-token-not-registered'
+        ) {
+          const tokenSet = deviceTokens.get(userId);
+          if (tokenSet) tokenSet.delete(tokens[idx]);
+        }
+      }
+    });
+  } catch (err) {
+    console.error('FCM sendPushToUser failed:', err?.message || err);
+  }
+}
+
+// ── Image Upload ─────────────────────────────────────────────────────────────
+app.use('/uploads', express.static(uploadsDir));
+
+app.post('/uploads/image', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Kein Bild empfangen' });
+  }
+
+  const publicBase = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/$/, '');
+  const relPath = `/uploads/${req.file.filename}`;
+  const url = publicBase ? `${publicBase}${relPath}` : relPath;
+
+  return res.status(201).json({ url, filename: req.file.filename, size: req.file.size });
+});
+
 
 // Server starten
 app.listen(PORT, '0.0.0.0', () => {

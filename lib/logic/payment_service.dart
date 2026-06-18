@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/logic/backend_api_client.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
@@ -13,6 +15,15 @@ class PaymentService {
   String? lastSyncError;
 
   bool get isBackendEnabled => _apiClient != null;
+
+  bool get _allowMockFallback => !isBackendEnabled || !kReleaseMode;
+
+  Never _throwBackendRequired(String context) {
+    throw StateError(
+      lastSyncError ??
+          '$context fehlgeschlagen und Mock-Fallback ist in Release deaktiviert.',
+    );
+  }
 
   PaymentTransaction _storeLocalTransaction(PaymentTransaction transaction) {
     final index = _transactions.indexWhere((item) => item.id == transaction.id);
@@ -41,12 +52,16 @@ class PaymentService {
     );
   }
 
+  /// Presents the Stripe PaymentSheet and returns the clientSecret on success.
+  /// In non-release builds without a backend the function falls back to a mock
+  /// clientSecret so the flow can still be exercised in testing.
   Future<Map<String, dynamic>> initiateStripePayment({
     required String eventId,
     required String hosterId,
     required double amount,
   }) async {
     lastSyncError = null;
+    String? clientSecret;
 
     if (_apiClient != null) {
       try {
@@ -60,20 +75,50 @@ class PaymentService {
           },
         );
 
-        if (payload is Map<String, dynamic>) {
-          return payload['item'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(payload['item'] as Map)
-              : payload;
-        }
+        final data = payload is Map<String, dynamic>
+            ? (payload['item'] is Map<String, dynamic>
+                ? Map<String, dynamic>.from(payload['item'] as Map)
+                : payload)
+            : <String, dynamic>{};
+        clientSecret = data['clientSecret']?.toString();
       } catch (e) {
         lastSyncError = 'Stripe-Initialisierung fehlgeschlagen: $e';
+        if (!_allowMockFallback) {
+          _throwBackendRequired('Stripe-Initialisierung');
+        }
       }
     }
 
-    await Future.delayed(const Duration(milliseconds: 1000));
+    if (clientSecret == null) {
+      if (!_allowMockFallback) {
+        _throwBackendRequired('Stripe-Initialisierung');
+      }
+      await Future.delayed(const Duration(milliseconds: 400));
+      clientSecret = 'pi_mock_${DateTime.now().millisecondsSinceEpoch}_secret_mock';
+    }
+
+    // Only show PaymentSheet for real Stripe client secrets (not mocks).
+    if (!clientSecret.contains('_mock_')) {
+      try {
+        await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+            paymentIntentClientSecret: clientSecret,
+            merchantDisplayName: 'Parentpeak',
+            style: ThemeMode.system,
+          ),
+        );
+        await Stripe.instance.presentPaymentSheet();
+      } on StripeException catch (e) {
+        lastSyncError = 'Stripe-Zahlung fehlgeschlagen: ${e.error.localizedMessage ?? e.toString()}';
+        rethrow;
+      }
+    }
+
     return {
-      'clientSecret': 'pi_mock_${DateTime.now().millisecondsSinceEpoch}',
-      'status': 'requires_payment_method',
+      'clientSecret': clientSecret,
+      'status': clientSecret.contains('_mock_')
+          ? 'mock_succeeded'
+          : 'succeeded',
     };
   }
 
@@ -103,7 +148,14 @@ class PaymentService {
         }
       } catch (e) {
         lastSyncError = 'PayPal-Initialisierung fehlgeschlagen: $e';
+        if (!_allowMockFallback) {
+          _throwBackendRequired('PayPal-Initialisierung');
+        }
       }
+    }
+
+    if (!_allowMockFallback) {
+      _throwBackendRequired('PayPal-Initialisierung');
     }
 
     await Future.delayed(const Duration(milliseconds: 1000));
@@ -120,6 +172,9 @@ class PaymentService {
     required double amount,
     required String paymentMethod,
     String? stripePaymentIntentId,
+    String? providerTransactionRef,
+    String initialStatus = 'pending',
+    bool providerVerified = false,
   }) async {
     lastSyncError = null;
 
@@ -133,6 +188,9 @@ class PaymentService {
             'amount': amount,
             'paymentMethod': paymentMethod,
             'stripePaymentIntentId': stripePaymentIntentId,
+            'providerTransactionRef': providerTransactionRef,
+            'status': initialStatus,
+            'providerVerified': providerVerified,
             'schemaVersion': APIConfig.getBackendApiVersion(),
           },
         );
@@ -147,7 +205,14 @@ class PaymentService {
         }
       } catch (e) {
         lastSyncError = 'Zahlungsbestaetigung fehlgeschlagen: $e';
+        if (!_allowMockFallback) {
+          _throwBackendRequired('Zahlungsbestaetigung');
+        }
       }
+    }
+
+    if (!_allowMockFallback) {
+      _throwBackendRequired('Zahlungsbestaetigung');
     }
 
     await Future.delayed(const Duration(milliseconds: 800));
@@ -157,14 +222,79 @@ class PaymentService {
       eventId: eventId,
       hosterId: hosterId,
       amount: amount,
-      status: 'completed',
+      status: initialStatus,
       paymentMethod: paymentMethod,
       stripePaymentIntentId: stripePaymentIntentId,
       createdAt: DateTime.now(),
-      completedAt: DateTime.now(),
+      completedAt: initialStatus == 'completed' ? DateTime.now() : null,
     );
 
     return _storeLocalTransaction(transaction);
+  }
+
+  Future<PaymentTransaction?> reportProviderEvent({
+    required String transactionId,
+    required String provider,
+    required String providerTransactionRef,
+    required String status,
+    required bool verified,
+  }) async {
+    lastSyncError = null;
+
+    if (_apiClient != null) {
+      try {
+        final payload = await _apiClient!.postJsonAny(
+          APIConfig.getBackendPaymentsProviderEventsPath(),
+          {
+            'transactionId': transactionId,
+            'provider': provider,
+            'providerTransactionRef': providerTransactionRef,
+            'status': status,
+            'verified': verified,
+            'schemaVersion': APIConfig.getBackendApiVersion(),
+          },
+        );
+
+        final raw = payload is Map<String, dynamic>
+            ? (payload['item'] is Map<String, dynamic>
+                ? Map<String, dynamic>.from(payload['item'] as Map)
+                : payload)
+            : <String, dynamic>{};
+        if (raw.isNotEmpty) {
+          return _storeLocalTransaction(_parseTransaction(raw));
+        }
+        return null;
+      } catch (e) {
+        lastSyncError = 'Provider-Event konnte nicht verarbeitet werden: $e';
+        if (!_allowMockFallback) {
+          _throwBackendRequired('Provider-Event Verarbeitung');
+        }
+      }
+    }
+
+    if (!_allowMockFallback) {
+      _throwBackendRequired('Provider-Event Verarbeitung');
+    }
+
+    final index = _transactions.indexWhere((transaction) => transaction.id == transactionId);
+    if (index == -1) {
+      return null;
+    }
+
+    final current = _transactions[index];
+    final updated = PaymentTransaction(
+      id: current.id,
+      eventId: current.eventId,
+      hosterId: current.hosterId,
+      amount: current.amount,
+      status: status,
+      paymentMethod: current.paymentMethod,
+      stripePaymentIntentId: current.stripePaymentIntentId,
+      createdAt: current.createdAt,
+      completedAt: status == 'completed' ? DateTime.now() : current.completedAt,
+    );
+
+    return _storeLocalTransaction(updated);
   }
 
   Future<PaymentTransaction?> getTransaction(String transactionId) async {

@@ -136,6 +136,7 @@ class FamilyCircleService {
   Future<void> respondToRequest({
     required String requestId,
     required bool accept,
+    String? actingUserId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 180));
 
@@ -166,12 +167,92 @@ class FamilyCircleService {
           normalizedPath,
           {
             'status': accept ? 'accepted' : 'declined',
+            if (actingUserId != null) 'actingUserId': actingUserId,
             'updatedAt': DateTime.now().toUtc().toIso8601String(),
             'schemaVersion': APIConfig.getBackendApiVersion(),
           },
         );
       } catch (_) {
         // Local state remains source of truth if backend update fails.
+      }
+    }
+  }
+
+  /// Sends a new connection request to [toUserId] from [fromUserId].
+  /// [actingUserId] must equal [fromUserId] to pass the backend security guard.
+  Future<FamilyConnectionRequest?> sendRequest({
+    required String fromUserId,
+    required String toUserId,
+    String? fromDisplayName,
+  }) async {
+    // Optimistically add to local state.
+    final localReq = FamilyConnectionRequest(
+      id: 'req_local_${DateTime.now().microsecondsSinceEpoch}',
+      fromUserId: fromUserId,
+      toUserId: toUserId,
+      fromDisplayName: fromDisplayName ?? fromUserId,
+      sentAt: DateTime.now(),
+    );
+    _incomingRequests.add(localReq);
+
+    if (_apiClient != null) {
+      try {
+        final payload = await _apiClient!.postJson(
+          APIConfig.getBackendFamilyRequestsPath(),
+          {
+            'fromUserId': fromUserId,
+            'toUserId': toUserId,
+            'actingUserId': fromUserId,
+            'status': 'pending',
+            'schemaVersion': APIConfig.getBackendApiVersion(),
+          },
+        );
+        final raw = payload['item'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(payload['item'] as Map)
+            : payload;
+        if ((raw['id'] ?? '').toString().isNotEmpty) {
+          // Replace the optimistic entry with the server-issued one.
+          final idx = _incomingRequests.indexWhere((r) => r.id == localReq.id);
+          final serverReq = FamilyConnectionRequest(
+            id: raw['id'].toString(),
+            fromUserId: fromUserId,
+            toUserId: toUserId,
+            fromDisplayName: fromDisplayName ?? fromUserId,
+            sentAt: DateTime.tryParse((raw['createdAt'] ?? '').toString()) ??
+                DateTime.now(),
+          );
+          if (idx != -1) {
+            _incomingRequests[idx] = serverReq;
+          }
+          return serverReq;
+        }
+      } catch (_) {
+        // Local optimistic entry stays.
+      }
+    }
+    return localReq;
+  }
+
+  /// Removes a family connection request by [requestId].
+  /// [actingUserId] is forwarded to the backend security guard.
+  Future<void> deleteRequest({
+    required String requestId,
+    String? actingUserId,
+  }) async {
+    _incomingRequests.removeWhere((r) => r.id == requestId);
+
+    if (_apiClient != null) {
+      try {
+        final basePath = APIConfig.getBackendFamilyRequestsPath();
+        final normalizedPath = basePath.endsWith('/')
+            ? '${basePath.substring(0, basePath.length - 1)}/$requestId'
+            : '$basePath/$requestId';
+        final queryParam = actingUserId != null
+            ? '?actingUserId=${Uri.encodeComponent(actingUserId)}'
+            : '';
+        await _apiClient!.delete('$normalizedPath$queryParam');
+      } catch (_) {
+        // Local deletion already applied.
       }
     }
   }

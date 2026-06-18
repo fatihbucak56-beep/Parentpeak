@@ -31,9 +31,11 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.2
   pdf: ^3.11.3
   printing: ^5.14.3
   crypto: ^3.0.7
+  flutter_stripe: ^11.2.0
 
 dev_dependencies:
   flutter_test:
@@ -46,6 +48,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - .env
     - assets/images/
     - assets/icons/

@@ -1,6 +1,8 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:trusted_circle_demo/logic/backend_api_client.dart';
 
 class NotificationService {
   NotificationService._();
@@ -13,7 +15,6 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
     tz.initializeTimeZones();
-    // Fallback Zeitzone (optional anpassen)
     tz.setLocalLocation(tz.getLocation('Europe/Berlin'));
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -40,6 +41,76 @@ class NotificationService {
     ));
 
     _initialized = true;
+  }
+
+  /// Wire up FCM: request permission, get token, register with backend,
+  /// and handle foreground messages as local notifications.
+  Future<void> initFcm({BackendApiClient? apiClient, String? userId}) async {
+    final messaging = FirebaseMessaging.instance;
+
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional) {
+      final token = await messaging.getToken();
+      if (token != null && apiClient != null && userId != null) {
+        try {
+          await apiClient.registerFcmToken(
+            userId: userId,
+            token: token,
+          );
+        } catch (_) {
+          // Non-fatal: local notifications still work.
+        }
+      }
+
+      // Re-register whenever the token is refreshed.
+      messaging.onTokenRefresh.listen((newToken) async {
+        if (apiClient != null && userId != null) {
+          try {
+            await apiClient.registerFcmToken(
+              userId: userId,
+              token: newToken,
+            );
+          } catch (_) {}
+        }
+      });
+
+      // Show foreground FCM messages as local notifications.
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        final notification = message.notification;
+        if (notification != null) {
+          showLocalNotification(
+            title: notification.title ?? 'Parentpeak',
+            body: notification.body ?? '',
+          );
+        }
+      });
+    }
+  }
+
+  /// Display an immediate local notification (no scheduling).
+  Future<void> showLocalNotification({
+    required String title,
+    required String body,
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      'parentpeak_events',
+      'Terminerinnerungen',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const iosDetails = DarwinNotificationDetails();
+    await _plugin.show(
+      DateTime.now().millisecondsSinceEpoch % 2147483647,
+      title,
+      body,
+      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+    );
   }
 
   Future<void> scheduleReminder(

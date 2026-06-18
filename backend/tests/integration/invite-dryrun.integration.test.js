@@ -116,6 +116,20 @@ async function getJson(baseUrl, route) {
   return { response, payload };
 }
 
+async function deletePath(baseUrl, route) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    method: 'DELETE',
+  });
+
+  let payload = null;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    payload = await response.json();
+  }
+
+  return { response, payload };
+}
+
 test('invite code persists in DB across restart and delete-data dryRun is non-destructive', async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   const inviteHostUser = `it_invite_host_${suffix}`;
@@ -257,6 +271,123 @@ test('invite join rejects expired or invalid codes and dryRun delete requires us
     const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
     throw new Error(`${error.message}\n\n${extraLogs}`);
   } finally {
+    await stopServer(server?.child);
+  }
+});
+
+test('discover enforces public, familyCircle, privateOnly and inviteOnly visibility', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const viewerUserId = 'host_demo_001';
+  const publicHostUser = `it_discover_public_host_${suffix}`;
+  const privateHostUser = `it_discover_private_host_${suffix}`;
+  const inviteHostUser = `it_discover_invite_host_${suffix}`;
+
+  let server;
+  const createdEventIds = [];
+
+  try {
+    server = startServer(3028);
+    await waitForHealth(server.baseUrl);
+
+    const publicEvent = await postJson(server.baseUrl, '/events', {
+      hosterId: publicHostUser,
+      title: `IT Discover Public ${suffix}`,
+      visibility: 'publicNearby',
+      eventDate: '2026-07-05T10:00:00.000Z',
+    });
+    assert.equal(publicEvent.response.status, 201);
+    const publicEventId = publicEvent.payload?.item?.id;
+    createdEventIds.push(publicEventId);
+
+    const familyEvent = await postJson(server.baseUrl, '/events', {
+      hosterId: 'host_001',
+      title: `IT Discover Family ${suffix}`,
+      visibility: 'familyCircle',
+      eventDate: '2026-07-05T11:00:00.000Z',
+    });
+    assert.equal(familyEvent.response.status, 201);
+    const familyEventId = familyEvent.payload?.item?.id;
+    createdEventIds.push(familyEventId);
+
+    const privateEvent = await postJson(server.baseUrl, '/events', {
+      hosterId: privateHostUser,
+      title: `IT Discover Private ${suffix}`,
+      visibility: 'privateOnly',
+      eventDate: '2026-07-05T12:00:00.000Z',
+    });
+    assert.equal(privateEvent.response.status, 201);
+    const privateEventId = privateEvent.payload?.item?.id;
+    createdEventIds.push(privateEventId);
+
+    const inviteOnlyEvent = await postJson(server.baseUrl, '/events', {
+      hosterId: inviteHostUser,
+      title: `IT Discover Invite ${suffix}`,
+      visibility: 'inviteOnly',
+      eventDate: '2026-07-05T13:00:00.000Z',
+      invitedUserIds: [viewerUserId],
+    });
+    assert.equal(inviteOnlyEvent.response.status, 201);
+    const inviteOnlyEventId = inviteOnlyEvent.payload?.item?.id;
+    const inviteCode = inviteOnlyEvent.payload?.item?.inviteCode;
+    createdEventIds.push(inviteOnlyEventId);
+    assert.ok(inviteCode);
+
+    const discoverBeforeJoin = await getJson(
+      server.baseUrl,
+      `/events/discover?viewerUserId=${viewerUserId}`,
+    );
+    assert.equal(discoverBeforeJoin.response.status, 200);
+    const beforeJoinIds = new Set((discoverBeforeJoin.payload?.items || []).map(item => item.id));
+
+    assert.ok(beforeJoinIds.has(publicEventId));
+    assert.ok(beforeJoinIds.has(familyEventId));
+    assert.ok(!beforeJoinIds.has(privateEventId));
+    assert.ok(!beforeJoinIds.has(inviteOnlyEventId));
+
+    const joinInvite = await postJson(server.baseUrl, '/events/invitations/join', {
+      code: inviteCode,
+      userId: viewerUserId,
+    });
+    assert.equal(joinInvite.response.status, 201);
+
+    const discoverAfterJoin = await getJson(
+      server.baseUrl,
+      `/events/discover?viewerUserId=${viewerUserId}`,
+    );
+    assert.equal(discoverAfterJoin.response.status, 200);
+    const afterJoinIds = new Set((discoverAfterJoin.payload?.items || []).map(item => item.id));
+
+    assert.ok(afterJoinIds.has(publicEventId));
+    assert.ok(afterJoinIds.has(familyEventId));
+    assert.ok(!afterJoinIds.has(privateEventId));
+    assert.ok(afterJoinIds.has(inviteOnlyEventId));
+
+    const discoverForPrivateHost = await getJson(
+      server.baseUrl,
+      `/events/discover?viewerUserId=${privateHostUser}`,
+    );
+    assert.equal(discoverForPrivateHost.response.status, 200);
+    const privateHostIds = new Set((discoverForPrivateHost.payload?.items || []).map(item => item.id));
+    assert.ok(privateHostIds.has(privateEventId));
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    if (server) {
+      for (const eventId of createdEventIds) {
+        if (!eventId) continue;
+        try {
+          await deletePath(server.baseUrl, `/events/item/${eventId}`);
+        } catch (_) {
+          // Ignore cleanup errors in tests.
+        }
+      }
+
+      await postJson(server.baseUrl, '/account/delete-data', { userId: publicHostUser });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: privateHostUser });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: inviteHostUser });
+    }
+
     await stopServer(server?.child);
   }
 });

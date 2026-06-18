@@ -207,3 +207,56 @@ test('invite code persists in DB across restart and delete-data dryRun is non-de
     await stopServer(serverB?.child);
   }
 });
+
+test('invite join rejects expired or invalid codes and dryRun delete requires userId', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const inviteHostUser = `it_invite_negative_host_${suffix}`;
+  const inviteJoinUser = `it_invite_negative_join_${suffix}`;
+
+  let server;
+
+  try {
+    server = startServer(3027);
+    await waitForHealth(server.baseUrl);
+
+    const createExpiredInviteEvent = await postJson(server.baseUrl, '/events', {
+      hosterId: inviteHostUser,
+      title: `IT Expired Invite Event ${suffix}`,
+      visibility: 'inviteOnly',
+      eventDate: '2026-07-04T10:00:00.000Z',
+      inviteCodeExpiresAt: '2001-01-01T00:00:00.000Z',
+      invitedUserIds: [inviteJoinUser],
+    });
+
+    assert.equal(createExpiredInviteEvent.response.status, 201);
+    const expiredInviteCode = createExpiredInviteEvent.payload?.item?.inviteCode;
+    assert.ok(expiredInviteCode);
+
+    const joinExpiredCode = await postJson(server.baseUrl, '/events/invitations/join', {
+      code: expiredInviteCode,
+      userId: inviteJoinUser,
+    });
+    assert.equal(joinExpiredCode.response.status, 404);
+    assert.match(joinExpiredCode.payload?.error || '', /ungültig|abgelaufen/i);
+
+    const joinInvalidCode = await postJson(server.baseUrl, '/events/invitations/join', {
+      code: 'PP-INVALID-CODE',
+      userId: inviteJoinUser,
+    });
+    assert.equal(joinInvalidCode.response.status, 404);
+    assert.match(joinInvalidCode.payload?.error || '', /ungültig|abgelaufen/i);
+
+    const dryRunWithoutUser = await postJson(server.baseUrl, '/account/delete-data?dryRun=true', {});
+    assert.equal(dryRunWithoutUser.response.status, 400);
+    assert.match(dryRunWithoutUser.payload?.error || '', /userId/i);
+
+    // Best-effort cleanup of created test users.
+    await postJson(server.baseUrl, '/account/delete-data', { userId: inviteHostUser });
+    await postJson(server.baseUrl, '/account/delete-data', { userId: inviteJoinUser });
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    await stopServer(server?.child);
+  }
+});

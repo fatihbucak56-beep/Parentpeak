@@ -1,0 +1,289 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTHENTICATION & USERS
+// ============================================================================
+
+model User {
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  passwordHash          String
+  passwordSalt          String
+  firstName             String?
+  lastName              String?
+  avatar                String?
+  bio                   String?
+  
+  // Trial/Premium Entitlements
+  createdAt             DateTime @default(now())
+  trialExpiresAt        DateTime?
+  isPremium             Boolean  @default(false)
+  premiumExpiresAt      DateTime?
+  
+  // Relations
+  families              Family[]
+  hostedEvents          Event[]  @relation("EventHost")
+  eventParticipations   EventParticipation[]
+  paymentTransactions   PaymentTransaction[]
+  messages              Message[]
+  chatReports           ChatReport[]
+  
+  @@index([email])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// FAMILY & SOCIAL
+// ============================================================================
+
+model Family {
+  id                    String   @id @default(cuid())
+  name                  String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  createdById           String
+  createdBy             User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  
+  members               User[]
+  events                Event[]
+  todos                 Todo[]
+  shoppingItems         ShoppingItem[]
+  
+  @@index([createdById])
+}
+
+model FamilyRequest {
+  id                    String   @id @default(cuid())
+  fromUserId            String
+  toUserId              String
+  status                String   @default("pending") // pending, accepted, declined
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+// ============================================================================
+// EVENTS
+// ============================================================================
+
+model Event {
+  id                    String   @id @default(cuid())
+  title                 String
+  description           String?
+  
+  hosterId              String
+  hoster                User     @relation("EventHost", fields: [hosterId], references: [id], onDelete: Cascade)
+  
+  familyId              String?
+  family                Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  
+  startDate             DateTime
+  endDate               DateTime?
+  location              String?
+  latitude              Float?
+  longitude             Float?
+  price                 Decimal? @db.Decimal(10, 2)
+  maxParticipants       Int?
+  ageGroupMin           Int?
+  ageGroupMax           Int?
+  
+  visibility            String   @default("public") // public, invite-only
+  inviteCode            String?  @unique
+  inviteCodeExpiresAt   DateTime?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relations
+  participations        EventParticipation[]
+  chats                 EventChat[]
+  
+  @@index([hosterId])
+  @@index([familyId])
+  @@index([createdAt])
+  @@index([startDate])
+}
+
+model EventParticipation {
+  id                    String   @id @default(cuid())
+  
+  eventId               String
+  event                 Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status                String   @default("pending") // pending, approved, declined
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+// ============================================================================
+// EVENT CHAT & MESSAGING
+// ============================================================================
+
+model EventChat {
+  id                    String   @id @default(cuid())
+  
+  eventId               String
+  event                 Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  messages              Message[]
+  
+  createdAt             DateTime @default(now())
+  
+  @@index([eventId])
+}
+
+model Message {
+  id                    String   @id @default(cuid())
+  content               String
+  
+  senderId              String
+  sender                User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  eventChatId           String?
+  eventChat             EventChat? @relation(fields: [eventChatId], references: [id], onDelete: Cascade)
+  
+  hasBeenReported       Boolean  @default(false)
+  reportReason          String?
+  
+  createdAt             DateTime @default(now())
+  
+  @@index([senderId])
+  @@index([eventChatId])
+}
+
+model ChatReport {
+  id                    String   @id @default(cuid())
+  
+  reporterId            String
+  reporter              User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  messageId             String
+  reason                String
+  details               String?
+  
+  createdAt             DateTime @default(now())
+  
+  @@index([reporterId])
+  @@index([messageId])
+}
+
+// ============================================================================
+// PAYMENTS & TRANSACTIONS
+// ============================================================================
+
+model PaymentTransaction {
+  id                    String   @id @default(cuid())
+  
+  // Stripe Integration
+  stripePaymentIntentId String?  @unique
+  stripeTxnId           String?
+  
+  // User & Amount
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  amount                Decimal  @db.Decimal(10, 2)
+  currency              String   @default("EUR")
+  status                String   @default("initiated") // initiated, pending, completed, failed, refunded
+  
+  // Idempotency Key (prevent duplicate charges on retry)
+  idempotencyKey        String?  @unique
+  
+  // Audit Trail
+  createdByType         String   // webhook, api, manual
+  webhookId             String?  // Stripe webhook ID for tracking
+  verifiedAt            DateTime?
+  verificationDetails   String?  @db.Json
+  
+  // Refund Tracking
+  refundedAmount        Decimal? @db.Decimal(10, 2)
+  refundedAt            DateTime?
+  refundReason          String?
+  
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([stripeTxnId])
+  @@index([stripePaymentIntentId])
+}
+
+// ============================================================================
+// MARKETPLACE
+// ============================================================================
+
+model Provider {
+  id                    String   @id @default(cuid())
+  name                  String
+  category              String
+  description           String?
+  website               String?
+  rating                Decimal? @db.Decimal(3, 2)
+  ratingCount           Int      @default(0)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([category])
+}
+
+// ============================================================================
+// TODOS & SHOPPING
+// ============================================================================
+
+model Todo {
+  id                    String   @id @default(cuid())
+  
+  familyId              String
+  family                Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  
+  title                 String
+  completed             Boolean  @default(false)
+  priority              Int      @default(0)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([familyId])
+  @@index([completed])
+}
+
+model ShoppingItem {
+  id                    String   @id @default(cuid())
+  
+  familyId              String
+  family                Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  
+  item                  String
+  quantity              Int      @default(1)
+  completed             Boolean  @default(false)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([familyId])
+  @@index([completed])
+}

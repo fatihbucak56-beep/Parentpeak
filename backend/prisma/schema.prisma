@@ -106,6 +106,10 @@ model Event {
   // Event Status & Type
   status                String   @default("upcoming") // upcoming, ongoing, completed, cancelled
   eventType             String   @default("generic") // generic, birthday, meeting, outing, etc.
+  visibility            String   @default("publicNearby") // publicNearby, familyCircle, privateOnly, inviteOnly
+  shareRadiusKm         Float    @default(25)
+  inviteCode            String?  @unique
+  inviteCodeExpiresAt   DateTime?
   
   // Pricing (optional)
   costPerPerson         Decimal? @db.Decimal(10, 2)
@@ -125,6 +129,7 @@ model Event {
   @@index([hosterId])
   @@index([familyId])
   @@index([status])
+  @@index([visibility])
   @@index([createdAt])
 }
 

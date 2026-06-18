@@ -517,6 +517,11 @@ function isInviteExpired(eventId) {
   return new Date() > new Date(expiresAt);
 }
 
+function isInviteExpiredAt(expiresAt) {
+  if (!expiresAt) return false;
+  return new Date() > new Date(expiresAt);
+}
+
 function canViewerSeeEvent(event, viewerUserId) {
   if (!event || event.status !== 'active') return false;
   if (event.hosterId === viewerUserId) return true;
@@ -754,10 +759,12 @@ function mapEventRecordToApiItem(record, options = {}) {
     photoUrl: record.imageUrl || memoryEvent?.photoUrl || '',
     status: mapDbEventStatusToApi(record.status),
     price: record.costPerPerson != null ? Number(record.costPerPerson) : (memoryEvent?.price ?? null),
-    visibility: memoryEvent?.visibility || 'publicNearby',
-    shareRadiusKm: Number(memoryEvent?.shareRadiusKm || 25),
+    visibility: record.visibility || memoryEvent?.visibility || 'publicNearby',
+    shareRadiusKm: Number(record.shareRadiusKm || memoryEvent?.shareRadiusKm || 25),
     invitedUserIds: Array.isArray(memoryEvent?.invitedUserIds) ? memoryEvent.invitedUserIds : [],
-    inviteCodeExpiresAt: eventInviteExpiresAt[record.id] || memoryEvent?.inviteCodeExpiresAt || null,
+    inviteCode: record.inviteCode || eventInviteCodes[record.id] || null,
+    inviteCodeExpiresAt:
+      record.inviteCodeExpiresAt || eventInviteExpiresAt[record.id] || memoryEvent?.inviteCodeExpiresAt || null,
   };
 }
 
@@ -1157,6 +1164,55 @@ function removeMatching(list, predicate) {
   return originalLength - list.length;
 }
 
+function countAccountDataByUserIdInMemory(userId) {
+  let removed = 0;
+
+  if (userEntitlements.has(userId)) {
+    removed += 1;
+  }
+
+  removed += familyContacts.filter(item => item.userId === userId).length;
+  removed += familyRequests.filter(
+    item => item.fromUserId === userId || item.toUserId === userId,
+  ).length;
+
+  const removedEventIds = events
+    .filter(item => item.hosterId === userId)
+    .map(item => item.id)
+    .filter(Boolean);
+  removed += removedEventIds.length;
+
+  removed += eventInvitations.filter(
+    item =>
+      item.invitedUserId === userId ||
+      item.hostUserId === userId ||
+      removedEventIds.includes(item.eventId),
+  ).length;
+
+  removed += eventParticipations.filter(
+    item => item.userId === userId || removedEventIds.includes(item.eventId),
+  ).length;
+
+  removed += paymentTransactions.filter(
+    item => item.userId === userId || item.hostUserId === userId,
+  ).length;
+
+  removed += eventChatReports.filter(item => item.userId === userId).length;
+
+  for (const [eventId, messages] of Object.entries(eventChatMessages)) {
+    if (!Array.isArray(messages)) continue;
+    if (removedEventIds.includes(eventId)) {
+      removed += messages.length;
+      continue;
+    }
+    removed += messages.filter(item => item?.userId === userId).length;
+  }
+
+  removed += parentMatchingActions.filter(item => item.userId === userId).length;
+
+  return removed;
+}
+
 function deleteAccountDataByUserIdInMemory(userId) {
   let removed = 0;
 
@@ -1221,11 +1277,36 @@ function deleteAccountDataByUserIdInMemory(userId) {
   return removed;
 }
 
-async function deleteAccountDataByUserIdPrisma(userId) {
+async function deleteAccountDataByUserIdPrisma(userId, options = {}) {
   const hostedEvents = await prisma.event.findMany({
     where: { hosterId: userId },
     select: { id: true },
   });
+
+  const familyRequestCount = await prisma.familyRequest.count({
+    where: {
+      OR: [{ fromUserId: userId }, { toUserId: userId }],
+    },
+  });
+
+  const hostAuditPaymentCount = await prisma.paymentTransaction.count({
+    where: {
+      auditDetails: {
+        path: ['hosterId'],
+        equals: userId,
+      },
+    },
+  });
+
+  const userCount = await prisma.user.count({ where: { id: userId } });
+
+  if (options.dryRun === true) {
+    return {
+      removed: familyRequestCount + hostAuditPaymentCount + userCount,
+      hostedEventIds: hostedEvents.map(item => item.id),
+      dryRun: true,
+    };
+  }
 
   let removed = 0;
   removed += (await prisma.familyRequest.deleteMany({
@@ -1255,24 +1336,33 @@ async function deleteAccountDataByUserIdPrisma(userId) {
 
 app.post('/account/delete-data', async (req, res) => {
   const userId = (req.body.userId || '').toString().trim();
+  const dryRun =
+    String(req.query.dryRun || req.body.dryRun || '')
+      .toLowerCase()
+      .trim() === 'true';
   if (!userId) {
     return res.status(400).json({ error: 'userId ist erforderlich' });
   }
 
   try {
-    const prismaResult = await deleteAccountDataByUserIdPrisma(userId);
-    const removedMemoryEntries = deleteAccountDataByUserIdInMemory(userId);
+    const prismaResult = await deleteAccountDataByUserIdPrisma(userId, { dryRun });
+    const removedMemoryEntries = dryRun
+      ? countAccountDataByUserIdInMemory(userId)
+      : deleteAccountDataByUserIdInMemory(userId);
 
-    for (const eventId of prismaResult.hostedEventIds) {
-      delete eventInviteCodes[eventId];
-      delete eventInviteExpiresAt[eventId];
-      delete eventChatMessages[eventId];
+    if (!dryRun) {
+      for (const eventId of prismaResult.hostedEventIds) {
+        delete eventInviteCodes[eventId];
+        delete eventInviteExpiresAt[eventId];
+        delete eventChatMessages[eventId];
+      }
     }
 
     const removedEntries = prismaResult.removed + removedMemoryEntries;
     return res.json({
       ok: true,
       userId,
+      dryRun,
       removedEntries,
       removedDbEntries: prismaResult.removed,
       removedMemoryEntries,
@@ -1280,8 +1370,10 @@ app.post('/account/delete-data', async (req, res) => {
     });
   } catch (error) {
     console.error('POST /account/delete-data fallback (in-memory):', error?.message || error);
-    const removedEntries = deleteAccountDataByUserIdInMemory(userId);
-    return res.json({ ok: true, userId, removedEntries, mode: 'in-memory' });
+    const removedEntries = dryRun
+      ? countAccountDataByUserIdInMemory(userId)
+      : deleteAccountDataByUserIdInMemory(userId);
+    return res.json({ ok: true, userId, dryRun, removedEntries, mode: 'in-memory' });
   }
 });
 
@@ -1776,13 +1868,34 @@ app.get('/events/discover', async (req, res) => {
   const viewerUserId = (req.query.viewerUserId || 'guest_user').toString();
 
   try {
+    const acceptedInvites = await prisma.eventParticipation.findMany({
+      where: {
+        userId: viewerUserId,
+        status: 'accepted',
+      },
+      select: { eventId: true },
+    });
+    const acceptedInviteEventIds = new Set(acceptedInvites.map(item => item.eventId));
+
     const records = await prisma.event.findMany({
       orderBy: { createdAt: 'desc' },
     });
     const countMap = await buildParticipantCountMap(records.map(item => item.id));
     let items = records
       .map(item => mapEventRecordToApiItem(item, { currentParticipants: countMap.get(item.id) || 0 }))
-      .filter(event => canViewerSeeEvent(event, viewerUserId));
+      .filter(event => {
+        if (!event || event.status !== 'active') return false;
+        if (event.hosterId === viewerUserId) return true;
+        if (event.visibility === 'privateOnly') return false;
+        if (event.visibility === 'familyCircle') {
+          const keyA = [event.hosterId, viewerUserId].sort().join('::');
+          return keyA === 'host_001::host_demo_001' || keyA === 'host_002::host_demo_001';
+        }
+        if (event.visibility === 'inviteOnly') {
+          return acceptedInviteEventIds.has(event.id);
+        }
+        return true;
+      });
 
     if (req.query.ageGroups) {
       const requested = req.query.ageGroups
@@ -1828,7 +1941,7 @@ app.get('/events/item/:id', async (req, res) => {
     const item = mapEventRecordToApiItem(record, {
       currentParticipants: countMap.get(record.id) || 0,
     });
-    const inviteCode = eventInviteCodes[item.id] || null;
+    const inviteCode = item.inviteCode || eventInviteCodes[item.id] || null;
     const inviteCodeExpiresAt = eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt || null;
     return res.json({ item: { ...item, inviteCode, inviteCodeExpiresAt } });
   } catch (error) {
@@ -1837,7 +1950,7 @@ app.get('/events/item/:id', async (req, res) => {
     if (!item) {
       return res.status(404).json({ error: 'Event nicht gefunden' });
     }
-    const inviteCode = eventInviteCodes[item.id] || null;
+    const inviteCode = item.inviteCode || eventInviteCodes[item.id] || null;
     const inviteCodeExpiresAt = eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt || null;
     return res.json({ item: { ...item, inviteCode, inviteCodeExpiresAt } });
   }
@@ -1870,6 +1983,14 @@ app.post('/events', async (req, res) => {
   };
 
   try {
+    let inviteCode = null;
+    let inviteCodeExpiresAt = item.inviteCodeExpiresAt || null;
+    if (item.visibility === 'inviteOnly') {
+      inviteCode = generateInviteCode(item.id);
+      inviteCodeExpiresAt =
+        inviteCodeExpiresAt || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     const hosterId = await ensureBackendUser(item.hosterId, item.hosterId);
     const created = await prisma.event.create({
       data: {
@@ -1885,6 +2006,10 @@ app.post('/events', async (req, res) => {
         eventType: item.category,
         maxParticipants: item.maxParticipants,
         imageUrl: item.photoUrl,
+        visibility: item.visibility,
+        shareRadiusKm: item.shareRadiusKm,
+        inviteCode,
+        inviteCodeExpiresAt: inviteCodeExpiresAt ? new Date(inviteCodeExpiresAt) : null,
         costPerPerson: item.price != null ? Number(item.price) : null,
       },
     });
@@ -1897,10 +2022,8 @@ app.post('/events', async (req, res) => {
     }
 
     if (item.visibility === 'inviteOnly') {
-      const code = generateInviteCode(item.id);
-      eventInviteCodes[item.id] = code;
-      eventInviteExpiresAt[item.id] =
-        item.inviteCodeExpiresAt || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+      eventInviteCodes[item.id] = inviteCode;
+      eventInviteExpiresAt[item.id] = inviteCodeExpiresAt;
 
       for (const invitedUserIdRaw of item.invitedUserIds) {
         const invitedUserId = await ensureBackendUser(invitedUserIdRaw, invitedUserIdRaw);
@@ -1924,8 +2047,9 @@ app.post('/events', async (req, res) => {
     return res.status(201).json({
       item: {
         ...item,
-        inviteCode: eventInviteCodes[item.id] || null,
-        inviteCodeExpiresAt: eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt,
+        inviteCode: created.inviteCode || eventInviteCodes[item.id] || null,
+        inviteCodeExpiresAt:
+          created.inviteCodeExpiresAt || eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt,
       },
     });
   } catch (error) {
@@ -2077,16 +2201,23 @@ app.post('/events/invitations/join', async (req, res) => {
     return res.status(400).json({ error: 'Code und UserId sind erforderlich' });
   }
 
-  const eventId = Object.keys(eventInviteCodes).find(
-    id => (eventInviteCodes[id] || '').toUpperCase() === codeInput,
-  );
-
-  if (!eventId || isInviteExpired(eventId)) {
-    return res.status(404).json({ error: 'Code ungültig oder abgelaufen' });
-  }
-
   try {
-    const event = await ensureEventContext(eventId, getInMemoryEventById(eventId)?.hosterId || DEMO_USER_ID);
+    const eventByCode = await prisma.event.findFirst({
+      where: {
+        inviteCode: codeInput,
+      },
+      select: {
+        id: true,
+        hosterId: true,
+        inviteCodeExpiresAt: true,
+      },
+    });
+
+    if (!eventByCode || isInviteExpiredAt(eventByCode.inviteCodeExpiresAt)) {
+      return res.status(404).json({ error: 'Code ungültig oder abgelaufen' });
+    }
+
+    const event = await ensureEventContext(eventByCode.id, eventByCode.hosterId || DEMO_USER_ID);
     const safeUserId = await ensureBackendUser(userId, userId);
     const invitation = await prisma.eventParticipation.upsert({
       where: {
@@ -2106,6 +2237,14 @@ app.post('/events/invitations/join', async (req, res) => {
     return res.status(201).json({ item: mapInvitationRecordToApiItem(invitation) });
   } catch (error) {
     console.error('POST /events/invitations/join fallback (in-memory):', error?.message || error);
+    const eventId = Object.keys(eventInviteCodes).find(
+      id => (eventInviteCodes[id] || '').toUpperCase() === codeInput,
+    );
+
+    if (!eventId || isInviteExpired(eventId)) {
+      return res.status(404).json({ error: 'Code ungültig oder abgelaufen' });
+    }
+
     const event = events.find(item => item.id === eventId);
     if (!event) {
       return res.status(404).json({ error: 'Event nicht gefunden' });

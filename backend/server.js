@@ -3,6 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const Stripe = require('stripe');
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
@@ -80,6 +81,16 @@ const stripeWebhookToleranceSec = Number.parseInt(
   process.env.STRIPE_WEBHOOK_TOLERANCE_SEC || '300',
   10,
 );
+const stripeSecretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+
+// Stripe client — initialized if secret key is available, otherwise mocks are used
+let stripe = null;
+if (stripeSecretKey) {
+  stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-04-10' });
+  console.log('✅ Stripe SDK mit echtem API-Schlüssel initialisiert');
+} else {
+  console.warn('⚠️  STRIPE_SECRET_KEY nicht gesetzt — Stripe-Zahlungen nutzen Mock-Modus (Test nur)');
+}
 const allowClientProviderEvents =
   (process.env.ALLOW_CLIENT_PROVIDER_EVENTS ||
     (process.env.NODE_ENV === 'production' ? '0' : '1')) === '1';
@@ -3234,7 +3245,7 @@ app.get('/events/:id/chat/access', async (req, res) => {
 });
 
 // 18. Payments
-app.post('/payments/stripe/initiate', (req, res) => {
+app.post('/payments/stripe/initiate', async (req, res) => {
   const body = req.body || {};
   const amount = parsePositiveNumber(body.amount);
   const eventId = (body.eventId || '').toString();
@@ -3246,17 +3257,89 @@ app.post('/payments/stripe/initiate', (req, res) => {
     });
   }
 
-  res.status(201).json({
-    item: {
-      provider: 'stripe',
-      mode: 'mock_backend',
-      eventId,
-      hosterId,
-      amount,
-      clientSecret: `pi_mock_${Date.now()}`,
-      status: 'requires_payment_method',
-    },
-  });
+  try {
+    // Real Stripe: create PaymentIntent if secret key is available.
+    if (stripe) {
+      const intent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Stripe expects cents
+        currency: 'eur',
+        description: `Parentpeak Event ${eventId}`,
+        metadata: {
+          eventId,
+          hosterId,
+        },
+      });
+
+      return res.status(201).json({
+        item: {
+          provider: 'stripe',
+          mode: 'real_stripe',
+          eventId,
+          hosterId,
+          amount,
+          stripePaymentIntentId: intent.id,
+          clientSecret: intent.client_secret,
+          status: intent.status,
+        },
+      });
+    }
+
+    // Fallback: mock mode when no Stripe secret key configured
+    return res.status(201).json({
+      item: {
+        provider: 'stripe',
+        mode: 'mock_backend',
+        eventId,
+        hosterId,
+        amount,
+        clientSecret: `pi_mock_${Date.now()}`,
+        status: 'requires_payment_method',
+      },
+    });
+  } catch (error) {
+    console.error('Stripe PaymentIntent creation failed:', error?.message || error);
+    return res.status(500).json({
+      error: `Stripe-Initialisierung fehlgeschlagen: ${error?.message || 'Unknown error'}`,
+    });
+  }
+});
+
+// Get Stripe PaymentIntent status (for payment confirmation)
+app.get('/payments/stripe/confirm/:intentId', async (req, res) => {
+  const { intentId } = req.params;
+
+  if (!intentId) {
+    return res.status(400).json({ error: 'intentId erforderlich' });
+  }
+
+  try {
+    if (stripe) {
+      const intent = await stripe.paymentIntents.retrieve(intentId);
+      return res.json({
+        item: {
+          id: intent.id,
+          amount: intent.amount / 100, // Convert back from cents
+          status: intent.status,
+          clientSecret: intent.client_secret,
+        },
+      });
+    }
+
+    // Fallback: mock mode
+    return res.json({
+      item: {
+        id: intentId,
+        amount: 0,
+        status: 'succeeded',
+        clientSecret: `pi_mock_${Date.now()}`,
+      },
+    });
+  } catch (error) {
+    console.error('Stripe PaymentIntent retrieval failed:', error?.message || error);
+    return res.status(500).json({
+      error: `Stripe Abruf fehlgeschlagen: ${error?.message || 'Unknown error'}`,
+    });
+  }
 });
 
 app.post('/payments/paypal/initiate', (req, res) => {

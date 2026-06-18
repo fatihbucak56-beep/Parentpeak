@@ -951,3 +951,41 @@ test('image upload endpoint accepts valid image and rejects non-image', async ()
     await stopServer(server?.child);
   }
 });
+
+test('Stripe initiate validates input and returns mock mode when secret key is missing', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const hosterId = `it_stripe_user_${suffix}`;
+  let server;
+
+  try {
+    // Force missing secret in test so endpoint behavior is deterministic.
+    server = startServer(3037, { STRIPE_SECRET_KEY: '' });
+    await waitForHealth(server.baseUrl);
+
+    const missingFields = await postJson(server.baseUrl, '/payments/stripe/initiate', {
+      amount: 9.99,
+    });
+    assert.equal(missingFields.response.status, 400);
+
+    const ok = await postJson(server.baseUrl, '/payments/stripe/initiate', {
+      eventId: `event_${suffix}`,
+      hosterId,
+      amount: 12.5,
+    });
+    assert.equal(ok.response.status, 201);
+    assert.equal(ok.payload?.item?.provider, 'stripe');
+    assert.equal(ok.payload?.item?.mode, 'mock_backend');
+    assert.equal(ok.payload?.item?.eventId, `event_${suffix}`);
+    assert.equal(ok.payload?.item?.hosterId, hosterId);
+    assert.equal(ok.payload?.item?.amount, 12.5);
+    assert.ok(typeof ok.payload?.item?.clientSecret === 'string');
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    if (server) {
+      await postJson(server.baseUrl, '/account/delete-data', { userId: hosterId });
+    }
+    await stopServer(server?.child);
+  }
+});

@@ -713,6 +713,150 @@ function mapPaymentRecordToApiItem(record) {
   };
 }
 
+function mapDbEventStatusToApi(status) {
+  if (status === 'upcoming' || status === 'ongoing') return 'active';
+  if (status === 'completed') return 'completed';
+  if (status === 'cancelled') return 'cancelled';
+  return 'active';
+}
+
+function mapApiEventStatusToDb(status) {
+  const normalized = (status || '').toString().trim().toLowerCase();
+  if (!normalized || normalized === 'active') return 'upcoming';
+  if (['upcoming', 'ongoing', 'completed', 'cancelled'].includes(normalized)) {
+    return normalized;
+  }
+  return 'upcoming';
+}
+
+function getInMemoryEventById(eventId) {
+  return events.find(item => item.id === eventId) || null;
+}
+
+function mapEventRecordToApiItem(record, options = {}) {
+  const memoryEvent = getInMemoryEventById(record.id);
+  const currentParticipants = Number(options.currentParticipants || 0);
+  return {
+    id: record.id,
+    hosterId: record.hosterId,
+    title: record.title,
+    description: record.description || '',
+    category: record.eventType || memoryEvent?.category || 'other',
+    ageGroups: Array.isArray(memoryEvent?.ageGroups) ? memoryEvent.ageGroups : [],
+    location: record.location || '',
+    latitude: Number(record.latitude || 0),
+    longitude: Number(record.longitude || 0),
+    eventDate: record.startDate,
+    createdAt: record.createdAt,
+    paymentDate: memoryEvent?.paymentDate || null,
+    maxParticipants: Number(record.maxParticipants || memoryEvent?.maxParticipants || 20),
+    currentParticipants,
+    photoUrl: record.imageUrl || memoryEvent?.photoUrl || '',
+    status: mapDbEventStatusToApi(record.status),
+    price: record.costPerPerson != null ? Number(record.costPerPerson) : (memoryEvent?.price ?? null),
+    visibility: memoryEvent?.visibility || 'publicNearby',
+    shareRadiusKm: Number(memoryEvent?.shareRadiusKm || 25),
+    invitedUserIds: Array.isArray(memoryEvent?.invitedUserIds) ? memoryEvent.invitedUserIds : [],
+    inviteCodeExpiresAt: eventInviteExpiresAt[record.id] || memoryEvent?.inviteCodeExpiresAt || null,
+  };
+}
+
+function mapInvitationRecordToApiItem(record) {
+  return {
+    id: record.id,
+    eventId: record.eventId,
+    hostUserId: null,
+    invitedUserId: record.userId,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    status: record.status === 'invited' ? 'pending' : record.status,
+  };
+}
+
+function mapParticipationRecordToApiItem(record) {
+  const approvedAt = record.status === 'approved' ? record.updatedAt : null;
+  const declinedAt = record.status === 'declined' ? record.updatedAt : null;
+  const cancelledAt = record.status === 'cancelled' ? record.updatedAt : null;
+  return {
+    id: record.id,
+    eventId: record.eventId,
+    userId: record.userId,
+    requestedAt: record.createdAt,
+    approvedAt,
+    declinedAt,
+    cancelledAt,
+    status: record.status,
+  };
+}
+
+async function buildParticipantCountMap(eventIds) {
+  if (!Array.isArray(eventIds) || eventIds.length === 0) {
+    return new Map();
+  }
+
+  const grouped = await prisma.eventParticipation.groupBy({
+    by: ['eventId'],
+    where: {
+      eventId: { in: eventIds },
+      status: { in: ['approved', 'accepted', 'attended'] },
+    },
+    _count: {
+      eventId: true,
+    },
+  });
+
+  const counts = new Map();
+  for (const row of grouped) {
+    counts.set(row.eventId, Number(row._count.eventId || 0));
+  }
+  return counts;
+}
+
+async function ensureEventContext(eventId, hosterId) {
+  const safeHosterId = await ensureBackendUser(hosterId || DEMO_USER_ID, hosterId || 'Demo Host');
+  const source = getInMemoryEventById(eventId);
+  const safeEventId = (eventId || generateId('event')).toString();
+
+  const record = await prisma.event.upsert({
+    where: { id: safeEventId },
+    update: {},
+    create: {
+      id: safeEventId,
+      hosterId: safeHosterId,
+      title: source?.title || `Event ${safeEventId}`,
+      description: source?.description || '',
+      startDate: source?.eventDate ? new Date(source.eventDate) : new Date(),
+      location: source?.location || '',
+      latitude: Number(source?.latitude || 0),
+      longitude: Number(source?.longitude || 0),
+      status: mapApiEventStatusToDb(source?.status || 'active'),
+      eventType: source?.category || 'other',
+      maxParticipants: Number.isFinite(Number(source?.maxParticipants))
+        ? Number(source.maxParticipants)
+        : null,
+      imageUrl: source?.photoUrl || '',
+      costPerPerson: source?.price != null ? Number(source.price) : null,
+    },
+  });
+
+  return record;
+}
+
+async function ensureEventChatRecord(eventId) {
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) {
+    return null;
+  }
+
+  const chat = await prisma.eventChat.upsert({
+    where: { eventId },
+    update: {},
+    create: { eventId },
+  });
+
+  return chat;
+}
+
 function asIsoDate(value) {
   if (!value) return null;
   const parsed = new Date(value);
@@ -1543,49 +1687,111 @@ app.put('/family/requests/:id', (req, res) => {
   res.json({ item: familyRequests[index] });
 });
 
-// 14. Events
-app.get('/events', (req, res) => {
-  let items = [...events];
-  if (req.query.status) {
-    items = items.filter(event => event.status === req.query.status);
-  }
-  if (req.query.hostUserId) {
-    items = items.filter(event => event.hosterId === req.query.hostUserId);
-  }
-  res.json({ items });
-});
+// 14. Events (Prisma-first with in-memory fallback)
+app.get('/events', async (req, res) => {
+  try {
+    const hostUserId = (req.query.hostUserId || '').toString().trim();
+    const records = await prisma.event.findMany({
+      where: hostUserId ? { hosterId: hostUserId } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
 
-app.get('/events/discover', (req, res) => {
-  const viewerUserId = (req.query.viewerUserId || 'guest_user').toString();
-  let items = events.filter(event => canViewerSeeEvent(event, viewerUserId));
+    const countMap = await buildParticipantCountMap(records.map(item => item.id));
+    let items = records.map(item =>
+      mapEventRecordToApiItem(item, { currentParticipants: countMap.get(item.id) || 0 }),
+    );
 
-  if (req.query.ageGroups) {
-    const requested = req.query.ageGroups
-      .toString()
-      .split(',')
-      .map(value => value.trim())
-      .filter(Boolean);
-    if (requested.length > 0) {
-      items = items.filter(event =>
-        (event.ageGroups || []).some(group => requested.includes(group)),
-      );
+    if (req.query.status) {
+      const requestedStatus = req.query.status.toString();
+      items = items.filter(event => event.status === requestedStatus);
     }
-  }
 
-  res.json({ items });
+    return res.json({ items });
+  } catch (error) {
+    console.error('GET /events fallback (in-memory):', error?.message || error);
+    let items = [...events];
+    if (req.query.status) {
+      items = items.filter(event => event.status === req.query.status);
+    }
+    if (req.query.hostUserId) {
+      items = items.filter(event => event.hosterId === req.query.hostUserId);
+    }
+    return res.json({ items });
+  }
 });
 
-app.get('/events/item/:id', (req, res) => {
-  const item = events.find(event => event.id === req.params.id);
-  if (!item) {
-    return res.status(404).json({ error: 'Event nicht gefunden' });
+app.get('/events/discover', async (req, res) => {
+  const viewerUserId = (req.query.viewerUserId || 'guest_user').toString();
+
+  try {
+    const records = await prisma.event.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    const countMap = await buildParticipantCountMap(records.map(item => item.id));
+    let items = records
+      .map(item => mapEventRecordToApiItem(item, { currentParticipants: countMap.get(item.id) || 0 }))
+      .filter(event => canViewerSeeEvent(event, viewerUserId));
+
+    if (req.query.ageGroups) {
+      const requested = req.query.ageGroups
+        .toString()
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+      if (requested.length > 0) {
+        items = items.filter(event =>
+          (event.ageGroups || []).some(group => requested.includes(group)),
+        );
+      }
+    }
+
+    return res.json({ items });
+  } catch (error) {
+    console.error('GET /events/discover fallback (in-memory):', error?.message || error);
+    let items = events.filter(event => canViewerSeeEvent(event, viewerUserId));
+    if (req.query.ageGroups) {
+      const requested = req.query.ageGroups
+        .toString()
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+      if (requested.length > 0) {
+        items = items.filter(event =>
+          (event.ageGroups || []).some(group => requested.includes(group)),
+        );
+      }
+    }
+    return res.json({ items });
   }
-  const inviteCode = eventInviteCodes[item.id] || null;
-  const inviteCodeExpiresAt = eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt || null;
-  res.json({ item: { ...item, inviteCode, inviteCodeExpiresAt } });
 });
 
-app.post('/events', (req, res) => {
+app.get('/events/item/:id', async (req, res) => {
+  try {
+    const record = await prisma.event.findUnique({ where: { id: req.params.id } });
+    if (!record) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    const countMap = await buildParticipantCountMap([record.id]);
+    const item = mapEventRecordToApiItem(record, {
+      currentParticipants: countMap.get(record.id) || 0,
+    });
+    const inviteCode = eventInviteCodes[item.id] || null;
+    const inviteCodeExpiresAt = eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt || null;
+    return res.json({ item: { ...item, inviteCode, inviteCodeExpiresAt } });
+  } catch (error) {
+    console.error('GET /events/item/:id fallback (in-memory):', error?.message || error);
+    const item = events.find(event => event.id === req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+    const inviteCode = eventInviteCodes[item.id] || null;
+    const inviteCodeExpiresAt = eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt || null;
+    return res.json({ item: { ...item, inviteCode, inviteCodeExpiresAt } });
+  }
+});
+
+app.post('/events', async (req, res) => {
   const body = req.body || {};
   const item = {
     id: body.id || generateId('event'),
@@ -1611,87 +1817,207 @@ app.post('/events', (req, res) => {
     inviteCodeExpiresAt: body.inviteCodeExpiresAt || null,
   };
 
-  events.push(item);
+  try {
+    const hosterId = await ensureBackendUser(item.hosterId, item.hosterId);
+    const created = await prisma.event.create({
+      data: {
+        id: item.id,
+        hosterId,
+        title: item.title,
+        description: item.description,
+        startDate: new Date(item.eventDate),
+        location: item.location,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        status: mapApiEventStatusToDb(item.status),
+        eventType: item.category,
+        maxParticipants: item.maxParticipants,
+        imageUrl: item.photoUrl,
+        costPerPerson: item.price != null ? Number(item.price) : null,
+      },
+    });
 
-  if (item.visibility === 'inviteOnly') {
-    const code = generateInviteCode(item.id);
-    eventInviteCodes[item.id] = code;
-    eventInviteExpiresAt[item.id] =
-      item.inviteCodeExpiresAt || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-
-    for (const invitedUserId of item.invitedUserIds) {
-      eventInvitations.push({
-        id: `inv_${item.id}_${invitedUserId}`,
-        eventId: item.id,
-        hostUserId: item.hosterId,
-        invitedUserId,
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-      });
+    const mirroredIndex = events.findIndex(event => event.id === item.id);
+    if (mirroredIndex === -1) {
+      events.push(item);
+    } else {
+      events[mirroredIndex] = item;
     }
-  }
 
-  res.status(201).json({
-    item: {
-      ...item,
-      inviteCode: eventInviteCodes[item.id] || null,
-      inviteCodeExpiresAt: eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt,
-    },
-  });
-});
+    if (item.visibility === 'inviteOnly') {
+      const code = generateInviteCode(item.id);
+      eventInviteCodes[item.id] = code;
+      eventInviteExpiresAt[item.id] =
+        item.inviteCodeExpiresAt || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-app.delete('/events/item/:id', (req, res) => {
-  const index = events.findIndex(event => event.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Event nicht gefunden' });
-  }
-
-  const [removed] = events.splice(index, 1);
-  delete eventInviteCodes[removed.id];
-  delete eventInviteExpiresAt[removed.id];
-
-  for (let i = eventInvitations.length - 1; i >= 0; i -= 1) {
-    if (eventInvitations[i].eventId === removed.id) {
-      eventInvitations.splice(i, 1);
+      for (const invitedUserIdRaw of item.invitedUserIds) {
+        const invitedUserId = await ensureBackendUser(invitedUserIdRaw, invitedUserIdRaw);
+        await prisma.eventParticipation.upsert({
+          where: {
+            eventId_userId: {
+              eventId: created.id,
+              userId: invitedUserId,
+            },
+          },
+          update: { status: 'invited' },
+          create: {
+            eventId: created.id,
+            userId: invitedUserId,
+            status: 'invited',
+          },
+        });
+      }
     }
-  }
 
-  res.status(204).send();
+    return res.status(201).json({
+      item: {
+        ...item,
+        inviteCode: eventInviteCodes[item.id] || null,
+        inviteCodeExpiresAt: eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt,
+      },
+    });
+  } catch (error) {
+    console.error('POST /events fallback (in-memory):', error?.message || error);
+    events.push(item);
+
+    if (item.visibility === 'inviteOnly') {
+      const code = generateInviteCode(item.id);
+      eventInviteCodes[item.id] = code;
+      eventInviteExpiresAt[item.id] =
+        item.inviteCodeExpiresAt || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+      for (const invitedUserId of item.invitedUserIds) {
+        eventInvitations.push({
+          id: `inv_${item.id}_${invitedUserId}`,
+          eventId: item.id,
+          hostUserId: item.hosterId,
+          invitedUserId,
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+        });
+      }
+    }
+
+    return res.status(201).json({
+      item: {
+        ...item,
+        inviteCode: eventInviteCodes[item.id] || null,
+        inviteCodeExpiresAt: eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt,
+      },
+    });
+  }
 });
 
-// 15. Event invitations
-app.get('/events/invitations', (req, res) => {
-  let items = [...eventInvitations];
-  if (req.query.userId) {
-    items = items.filter(invitation => invitation.invitedUserId === req.query.userId);
+app.delete('/events/item/:id', async (req, res) => {
+  try {
+    await prisma.event.delete({ where: { id: req.params.id } });
+
+    const index = events.findIndex(event => event.id === req.params.id);
+    if (index !== -1) {
+      events.splice(index, 1);
+    }
+    delete eventInviteCodes[req.params.id];
+    delete eventInviteExpiresAt[req.params.id];
+    return res.status(204).send();
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    console.error('DELETE /events/item/:id fallback (in-memory):', error?.message || error);
+    const index = events.findIndex(event => event.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    const [removed] = events.splice(index, 1);
+    delete eventInviteCodes[removed.id];
+    delete eventInviteExpiresAt[removed.id];
+
+    for (let i = eventInvitations.length - 1; i >= 0; i -= 1) {
+      if (eventInvitations[i].eventId === removed.id) {
+        eventInvitations.splice(i, 1);
+      }
+    }
+
+    return res.status(204).send();
   }
-  if (req.query.eventId) {
-    items = items.filter(invitation => invitation.eventId === req.query.eventId);
-  }
-  if (req.query.status) {
-    items = items.filter(invitation => invitation.status === req.query.status);
-  }
-  res.json({ items });
 });
 
-app.put('/events/invitations/:id/respond', (req, res) => {
-  const index = eventInvitations.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Einladung nicht gefunden' });
+// 15. Event invitations (Prisma-first with in-memory fallback)
+app.get('/events/invitations', async (req, res) => {
+  try {
+    let statusFilter = null;
+    if (req.query.status) {
+      const rawStatus = req.query.status.toString();
+      statusFilter = rawStatus === 'pending' ? 'invited' : rawStatus;
+    }
+
+    const items = await prisma.eventParticipation.findMany({
+      where: {
+        status: statusFilter || undefined,
+        userId: req.query.userId ? req.query.userId.toString() : undefined,
+        eventId: req.query.eventId ? req.query.eventId.toString() : undefined,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const invitationItems = items
+      .filter(item => ['invited', 'accepted', 'declined'].includes(item.status))
+      .map(mapInvitationRecordToApiItem);
+
+    return res.json({ items: invitationItems });
+  } catch (error) {
+    console.error('GET /events/invitations fallback (in-memory):', error?.message || error);
+    let items = [...eventInvitations];
+    if (req.query.userId) {
+      items = items.filter(invitation => invitation.invitedUserId === req.query.userId);
+    }
+    if (req.query.eventId) {
+      items = items.filter(invitation => invitation.eventId === req.query.eventId);
+    }
+    if (req.query.status) {
+      items = items.filter(invitation => invitation.status === req.query.status);
+    }
+    return res.json({ items });
   }
-
-  const accept = Boolean(req.body.accept);
-  const nextStatus = accept ? 'accepted' : 'declined';
-  eventInvitations[index] = {
-    ...eventInvitations[index],
-    status: nextStatus,
-    updatedAt: new Date().toISOString(),
-  };
-
-  res.json({ item: eventInvitations[index] });
 });
 
-app.post('/events/invitations/join', (req, res) => {
+app.put('/events/invitations/:id/respond', async (req, res) => {
+  try {
+    const current = await prisma.eventParticipation.findUnique({ where: { id: req.params.id } });
+    if (!current || !['invited', 'accepted', 'declined'].includes(current.status)) {
+      return res.status(404).json({ error: 'Einladung nicht gefunden' });
+    }
+
+    const accept = Boolean(req.body.accept);
+    const nextStatus = accept ? 'accepted' : 'declined';
+    const updated = await prisma.eventParticipation.update({
+      where: { id: req.params.id },
+      data: { status: nextStatus },
+    });
+
+    return res.json({ item: mapInvitationRecordToApiItem(updated) });
+  } catch (error) {
+    console.error('PUT /events/invitations/:id/respond fallback (in-memory):', error?.message || error);
+    const index = eventInvitations.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Einladung nicht gefunden' });
+    }
+
+    const accept = Boolean(req.body.accept);
+    const nextStatus = accept ? 'accepted' : 'declined';
+    eventInvitations[index] = {
+      ...eventInvitations[index],
+      status: nextStatus,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return res.json({ item: eventInvitations[index] });
+  }
+});
+
+app.post('/events/invitations/join', async (req, res) => {
   const codeInput = (req.body.code || '').toString().trim().toUpperCase();
   const userId = (req.body.userId || '').toString().trim();
 
@@ -1707,77 +2033,155 @@ app.post('/events/invitations/join', (req, res) => {
     return res.status(404).json({ error: 'Code ungültig oder abgelaufen' });
   }
 
-  const event = events.find(item => item.id === eventId);
-  if (!event) {
-    return res.status(404).json({ error: 'Event nicht gefunden' });
+  try {
+    const event = await ensureEventContext(eventId, getInMemoryEventById(eventId)?.hosterId || DEMO_USER_ID);
+    const safeUserId = await ensureBackendUser(userId, userId);
+    const invitation = await prisma.eventParticipation.upsert({
+      where: {
+        eventId_userId: {
+          eventId: event.id,
+          userId: safeUserId,
+        },
+      },
+      update: { status: 'accepted' },
+      create: {
+        eventId: event.id,
+        userId: safeUserId,
+        status: 'accepted',
+      },
+    });
+
+    return res.status(201).json({ item: mapInvitationRecordToApiItem(invitation) });
+  } catch (error) {
+    console.error('POST /events/invitations/join fallback (in-memory):', error?.message || error);
+    const event = events.find(item => item.id === eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    let invitation = eventInvitations.find(
+      item => item.eventId === eventId && item.invitedUserId === userId,
+    );
+
+    if (!invitation) {
+      invitation = {
+        id: `inv_${eventId}_${userId}`,
+        eventId,
+        hostUserId: event.hosterId,
+        invitedUserId: userId,
+        createdAt: new Date().toISOString(),
+        status: 'accepted',
+      };
+      eventInvitations.push(invitation);
+    } else {
+      invitation.status = 'accepted';
+      invitation.updatedAt = new Date().toISOString();
+    }
+
+    return res.status(201).json({ item: invitation });
   }
-
-  let invitation = eventInvitations.find(
-    item => item.eventId === eventId && item.invitedUserId === userId,
-  );
-
-  if (!invitation) {
-    invitation = {
-      id: `inv_${eventId}_${userId}`,
-      eventId,
-      hostUserId: event.hosterId,
-      invitedUserId: userId,
-      createdAt: new Date().toISOString(),
-      status: 'accepted',
-    };
-    eventInvitations.push(invitation);
-  } else {
-    invitation.status = 'accepted';
-    invitation.updatedAt = new Date().toISOString();
-  }
-
-  res.status(201).json({ item: invitation });
 });
 
-app.get('/events/hosted-invite-only', (req, res) => {
+app.get('/events/hosted-invite-only', async (req, res) => {
   const hostUserId = (req.query.hostUserId || '').toString();
-  const items = events.filter(
-    event =>
-      event.visibility === 'inviteOnly' &&
-      event.status === 'active' &&
-      (!hostUserId || event.hosterId === hostUserId),
-  );
-  res.json({ items });
-});
 
-app.get('/events/:id/invitations/accepted', (req, res) => {
-  const items = eventInvitations.filter(
-    item => item.eventId === req.params.id && item.status === 'accepted',
-  );
-  res.json({ items });
-});
-
-// 16. Event participations (host dashboard)
-app.get('/events/participations', (req, res) => {
-  let items = [...eventParticipations];
-  if (req.query.userId) {
-    items = items.filter(item => item.userId === req.query.userId);
+  try {
+    const records = await prisma.event.findMany({
+      where: hostUserId ? { hosterId: hostUserId } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
+    const countMap = await buildParticipantCountMap(records.map(item => item.id));
+    const items = records
+      .map(item => mapEventRecordToApiItem(item, { currentParticipants: countMap.get(item.id) || 0 }))
+      .filter(
+        event =>
+          event.visibility === 'inviteOnly' &&
+          event.status === 'active' &&
+          (!hostUserId || event.hosterId === hostUserId),
+      );
+    return res.json({ items });
+  } catch (error) {
+    console.error('GET /events/hosted-invite-only fallback (in-memory):', error?.message || error);
+    const items = events.filter(
+      event =>
+        event.visibility === 'inviteOnly' &&
+        event.status === 'active' &&
+        (!hostUserId || event.hosterId === hostUserId),
+    );
+    return res.json({ items });
   }
-  if (req.query.eventId) {
-    items = items.filter(item => item.eventId === req.query.eventId);
-  }
-  res.json({ items });
 });
 
-app.get('/events/participations/pending', (req, res) => {
+app.get('/events/:id/invitations/accepted', async (req, res) => {
+  try {
+    const items = await prisma.eventParticipation.findMany({
+      where: { eventId: req.params.id, status: 'accepted' },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ items: items.map(mapInvitationRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /events/:id/invitations/accepted fallback (in-memory):', error?.message || error);
+    const items = eventInvitations.filter(
+      item => item.eventId === req.params.id && item.status === 'accepted',
+    );
+    return res.json({ items });
+  }
+});
+
+// 16. Event participations (Prisma-first with in-memory fallback)
+app.get('/events/participations', async (req, res) => {
+  try {
+    const items = await prisma.eventParticipation.findMany({
+      where: {
+        userId: req.query.userId ? req.query.userId.toString() : undefined,
+        eventId: req.query.eventId ? req.query.eventId.toString() : undefined,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ items: items.map(mapParticipationRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /events/participations fallback (in-memory):', error?.message || error);
+    let items = [...eventParticipations];
+    if (req.query.userId) {
+      items = items.filter(item => item.userId === req.query.userId);
+    }
+    if (req.query.eventId) {
+      items = items.filter(item => item.eventId === req.query.eventId);
+    }
+    return res.json({ items });
+  }
+});
+
+app.get('/events/participations/pending', async (req, res) => {
   const hostUserId = (req.query.hostUserId || '').toString();
-  const hostEventIds = events
-    .filter(event => !hostUserId || event.hosterId === hostUserId)
-    .map(event => event.id);
 
-  const items = eventParticipations.filter(
-    item => hostEventIds.includes(item.eventId) && item.status === 'pending',
-  );
-
-  res.json({ items });
+  try {
+    const hostEvents = await prisma.event.findMany({
+      where: hostUserId ? { hosterId: hostUserId } : undefined,
+      select: { id: true },
+    });
+    const hostEventIds = hostEvents.map(item => item.id);
+    const items = await prisma.eventParticipation.findMany({
+      where: {
+        eventId: { in: hostEventIds },
+        status: 'pending',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ items: items.map(mapParticipationRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /events/participations/pending fallback (in-memory):', error?.message || error);
+    const hostEventIds = events
+      .filter(event => !hostUserId || event.hosterId === hostUserId)
+      .map(event => event.id);
+    const items = eventParticipations.filter(
+      item => hostEventIds.includes(item.eventId) && item.status === 'pending',
+    );
+    return res.json({ items });
+  }
 });
 
-app.post('/events/participations', (req, res) => {
+app.post('/events/participations', async (req, res) => {
   const eventId = (req.body.eventId || '').toString();
   const userId = (req.body.userId || '').toString();
 
@@ -1785,155 +2189,383 @@ app.post('/events/participations', (req, res) => {
     return res.status(400).json({ error: 'eventId und userId sind erforderlich' });
   }
 
-  const event = events.find(item => item.id === eventId);
-  if (!event) {
-    return res.status(404).json({ error: 'Event nicht gefunden' });
-  }
+  try {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
 
-  const existing = eventParticipations.find(
-    item => item.eventId === eventId && item.userId === userId && item.status !== 'cancelled',
-  );
-  if (existing) {
-    return res.status(200).json({ item: existing });
-  }
+    const safeUserId = await ensureBackendUser(userId, req.body.userName || userId);
+    const item = await prisma.eventParticipation.upsert({
+      where: {
+        eventId_userId: {
+          eventId,
+          userId: safeUserId,
+        },
+      },
+      update: {
+        status: 'pending',
+      },
+      create: {
+        eventId,
+        userId: safeUserId,
+        status: 'pending',
+      },
+    });
+    return res.status(201).json({ item: mapParticipationRecordToApiItem(item) });
+  } catch (error) {
+    console.error('POST /events/participations fallback (in-memory):', error?.message || error);
+    const event = events.find(item => item.id === eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
 
-  const item = {
-    id: generateId('participation'),
-    eventId,
-    userId,
-    requestedAt: new Date().toISOString(),
-    approvedAt: null,
-    declinedAt: null,
-    cancelledAt: null,
-    status: 'pending',
-  };
+    const existing = eventParticipations.find(
+      item => item.eventId === eventId && item.userId === userId && item.status !== 'cancelled',
+    );
+    if (existing) {
+      return res.status(200).json({ item: existing });
+    }
 
-  eventParticipations.unshift(item);
-  res.status(201).json({ item });
-});
-
-app.put('/events/participations/:id/respond', (req, res) => {
-  const index = eventParticipations.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Teilnahme nicht gefunden' });
-  }
-
-  const accept = Boolean(req.body.accept);
-  const current = eventParticipations[index];
-  const eventIndex = events.findIndex(event => event.id === current.eventId);
-
-  const nextItem = {
-    ...current,
-    status: accept ? 'approved' : 'declined',
-    approvedAt: accept ? new Date().toISOString() : null,
-    declinedAt: accept ? null : new Date().toISOString(),
-  };
-
-  eventParticipations[index] = nextItem;
-
-  if (accept && eventIndex !== -1) {
-    events[eventIndex] = {
-      ...events[eventIndex],
-      currentParticipants: Number(events[eventIndex].currentParticipants || 0) + 1,
+    const item = {
+      id: generateId('participation'),
+      eventId,
+      userId,
+      requestedAt: new Date().toISOString(),
+      approvedAt: null,
+      declinedAt: null,
+      cancelledAt: null,
+      status: 'pending',
     };
+
+    eventParticipations.unshift(item);
+    return res.status(201).json({ item });
   }
-
-  res.json({ item: nextItem });
 });
 
-app.get('/events/:id/participations/approved', (req, res) => {
-  const items = eventParticipations.filter(
-    item => item.eventId === req.params.id && item.status === 'approved',
-  );
-  res.json({ items });
+app.put('/events/participations/:id/respond', async (req, res) => {
+  try {
+    const current = await prisma.eventParticipation.findUnique({ where: { id: req.params.id } });
+    if (!current) {
+      return res.status(404).json({ error: 'Teilnahme nicht gefunden' });
+    }
+
+    const accept = Boolean(req.body.accept);
+    const nextStatus = accept ? 'approved' : 'declined';
+    const updated = await prisma.eventParticipation.update({
+      where: { id: req.params.id },
+      data: { status: nextStatus },
+    });
+    return res.json({ item: mapParticipationRecordToApiItem(updated) });
+  } catch (error) {
+    console.error('PUT /events/participations/:id/respond fallback (in-memory):', error?.message || error);
+    const index = eventParticipations.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Teilnahme nicht gefunden' });
+    }
+
+    const accept = Boolean(req.body.accept);
+    const current = eventParticipations[index];
+    const eventIndex = events.findIndex(event => event.id === current.eventId);
+    const nextItem = {
+      ...current,
+      status: accept ? 'approved' : 'declined',
+      approvedAt: accept ? new Date().toISOString() : null,
+      declinedAt: accept ? null : new Date().toISOString(),
+    };
+
+    eventParticipations[index] = nextItem;
+
+    if (accept && eventIndex !== -1) {
+      events[eventIndex] = {
+        ...events[eventIndex],
+        currentParticipants: Number(events[eventIndex].currentParticipants || 0) + 1,
+      };
+    }
+
+    return res.json({ item: nextItem });
+  }
 });
 
-// 17. Event chat
-app.get('/events/:id/chat/messages', (req, res) => {
-  const items = eventChatMessages[req.params.id] || [];
-  res.json({ items });
+app.get('/events/:id/participations/approved', async (req, res) => {
+  try {
+    const items = await prisma.eventParticipation.findMany({
+      where: { eventId: req.params.id, status: 'approved' },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ items: items.map(mapParticipationRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /events/:id/participations/approved fallback (in-memory):', error?.message || error);
+    const items = eventParticipations.filter(
+      item => item.eventId === req.params.id && item.status === 'approved',
+    );
+    return res.json({ items });
+  }
 });
 
-app.post('/events/:id/chat/messages', (req, res) => {
+// 17. Event chat (Prisma-first with in-memory fallback)
+app.get('/events/:id/chat/messages', async (req, res) => {
+  try {
+    const chat = await prisma.eventChat.findUnique({
+      where: { eventId: req.params.id },
+      include: {
+        event: { select: { hosterId: true } },
+        messages: {
+          include: { author: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!chat) {
+      return res.json({ items: [] });
+    }
+
+    const items = chat.messages.map(message => ({
+      id: message.id,
+      eventId: req.params.id,
+      userId: message.authorId,
+      userName: [message.author.firstName, message.author.lastName].filter(Boolean).join(' ') || message.authorId,
+      userAvatarUrl: message.author.avatar || '',
+      content: message.content,
+      timestamp: message.createdAt,
+      isHost: message.authorId === chat.event.hosterId,
+    }));
+
+    return res.json({ items });
+  } catch (error) {
+    console.error('GET /events/:id/chat/messages fallback (in-memory):', error?.message || error);
+    const items = eventChatMessages[req.params.id] || [];
+    return res.json({ items });
+  }
+});
+
+app.post('/events/:id/chat/messages', async (req, res) => {
   const eventId = req.params.id;
-  const event = events.find(item => item.id === eventId);
-  if (!event) {
-    return res.status(404).json({ error: 'Event nicht gefunden' });
-  }
 
-  const item = {
-    id: generateId('msg'),
-    eventId,
-    userId: req.body.userId || '',
-    userName: req.body.userName || 'Unbekannt',
-    userAvatarUrl: req.body.userAvatarUrl || '',
-    content: req.body.content || '',
-    timestamp: new Date().toISOString(),
-    isHost: Boolean(req.body.isHost),
-  };
+  try {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
 
-  if (!eventChatMessages[eventId]) {
-    eventChatMessages[eventId] = [];
+    const authorId = await ensureBackendUser(req.body.userId || DEMO_USER_ID, req.body.userName || 'Unbekannt');
+    const chat = await ensureEventChatRecord(eventId);
+    if (!chat) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    const message = await prisma.message.create({
+      data: {
+        chatId: chat.id,
+        authorId,
+        content: (req.body.content || '').toString(),
+        attachmentUrl: (req.body.userAvatarUrl || '').toString(),
+      },
+      include: {
+        author: true,
+      },
+    });
+
+    const item = {
+      id: message.id,
+      eventId,
+      userId: message.authorId,
+      userName: [message.author.firstName, message.author.lastName].filter(Boolean).join(' ') || message.authorId,
+      userAvatarUrl: message.author.avatar || req.body.userAvatarUrl || '',
+      content: message.content,
+      timestamp: message.createdAt,
+      isHost: message.authorId === event.hosterId,
+    };
+
+    return res.status(201).json({ item });
+  } catch (error) {
+    console.error('POST /events/:id/chat/messages fallback (in-memory):', error?.message || error);
+    const event = events.find(item => item.id === eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    const item = {
+      id: generateId('msg'),
+      eventId,
+      userId: req.body.userId || '',
+      userName: req.body.userName || 'Unbekannt',
+      userAvatarUrl: req.body.userAvatarUrl || '',
+      content: req.body.content || '',
+      timestamp: new Date().toISOString(),
+      isHost: Boolean(req.body.isHost),
+    };
+
+    if (!eventChatMessages[eventId]) {
+      eventChatMessages[eventId] = [];
+    }
+    eventChatMessages[eventId].push(item);
+    return res.status(201).json({ item });
   }
-  eventChatMessages[eventId].push(item);
-  res.status(201).json({ item });
 });
 
-app.delete('/events/:eventId/chat/messages/:messageId', (req, res) => {
-  const items = eventChatMessages[req.params.eventId] || [];
-  const before = items.length;
-  eventChatMessages[req.params.eventId] = items.filter(
-    item => item.id !== req.params.messageId,
-  );
-  if (before === eventChatMessages[req.params.eventId].length) {
-    return res.status(404).json({ error: 'Nachricht nicht gefunden' });
+app.delete('/events/:eventId/chat/messages/:messageId', async (req, res) => {
+  try {
+    const message = await prisma.message.findUnique({
+      where: { id: req.params.messageId },
+      include: { chat: true },
+    });
+    if (!message || message.chat.eventId !== req.params.eventId) {
+      return res.status(404).json({ error: 'Nachricht nicht gefunden' });
+    }
+
+    await prisma.message.delete({ where: { id: req.params.messageId } });
+    return res.status(204).send();
+  } catch (error) {
+    console.error('DELETE /events/:eventId/chat/messages/:messageId fallback (in-memory):', error?.message || error);
+    const items = eventChatMessages[req.params.eventId] || [];
+    const before = items.length;
+    eventChatMessages[req.params.eventId] = items.filter(
+      item => item.id !== req.params.messageId,
+    );
+    if (before === eventChatMessages[req.params.eventId].length) {
+      return res.status(404).json({ error: 'Nachricht nicht gefunden' });
+    }
+    return res.status(204).send();
   }
-  res.status(204).send();
 });
 
-app.post('/events/:id/chat/reports', (req, res) => {
-  const item = {
-    id: generateId('report'),
-    eventId: req.params.id,
-    reportedMessageId: req.body.reportedMessageId || '',
-    reporterId: req.body.reporterId || '',
-    reason: req.body.reason || 'other',
-    description: req.body.description || null,
-    reportedAt: new Date().toISOString(),
-  };
-  eventChatReports.unshift(item);
-  res.status(201).json({ item });
-});
+app.post('/events/:id/chat/reports', async (req, res) => {
+  try {
+    const chat = await ensureEventChatRecord(req.params.id);
+    if (!chat) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
 
-app.get('/events/:id/chat/reports', (req, res) => {
-  const items = eventChatReports.filter(item => item.eventId === req.params.id);
-  res.json({ items });
-});
+    const messageId = (req.body.reportedMessageId || '').toString();
+    const message = await prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.chatId !== chat.id) {
+      return res.status(404).json({ error: 'Nachricht nicht gefunden' });
+    }
 
-app.get('/events/:id/chat/access', (req, res) => {
-  const event = events.find(item => item.id === req.params.id);
-  if (!event) {
-    return res.status(404).json({ error: 'Event nicht gefunden' });
+    const reporterId = await ensureBackendUser(
+      req.body.reporterId || DEMO_USER_ID,
+      req.body.reporterName || req.body.reporterId || 'Reporter',
+    );
+
+    const report = await prisma.chatReport.create({
+      data: {
+        chatId: chat.id,
+        messageId,
+        reportedById: reporterId,
+        reason: (req.body.reason || 'other').toString(),
+        details: req.body.description || null,
+      },
+    });
+
+    return res.status(201).json({
+      item: {
+        id: report.id,
+        eventId: req.params.id,
+        reportedMessageId: report.messageId,
+        reporterId: report.reportedById,
+        reason: report.reason,
+        description: report.details,
+        reportedAt: report.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('POST /events/:id/chat/reports fallback (in-memory):', error?.message || error);
+    const item = {
+      id: generateId('report'),
+      eventId: req.params.id,
+      reportedMessageId: req.body.reportedMessageId || '',
+      reporterId: req.body.reporterId || '',
+      reason: req.body.reason || 'other',
+      description: req.body.description || null,
+      reportedAt: new Date().toISOString(),
+    };
+    eventChatReports.unshift(item);
+    return res.status(201).json({ item });
   }
+});
 
+app.get('/events/:id/chat/reports', async (req, res) => {
+  try {
+    const chat = await prisma.eventChat.findUnique({ where: { eventId: req.params.id } });
+    if (!chat) {
+      return res.json({ items: [] });
+    }
+
+    const reports = await prisma.chatReport.findMany({
+      where: { chatId: chat.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const items = reports.map(report => ({
+      id: report.id,
+      eventId: req.params.id,
+      reportedMessageId: report.messageId,
+      reporterId: report.reportedById,
+      reason: report.reason,
+      description: report.details,
+      reportedAt: report.createdAt,
+    }));
+    return res.json({ items });
+  } catch (error) {
+    console.error('GET /events/:id/chat/reports fallback (in-memory):', error?.message || error);
+    const items = eventChatReports.filter(item => item.eventId === req.params.id);
+    return res.json({ items });
+  }
+});
+
+app.get('/events/:id/chat/access', async (req, res) => {
   const userId = (req.query.userId || '').toString();
-  const hosterId = (req.query.hosterId || event.hosterId || '').toString();
 
-  const approvedParticipation = eventParticipations.some(
-    item =>
-      item.eventId === event.id &&
-      item.userId === userId &&
-      item.status === 'approved',
-  );
-  const acceptedInvite = eventInvitations.some(
-    item =>
-      item.eventId === event.id &&
-      item.invitedUserId === userId &&
-      item.status === 'accepted',
-  );
+  try {
+    const event = await prisma.event.findUnique({ where: { id: req.params.id } });
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
 
-  const hasAccess = userId === hosterId || approvedParticipation || acceptedInvite;
-  res.json({ hasAccess });
+    const hosterId = (req.query.hosterId || event.hosterId || '').toString();
+    const participation = await prisma.eventParticipation.findFirst({
+      where: {
+        eventId: event.id,
+        userId,
+        status: { in: ['approved', 'accepted', 'attended'] },
+      },
+    });
+
+    const acceptedInvite = eventInvitations.some(
+      item =>
+        item.eventId === event.id &&
+        item.invitedUserId === userId &&
+        item.status === 'accepted',
+    );
+
+    const hasAccess = userId === hosterId || Boolean(participation) || acceptedInvite;
+    return res.json({ hasAccess });
+  } catch (error) {
+    console.error('GET /events/:id/chat/access fallback (in-memory):', error?.message || error);
+    const event = events.find(item => item.id === req.params.id);
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    const hosterId = (req.query.hosterId || event.hosterId || '').toString();
+    const approvedParticipation = eventParticipations.some(
+      item =>
+        item.eventId === event.id &&
+        item.userId === userId &&
+        item.status === 'approved',
+    );
+    const acceptedInvite = eventInvitations.some(
+      item =>
+        item.eventId === event.id &&
+        item.invitedUserId === userId &&
+        item.status === 'accepted',
+    );
+
+    const hasAccess = userId === hosterId || approvedParticipation || acceptedInvite;
+    return res.json({ hasAccess });
+  }
 });
 
 // 18. Payments

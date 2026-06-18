@@ -1157,7 +1157,7 @@ function removeMatching(list, predicate) {
   return originalLength - list.length;
 }
 
-function deleteAccountDataByUserId(userId) {
+function deleteAccountDataByUserIdInMemory(userId) {
   let removed = 0;
 
   if (userEntitlements.delete(userId)) {
@@ -1221,16 +1221,68 @@ function deleteAccountDataByUserId(userId) {
   return removed;
 }
 
+async function deleteAccountDataByUserIdPrisma(userId) {
+  const hostedEvents = await prisma.event.findMany({
+    where: { hosterId: userId },
+    select: { id: true },
+  });
+
+  let removed = 0;
+  removed += (await prisma.familyRequest.deleteMany({
+    where: {
+      OR: [{ fromUserId: userId }, { toUserId: userId }],
+    },
+  })).count;
+
+  removed += (await prisma.paymentTransaction.deleteMany({
+    where: {
+      auditDetails: {
+        path: ['hosterId'],
+        equals: userId,
+      },
+    },
+  })).count;
+
+  removed += (await prisma.user.deleteMany({ where: { id: userId } })).count;
+
+  return {
+    removed,
+    hostedEventIds: hostedEvents.map(item => item.id),
+  };
+}
+
 // Routes
 
-app.post('/account/delete-data', (req, res) => {
+app.post('/account/delete-data', async (req, res) => {
   const userId = (req.body.userId || '').toString().trim();
   if (!userId) {
     return res.status(400).json({ error: 'userId ist erforderlich' });
   }
 
-  const removedEntries = deleteAccountDataByUserId(userId);
-  return res.json({ ok: true, userId, removedEntries });
+  try {
+    const prismaResult = await deleteAccountDataByUserIdPrisma(userId);
+    const removedMemoryEntries = deleteAccountDataByUserIdInMemory(userId);
+
+    for (const eventId of prismaResult.hostedEventIds) {
+      delete eventInviteCodes[eventId];
+      delete eventInviteExpiresAt[eventId];
+      delete eventChatMessages[eventId];
+    }
+
+    const removedEntries = prismaResult.removed + removedMemoryEntries;
+    return res.json({
+      ok: true,
+      userId,
+      removedEntries,
+      removedDbEntries: prismaResult.removed,
+      removedMemoryEntries,
+      mode: 'prisma',
+    });
+  } catch (error) {
+    console.error('POST /account/delete-data fallback (in-memory):', error?.message || error);
+    const removedEntries = deleteAccountDataByUserIdInMemory(userId);
+    return res.json({ ok: true, userId, removedEntries, mode: 'in-memory' });
+  }
 });
 
 app.get('/entitlements/:userId/status', (req, res) => {

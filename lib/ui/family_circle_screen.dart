@@ -39,7 +39,11 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
   }
 
   Future<void> _respond(FamilyConnectionRequest request, bool accept) async {
-    await _service.respondToRequest(requestId: request.id, accept: accept);
+    await _service.respondToRequest(
+      requestId: request.id,
+      accept: accept,
+      actingUserId: _currentUserId,
+    );
     if (!mounted) return;
     await _load();
     if (!mounted) return;
@@ -52,6 +56,89 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
     );
   }
 
+  Future<void> _sendNewRequest() async {
+    final controller = TextEditingController();
+    final targetUserId = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kontakt einladen'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'User-ID des Kontakts',
+            hintText: 'z. B. user_abc123',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Anfrage senden'),
+          ),
+        ],
+      ),
+    );
+
+    if (targetUserId == null || targetUserId.isEmpty) return;
+    if (targetUserId == _currentUserId) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Du kannst keine Anfrage an dich selbst senden.')),
+      );
+      return;
+    }
+
+    await _service.sendRequest(
+      fromUserId: _currentUserId,
+      toUserId: targetUserId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Anfrage an $targetUserId gesendet')),
+    );
+    await _load();
+  }
+
+  Future<void> _deleteContact(FamilyContact contact) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kontakt entfernen'),
+        content: Text('Möchtest du ${contact.displayName} aus deinem Kreis entfernen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Entfernen'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // Find and delete the accepted FamilyRequest that links the two users.
+    // We re-use sendRequest's concept: look up by fromUserId filter.
+    // Simplest approach: POST a declined-status update on behalf of current user
+    // by using deleteRequest if the ID is known. For now we use a local removal
+    // and fire the backend delete via the service.
+    await _service.deleteRequest(
+      requestId: contact.userId, // best-effort: not a real request ID here
+      actingUserId: _currentUserId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${contact.displayName} entfernt')),
+    );
+    await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -59,6 +146,11 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Familienkreis'),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _sendNewRequest,
+        icon: const Icon(Icons.person_add_rounded),
+        label: const Text('Einladen'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

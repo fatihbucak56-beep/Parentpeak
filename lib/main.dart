@@ -1,11 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:async';\nimport 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/logic/revocation_service_impl.dart';
 import 'package:trusted_circle_demo/logic/secure_storage.dart';
 import 'package:trusted_circle_demo/logic/background_sync_manager.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/home_screen.dart';
@@ -31,7 +33,7 @@ final GlobalKey<DemoAppState> demoAppKey = GlobalKey<DemoAppState>();
 
 // Development shortcut: skips auth gate and opens the app shell directly.
 const bool _debugBypassAuthGate =
-    bool.fromEnvironment('PP_DEBUG_SKIP_LOGIN', defaultValue: true);
+    bool.fromEnvironment('PP_DEBUG_SKIP_LOGIN', defaultValue: false);
 const String _debugStartTab =
     String.fromEnvironment('PP_DEBUG_START_TAB', defaultValue: 'home');
 
@@ -65,6 +67,28 @@ void main() async {
   await BackgroundSyncManager.initialize();
   await NotificationService.instance.initialize();
   await AuthService.instance.initialize();
+
+  // Stripe publishable key (from .env or compile-time dart-define).
+  final stripeKey = APIConfig.getStripePublishableKey();
+  if (stripeKey != null && stripeKey.isNotEmpty) {
+    Stripe.publishableKey = stripeKey;
+    await Stripe.instance.applySettings();
+  } else {
+    debugPrint('Hinweis: STRIPE_PUBLISHABLE_KEY nicht gesetzt — Stripe-PaymentSheet deaktiviert.');
+  }
+
+  // Wire FCM push notifications for the already-authenticated user.
+  final currentUser = AuthService.instance.currentUser;
+  if (currentUser != null) {
+    final apiClient = BackendServiceFactory.createApiClient();
+    unawaited(
+      NotificationService.instance.initFcm(
+        apiClient: apiClient,
+        userId: currentUser.uid,
+      ),
+    );
+  }
+
   runApp(DemoApp(
     key: demoAppKey,
     startupInviteInput: startupInviteInput,
@@ -191,11 +215,16 @@ class DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     const storage = FlutterSecureStorageAdapter();
-    // For demo purpose only: write a fake token so the production-style revocation
-    // implementation can read it from secure storage. DO NOT use real tokens here.
-    storage.write(key: 'ABACUS_API_TOKEN', value: 'demo-token');
+    final backendToken = APIConfig.getBackendApiToken();
+    if (backendToken != null && backendToken.isNotEmpty) {
+      storage.write(key: 'ABACUS_API_TOKEN', value: backendToken);
+    } else if (kDebugMode) {
+      // Keep demo token behavior only in debug builds.
+      storage.write(key: 'ABACUS_API_TOKEN', value: 'demo-token');
+    }
+    final backendBaseUrl = APIConfig.getBackendBaseUrl() ?? '';
     final service = RevocationServiceImpl(
-        baseUrl: 'https://api.example.com', secureStorage: storage);
+        baseUrl: backendBaseUrl, secureStorage: storage);
 
     final mockDevices = [
       TrustedDevice(
@@ -356,8 +385,29 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  bool _isRefreshingEntitlements = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncEntitlements();
+  }
+
+  Future<void> _syncEntitlements() async {
+    if (_isRefreshingEntitlements) return;
+    _isRefreshingEntitlements = true;
+    try {
+      await AuthService.instance.refreshEntitlements();
+    } finally {
+      _isRefreshingEntitlements = false;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
   bool get _allowWebQueryBypass {
-    if (!kIsWeb) return false;
+    if (!kIsWeb || kReleaseMode) return false;
     final value = Uri.base.queryParameters['pp_debug_skip_login']?.trim();
     return value == '1' || value?.toLowerCase() == 'true';
   }
@@ -374,11 +424,12 @@ class _AuthGateState extends State<AuthGate> {
     if (mounted) {
       setState(() {});
     }
+    _syncEntitlements();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_debugBypassAuthGate && (kDebugMode || _allowWebQueryBypass)) {
+    if ((_debugBypassAuthGate || _allowWebQueryBypass) && kDebugMode) {
       final debugScreen = _debugScreen;
       if (debugScreen != null) {
         switch (debugScreen) {
@@ -415,7 +466,9 @@ class _AuthGateState extends State<AuthGate> {
     // Trial abgelaufen & kein Premium → Paywall
     if (!user.hasFullAccess) {
       return PaywallScreen(
-        onSubscribed: _refresh,
+        onSubscribed: () {
+          _refresh();
+        },
       );
     }
 

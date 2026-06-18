@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:trusted_circle_demo/logic/event_backend_service.dart';
 import 'package:trusted_circle_demo/logic/event_service.dart';
 import 'package:trusted_circle_demo/logic/family_circle_service.dart';
 import 'package:trusted_circle_demo/models/family_contact.dart';
@@ -37,6 +40,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final Set<String> _selectedInvitees = {};
 
   bool _isSubmitting = false;
+  File? _selectedPhotoFile;
+  String? _uploadedPhotoUrl;
+  final _imagePicker = ImagePicker();
+  final _eventBackendService = EventBackendService();
 
   @override
   void initState() {
@@ -108,6 +115,28 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     });
   }
 
+  Future<void> _pickPhoto() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    setState(() {
+      _selectedPhotoFile = File(picked.path);
+      _uploadedPhotoUrl = null;
+    });
+  }
+
+  Future<String> _ensurePhotoUploaded() async {
+    if (_selectedPhotoFile == null) return '';
+    if (_uploadedPhotoUrl != null) return _uploadedPhotoUrl!;
+    final url = await _eventBackendService.uploadImage(_selectedPhotoFile!);
+    _uploadedPhotoUrl = url ?? '';
+    return _uploadedPhotoUrl!;
+  }
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAgeGroups.isEmpty) {
@@ -139,6 +168,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _selectedTime.minute,
       );
 
+      final photoUrl = await _ensurePhotoUploaded();
+
       final event = MeetupEvent(
         id: 'event_${DateTime.now().millisecondsSinceEpoch}',
         hosterId: AuthService.instance.currentUser?.uid ?? 'host_demo_001',
@@ -152,7 +183,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         eventDate: eventDateTime,
         createdAt: DateTime.now(),
         maxParticipants: int.parse(_maxParticipantsController.text),
-        photoUrl: '',
+        photoUrl: photoUrl,
         status: EventStatus.active,
         price: null,
         visibility: _visibility,

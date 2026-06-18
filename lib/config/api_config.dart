@@ -6,35 +6,41 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// await dotenv.load();
 
 class APIConfig {
-  // Gemini API Configuration - default to Gemini 3.5 Flash, overridable via .env
+  // Compile-time release values (set via --dart-define).
+  static const String _geminiApiKeyDefine =
+      String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+  static const String _backendApiTokenDefine =
+      String.fromEnvironment('BACKEND_API_TOKEN', defaultValue: '');
+  static const String _backendBaseUrlDefine =
+      String.fromEnvironment('BACKEND_BASE_URL', defaultValue: '');
+  static const String _geminiModelNameDefine =
+      String.fromEnvironment('GEMINI_MODEL_NAME', defaultValue: '');
+    static const String _privacyPolicyUrlDefine =
+      String.fromEnvironment('PRIVACY_POLICY_URL', defaultValue: '');
+    static const String _termsOfServiceUrlDefine =
+      String.fromEnvironment('TERMS_OF_SERVICE_URL', defaultValue: '');
+    static const String _contactEmailDefine =
+      String.fromEnvironment('CONTACT_EMAIL', defaultValue: '');
+    static const String _contactSupportUrlDefine =
+      String.fromEnvironment('CONTACT_SUPPORT_URL', defaultValue: '');
+
+  // Gemini API Configuration - default to Gemini 3.5 Flash, overridable via env.
   static const String geminiModelName = 'gemini-3.5-flash';
 
   static String getGeminiModelName() {
-    try {
-      final modelName = dotenv.env['GEMINI_MODEL_NAME']?.trim();
-      if (modelName != null && modelName.isNotEmpty) {
-        return modelName;
-      }
-    } catch (_) {}
-
+    final modelName = _readEnvOrDefine('GEMINI_MODEL_NAME');
+    if (modelName != null && modelName.isNotEmpty) {
+      return modelName;
+    }
     return geminiModelName;
   }
 
   // Backend API configuration
   static const String backendBaseUrlFallback = '';
 
-  /// Hole den Gemini API-Key aus der .env Datei.
-  /// Falls nicht gefunden, wird null zurückgegeben.
+  /// Hole den Gemini API-Key aus --dart-define oder .env.
   static String? getGeminiApiKey() {
-    try {
-      final apiKey = dotenv.env['GEMINI_API_KEY']?.trim();
-      if (apiKey != null && apiKey.isNotEmpty) {
-        return apiKey;
-      }
-    } catch (_) {
-      return null;
-    }
-    return null;
+    return _readEnvOrDefine('GEMINI_API_KEY');
   }
 
   /// Validiere ob ein API-Key vorhanden ist
@@ -63,45 +69,60 @@ class APIConfig {
   static List<String> getReleaseConfigIssues() {
     final issues = <String>[];
     final baseUrl = getBackendBaseUrl();
+    final privacyUrl = getPrivacyPolicyUrl();
+    final termsUrl = getTermsOfServiceUrl();
+    final contactEmail = getContactEmail();
 
     if (baseUrl == null || baseUrl.isEmpty) {
       issues.add('BACKEND_BASE_URL fehlt');
-      return issues;
+    } else {
+      if (!baseUrl.startsWith('https://')) {
+        issues.add('BACKEND_BASE_URL muss mit https:// beginnen');
+      }
+
+      final lower = baseUrl.toLowerCase();
+      if (lower.contains('localhost') ||
+          lower.contains('127.0.0.1') ||
+          lower.contains('10.0.2.2')) {
+        issues.add('BACKEND_BASE_URL darf kein lokaler Host sein');
+      }
     }
 
-    if (!baseUrl.startsWith('https://')) {
-      issues.add('BACKEND_BASE_URL muss mit https:// beginnen');
+    if (privacyUrl == null || privacyUrl.isEmpty) {
+      issues.add('PRIVACY_POLICY_URL fehlt');
+    } else if (!privacyUrl.startsWith('https://')) {
+      issues.add('PRIVACY_POLICY_URL muss mit https:// beginnen');
     }
 
-    final lower = baseUrl.toLowerCase();
-    if (lower.contains('localhost') ||
-        lower.contains('127.0.0.1') ||
-        lower.contains('10.0.2.2')) {
-      issues.add('BACKEND_BASE_URL darf kein lokaler Host sein');
+    if (termsUrl == null || termsUrl.isEmpty) {
+      issues.add('TERMS_OF_SERVICE_URL fehlt');
+    } else if (!termsUrl.startsWith('https://')) {
+      issues.add('TERMS_OF_SERVICE_URL muss mit https:// beginnen');
+    }
+
+    if (contactEmail == null || contactEmail.isEmpty) {
+      issues.add('CONTACT_EMAIL fehlt');
     }
 
     return issues;
   }
 
   static String? getBackendBaseUrl() {
-    try {
-      final value = dotenv.env['BACKEND_BASE_URL']?.trim();
-      if (value != null && value.isNotEmpty) {
-        return value;
-      }
-    } catch (_) {}
-
+    final value = _readEnvOrDefine('BACKEND_BASE_URL');
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
     return backendBaseUrlFallback.isNotEmpty ? backendBaseUrlFallback : null;
   }
 
   static String? getBackendApiToken() {
-    try {
-      final token = dotenv.env['BACKEND_API_TOKEN']?.trim();
-      if (token != null && token.isNotEmpty) {
-        return token;
-      }
-    } catch (_) {}
-    return null;
+    return _readEnvOrDefine('BACKEND_API_TOKEN');
+  }
+
+  /// Stripe publishable key — set STRIPE_PUBLISHABLE_KEY in your .env.
+  /// Starts with `pk_live_` in production, `pk_test_` for testing.
+  static String? getStripePublishableKey() {
+    return _readEnvOrDefine('STRIPE_PUBLISHABLE_KEY');
   }
 
   static String getBackendFamilyId() {
@@ -265,6 +286,13 @@ class APIConfig {
     );
   }
 
+  static String getBackendPaymentsProviderEventsPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PAYMENTS_PROVIDER_EVENTS_PATH',
+      '/payments/provider-events',
+    );
+  }
+
   static String getBackendPaymentsTransactionsPath() {
     return _getEnvOrDefault(
       'BACKEND_PAYMENTS_TRANSACTIONS_PATH',
@@ -290,14 +318,101 @@ class APIConfig {
     );
   }
 
+  static String getBackendAccountDeleteDataPath() {
+    return _getEnvOrDefault(
+      'BACKEND_ACCOUNT_DELETE_DATA_PATH',
+      '/account/delete-data',
+    );
+  }
+
+  static String getBackendEntitlementsPath() {
+    return _getEnvOrDefault(
+      'BACKEND_ENTITLEMENTS_PATH',
+      '/entitlements',
+    );
+  }
+
+  static String getBackendEntitlementsActivatePremiumSuffix() {
+    return _getEnvOrDefault(
+      'BACKEND_ENTITLEMENTS_ACTIVATE_PREMIUM_SUFFIX',
+      '/activate-premium',
+    );
+  }
+
+  // ──  Legal & Compliance URLs ──────────────────────────────────────────────
+  
+  /// Privacy Policy URL (required for stores)
+  static String? getPrivacyPolicyUrl() {
+    return _getEnvOrDefault('PRIVACY_POLICY_URL', '');
+  }
+
+  /// Terms of Service URL (required for stores)
+  static String? getTermsOfServiceUrl() {
+    return _getEnvOrDefault('TERMS_OF_SERVICE_URL', '');
+  }
+
+  /// Support/Contact Email
+  static String? getContactEmail() {
+    return _getEnvOrDefault('CONTACT_EMAIL', '');
+  }
+
+  /// Support/Contact URL
+  static String? getContactSupportUrl() {
+    return _getEnvOrDefault('CONTACT_SUPPORT_URL', '');
+  }
+
   static String _getEnvOrDefault(String key, String fallback) {
+    final value = _readEnvOrDefine(key);
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
+    return fallback;
+  }
+
+  static String? _readEnvOrDefine(String key) {
+    final compileTimeValue = _readCompileTimeValue(key);
+    if (compileTimeValue != null && compileTimeValue.isNotEmpty) {
+      return compileTimeValue;
+    }
+
     try {
-      final value = dotenv.env[key]?.trim();
-      if (value != null && value.isNotEmpty) {
-        return value;
+      final envValue = dotenv.env[key]?.trim();
+      if (envValue != null && envValue.isNotEmpty) {
+        return envValue;
       }
     } catch (_) {}
-    return fallback;
+    return null;
+  }
+
+  static String? _readCompileTimeValue(String key) {
+    switch (key) {
+      case 'GEMINI_API_KEY':
+        return _geminiApiKeyDefine.isNotEmpty ? _geminiApiKeyDefine : null;
+      case 'BACKEND_API_TOKEN':
+        return _backendApiTokenDefine.isNotEmpty
+            ? _backendApiTokenDefine
+            : null;
+      case 'BACKEND_BASE_URL':
+        return _backendBaseUrlDefine.isNotEmpty ? _backendBaseUrlDefine : null;
+      case 'GEMINI_MODEL_NAME':
+        return _geminiModelNameDefine.isNotEmpty
+            ? _geminiModelNameDefine
+            : null;
+      case 'PRIVACY_POLICY_URL':
+        return _privacyPolicyUrlDefine.isNotEmpty ? _privacyPolicyUrlDefine : null;
+      case 'TERMS_OF_SERVICE_URL':
+        return _termsOfServiceUrlDefine.isNotEmpty
+            ? _termsOfServiceUrlDefine
+            : null;
+      case 'CONTACT_EMAIL':
+        return _contactEmailDefine.isNotEmpty ? _contactEmailDefine : null;
+      case 'CONTACT_SUPPORT_URL':
+        return _contactSupportUrlDefine.isNotEmpty
+            ? _contactSupportUrlDefine
+            : null;
+      default:
+        return null;
+    }
   }
 
   /// System-Instruktion für Eltern-Assistent

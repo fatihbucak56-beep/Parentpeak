@@ -18,6 +18,10 @@ import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:trusted_circle_demo/logic/notification_service.dart';
+import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:trusted_circle_demo/logic/backend_api_client.dart';
+import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 
 // ─── Result-Typen ────────────────────────────────────────────────────────────
 
@@ -60,6 +64,8 @@ class ParentUser {
   final String displayName;
   final DateTime registeredAt;
   final bool isPremium;
+  final bool? serverHasFullAccess;
+  final int? serverTrialDaysRemaining;
 
   const ParentUser({
     required this.uid,
@@ -67,6 +73,8 @@ class ParentUser {
     required this.displayName,
     required this.registeredAt,
     required this.isPremium,
+    this.serverHasFullAccess,
+    this.serverTrialDaysRemaining,
   });
 
   bool get isTrialActive {
@@ -75,12 +83,19 @@ class ParentUser {
   }
 
   int get trialDaysRemaining {
+    if (serverTrialDaysRemaining != null) {
+      return serverTrialDaysRemaining! < 0 ? 0 : serverTrialDaysRemaining!;
+    }
     final trialEnd = registeredAt.add(const Duration(days: 14));
     final diff = trialEnd.difference(DateTime.now()).inDays;
     return diff < 0 ? 0 : diff;
   }
 
-  bool get hasFullAccess => isPremium || isTrialActive;
+  bool get hasFullAccess {
+    if (isPremium) return true;
+    if (serverHasFullAccess != null) return serverHasFullAccess!;
+    return isTrialActive;
+  }
 
   Map<String, dynamic> toJson() => {
         'uid': uid,
@@ -88,6 +103,8 @@ class ParentUser {
         'displayName': displayName,
         'registeredAt': registeredAt.toIso8601String(),
         'isPremium': isPremium,
+        'serverHasFullAccess': serverHasFullAccess,
+        'serverTrialDaysRemaining': serverTrialDaysRemaining,
       };
 
   factory ParentUser.fromJson(Map<String, dynamic> j) => ParentUser(
@@ -96,6 +113,8 @@ class ParentUser {
         displayName: j['displayName'] as String,
         registeredAt: DateTime.parse(j['registeredAt'] as String),
         isPremium: j['isPremium'] as bool,
+        serverHasFullAccess: j['serverHasFullAccess'] as bool?,
+        serverTrialDaysRemaining: j['serverTrialDaysRemaining'] as int?,
       );
 }
 
@@ -112,6 +131,7 @@ class AuthService {
 
   bool _firebaseReady = false;
   FirebaseAuth? _firebaseAuth;
+  final BackendApiClient? _apiClient = BackendServiceFactory.createApiClient();
 
   // Singleton
   static final AuthService instance = AuthService._();
@@ -126,6 +146,7 @@ class AuthService {
       final firebaseUser = _firebaseAuth?.currentUser;
       if (firebaseUser != null) {
         _currentUser = await _readOrCreateFirebaseUser(firebaseUser);
+        await refreshEntitlements();
       }
       return;
     }
@@ -136,6 +157,7 @@ class AuthService {
     if (raw != null) {
       try {
         _currentUser = ParentUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        await refreshEntitlements();
       } catch (_) {
         await prefs.remove(_kUserKey);
       }
@@ -185,6 +207,7 @@ class AuthService {
           forceNewRegisteredAt: true,
         );
         _currentUser = user;
+        await refreshEntitlements();
         return AuthResult.ok(user);
       } on FirebaseAuthException catch (e) {
         debugPrint(
@@ -261,6 +284,8 @@ class AuthService {
 
         final user = await _readOrCreateFirebaseUser(firebaseUser);
         _currentUser = user;
+        await refreshEntitlements();
+        _triggerFcmInit(user.uid);
         return AuthResult.ok(user);
       } on FirebaseAuthException catch (e) {
         debugPrint(
@@ -295,7 +320,17 @@ class AuthService {
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────────
-
+  void _triggerFcmInit(String userId) {
+    Future.microtask(() async {
+      try {
+        final apiClient = BackendServiceFactory.createApiClient();
+        await NotificationService.instance.initFcm(
+          apiClient: apiClient,
+          userId: userId,
+        );
+      } catch (_) {}
+    });
+  }
   Future<void> logout() async {
     if (_firebaseReady) {
       final auth = _firebaseAuth;
@@ -313,14 +348,31 @@ class AuthService {
 
   // ── Abo aktivieren (Stub für In-App Purchase) ──────────────────────────────
 
-  Future<void> activatePremium() async {
-    if (_currentUser == null) return;
+  Future<bool> activatePremium() async {
+    if (_currentUser == null) return false;
+
+    if (_apiClient != null) {
+      try {
+        await _apiClient!.postJsonAny(
+          '${APIConfig.getBackendEntitlementsPath()}/${_currentUser!.uid}${APIConfig.getBackendEntitlementsActivatePremiumSuffix()}',
+          {
+            'registeredAt': _currentUser!.registeredAt.toIso8601String(),
+            'schemaVersion': APIConfig.getBackendApiVersion(),
+          },
+        );
+      } catch (e) {
+        debugPrint('AuthService.activatePremium(): backend sync failed: $e');
+      }
+    }
+
     final user = ParentUser(
       uid: _currentUser!.uid,
       email: _currentUser!.email,
       displayName: _currentUser!.displayName,
       registeredAt: _currentUser!.registeredAt,
       isPremium: true,
+      serverHasFullAccess: true,
+      serverTrialDaysRemaining: _currentUser!.serverTrialDaysRemaining,
     );
     final prefs = await SharedPreferences.getInstance();
     if (_firebaseReady) {
@@ -329,6 +381,55 @@ class AuthService {
       await _persistSession(prefs, user);
     }
     _currentUser = user;
+    await refreshEntitlements();
+    return true;
+  }
+
+  Future<void> refreshEntitlements() async {
+    final current = _currentUser;
+    if (current == null || _apiClient == null) {
+      return;
+    }
+
+    try {
+      final payload = await _apiClient!.getJson(
+        '${APIConfig.getBackendEntitlementsPath()}/${current.uid}/status?registeredAt=${Uri.encodeQueryComponent(current.registeredAt.toIso8601String())}&isPremium=${current.isPremium}',
+      );
+
+      final raw = payload is Map<String, dynamic>
+          ? (payload['item'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(payload['item'] as Map)
+              : payload)
+          : <String, dynamic>{};
+
+      if (raw.isEmpty) return;
+
+      final serverPremium = raw['isPremium'] == true;
+      final serverHasFullAccess = raw['hasFullAccess'] == true;
+      final serverTrialDaysRemaining = raw['trialDaysRemaining'] is num
+          ? (raw['trialDaysRemaining'] as num).toInt()
+          : null;
+
+      final updated = ParentUser(
+        uid: current.uid,
+        email: current.email,
+        displayName: current.displayName,
+        registeredAt: current.registeredAt,
+        isPremium: current.isPremium || serverPremium,
+        serverHasFullAccess: serverHasFullAccess,
+        serverTrialDaysRemaining: serverTrialDaysRemaining,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      if (_firebaseReady) {
+        await _persistFirebaseProfile(prefs, updated);
+      } else {
+        await _persistSession(prefs, updated);
+      }
+      _currentUser = updated;
+    } catch (e) {
+      debugPrint('AuthService.refreshEntitlements(): failed: $e');
+    }
   }
 
   // ── Hilfsmethoden ──────────────────────────────────────────────────────────

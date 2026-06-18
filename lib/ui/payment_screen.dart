@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
+import 'package:trusted_circle_demo/models/payment_transaction.dart';
 import 'package:trusted_circle_demo/logic/payment_service.dart';
 import 'package:trusted_circle_demo/logic/event_service.dart';
 
@@ -36,28 +39,56 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // Simuliere Payment-Prozess
+      Map<String, dynamic> initResponse;
       if (_selectedPaymentMethod == 'stripe') {
-        await _paymentService.initiateStripePayment(
+        initResponse = await _paymentService.initiateStripePayment(
           eventId: widget.event.id,
           hosterId: widget.event.hosterId,
           amount: widget.amount,
         );
       } else {
-        await _paymentService.initiatePayPalPayment(
+        initResponse = await _paymentService.initiatePayPalPayment(
           eventId: widget.event.id,
           hosterId: widget.event.hosterId,
           amount: widget.amount,
         );
       }
 
-      // Bestätige Payment
-      final transaction = await _paymentService.confirmPayment(
+      final providerTransactionRef = _selectedPaymentMethod == 'stripe'
+          ? (initResponse['clientSecret']?.toString() ?? '').trim()
+          : (initResponse['token']?.toString() ?? '').trim();
+
+      if (providerTransactionRef.isEmpty) {
+        throw StateError('Provider-Referenz fehlt. Zahlung kann nicht fortgesetzt werden.');
+      }
+
+      // Lege Zahlung als pending an und warte auf verifiziertes Provider-Ergebnis.
+      final pendingTransaction = await _paymentService.confirmPayment(
         eventId: widget.event.id,
         hosterId: widget.event.hosterId,
         amount: widget.amount,
         paymentMethod: _selectedPaymentMethod,
+        providerTransactionRef: providerTransactionRef,
+        initialStatus: 'pending',
       );
+
+      final isMockBackend =
+          (initResponse['mode']?.toString().trim().toLowerCase() ?? '') ==
+              'mock_backend';
+
+      final transaction = (kDebugMode && isMockBackend)
+          ? await _paymentService.reportProviderEvent(
+              transactionId: pendingTransaction.id,
+              provider: _selectedPaymentMethod,
+              providerTransactionRef: providerTransactionRef,
+              status: 'completed',
+              verified: true,
+            )
+          : await _awaitFinalPaymentState(pendingTransaction.id);
+
+      if (transaction == null || transaction.status != 'completed') {
+        throw StateError('Zahlung ist noch nicht abgeschlossen (Status: ${transaction?.status ?? 'unknown'}).');
+      }
 
       // Erstelle das Event
       final eventWithPayment = MeetupEvent(
@@ -83,6 +114,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       );
 
       await _eventService.createEvent(eventWithPayment);
+
+      setState(() => _isProcessing = false);
 
       if (mounted) {
         // Zeige Erfolgs-Dialog
@@ -135,6 +168,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         );
       }
+    } on StripeException catch (e) {
+      setState(() => _isProcessing = false);
+      // User cancelled the PaymentSheet — treat as soft abort, not error.
+      final isCancel = e.error.code == FailureCode.Canceled;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isCancel
+                  ? 'Zahlung abgebrochen'
+                  : 'Stripe-Fehler: ${e.error.localizedMessage ?? e.toString()}',
+            ),
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _isProcessing = false);
       if (mounted) {
@@ -143,6 +191,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
         );
       }
     }
+  }
+
+  Future<PaymentTransaction?> _awaitFinalPaymentState(String transactionId) async {
+    const maxAttempts = 15;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final transaction = await _paymentService.getTransaction(transactionId);
+      if (transaction == null) {
+        await Future.delayed(const Duration(seconds: 2));
+        continue;
+      }
+      if (transaction.status == 'completed' || transaction.status == 'failed') {
+        return transaction;
+      }
+      await Future.delayed(const Duration(seconds: 2));
+    }
+    return await _paymentService.getTransaction(transactionId);
   }
 
   @override

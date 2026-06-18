@@ -2018,13 +2018,65 @@ app.put('/family/requests/:id', async (req, res) => {
   }
 });
 
+app.delete('/family/requests/:id', async (req, res) => {
+  const actingUserId = (req.body?.actingUserId || req.query.actingUserId || '').toString().trim();
+
+  try {
+    const current = await prisma.familyRequest.findUnique({ where: { id: req.params.id } });
+    if (!current) {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden' });
+    }
+
+    if (actingUserId) {
+      const involved = actingUserId === current.fromUserId || actingUserId === current.toUserId;
+      if (!involved) {
+        return res.status(403).json({ error: 'Keine Berechtigung, diese Anfrage zu löschen' });
+      }
+    }
+
+    await prisma.familyRequest.delete({ where: { id: req.params.id } });
+
+    const idx = familyRequests.findIndex(item => item.id === req.params.id);
+    if (idx !== -1) familyRequests.splice(idx, 1);
+
+    return res.status(204).send();
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden' });
+    }
+
+    console.error('DELETE /family/requests/:id fallback (in-memory):', error?.message || error);
+    const idx = familyRequests.findIndex(item => item.id === req.params.id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden' });
+    }
+
+    const entry = familyRequests[idx];
+    if (actingUserId) {
+      const involved = actingUserId === entry.fromUserId || actingUserId === entry.toUserId;
+      if (!involved) {
+        return res.status(403).json({ error: 'Keine Berechtigung, diese Anfrage zu löschen' });
+      }
+    }
+
+    familyRequests.splice(idx, 1);
+    return res.status(204).send();
+  }
+});
+
 // 14. Events (Prisma-first with in-memory fallback)
 app.get('/events', async (req, res) => {
+  const MAX_LIMIT = 100;
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '50', 10) || 50, 1), MAX_LIMIT);
+  const offset = Math.max(Number.parseInt(req.query.offset || '0', 10) || 0, 0);
+
   try {
     const hostUserId = (req.query.hostUserId || '').toString().trim();
     const records = await prisma.event.findMany({
       where: hostUserId ? { hosterId: hostUserId } : undefined,
       orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: limit,
     });
 
     const countMap = await buildParticipantCountMap(records.map(item => item.id));
@@ -2037,7 +2089,7 @@ app.get('/events', async (req, res) => {
       items = items.filter(event => event.status === requestedStatus);
     }
 
-    return res.json({ items });
+    return res.json({ items, limit, offset, hasMore: items.length === limit });
   } catch (error) {
     console.error('GET /events fallback (in-memory):', error?.message || error);
     let items = [...events];
@@ -2047,7 +2099,8 @@ app.get('/events', async (req, res) => {
     if (req.query.hostUserId) {
       items = items.filter(event => event.hosterId === req.query.hostUserId);
     }
-    return res.json({ items });
+    const page = items.slice(offset, offset + limit);
+    return res.json({ items: page, limit, offset, hasMore: page.length === limit });
   }
 });
 
@@ -2140,7 +2193,11 @@ app.get('/events/discover', async (req, res) => {
       }
     }
 
-    return res.json({ items });
+    const MAX_LIMIT = 100;
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '50', 10) || 50, 1), MAX_LIMIT);
+    const offset = Math.max(Number.parseInt(req.query.offset || '0', 10) || 0, 0);
+    const page = items.slice(offset, offset + limit);
+    return res.json({ items: page, limit, offset, hasMore: page.length === limit });
   } catch (error) {
     console.error('GET /events/discover fallback (in-memory):', error?.message || error);
     let items = events.filter(event => canViewerSeeEvent(event, viewerUserId));
@@ -2156,7 +2213,11 @@ app.get('/events/discover', async (req, res) => {
         );
       }
     }
-    return res.json({ items });
+    const MAX_LIMIT = 100;
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '50', 10) || 50, 1), MAX_LIMIT);
+    const offset = Math.max(Number.parseInt(req.query.offset || '0', 10) || 0, 0);
+    const page = items.slice(offset, offset + limit);
+    return res.json({ items: page, limit, offset, hasMore: page.length === limit });
   }
 });
 
@@ -2315,7 +2376,21 @@ app.post('/events', async (req, res) => {
 });
 
 app.delete('/events/item/:id', async (req, res) => {
+  const requestingUserId = (req.query.requestingUserId || req.body?.requestingUserId || '').toString().trim();
+
   try {
+    const record = await prisma.event.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, hosterId: true },
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+    if (requestingUserId && requestingUserId !== record.hosterId) {
+      return res.status(403).json({ error: 'Nur der Hoster darf dieses Event löschen' });
+    }
+
     await prisma.event.delete({ where: { id: req.params.id } });
 
     const index = events.findIndex(event => event.id === req.params.id);
@@ -2334,6 +2409,11 @@ app.delete('/events/item/:id', async (req, res) => {
     const index = events.findIndex(event => event.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    const eventEntry = events[index];
+    if (requestingUserId && requestingUserId !== eventEntry.hosterId) {
+      return res.status(403).json({ error: 'Nur der Hoster darf dieses Event löschen' });
     }
 
     const [removed] = events.splice(index, 1);

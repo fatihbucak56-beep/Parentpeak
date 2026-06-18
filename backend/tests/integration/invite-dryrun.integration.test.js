@@ -656,3 +656,122 @@ test('family request security: actingUserId prevents impersonation and blocks se
     await stopServer(server?.child);
   }
 });
+
+test('event ownership guard on DELETE and pagination on GET /events', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const ownerUser = `it_owner_${suffix}`;
+  const intruderUser = `it_intruder_owner_${suffix}`;
+  const createdEventIds = [];
+  let server;
+
+  try {
+    server = startServer(3032);
+    await waitForHealth(server.baseUrl);
+
+    // Create 3 events for pagination test.
+    for (let i = 0; i < 3; i++) {
+      const ev = await postJson(server.baseUrl, '/events', {
+        hosterId: ownerUser,
+        title: `IT Paging Event ${i} ${suffix}`,
+        eventDate: '2026-08-01T10:00:00.000Z',
+      });
+      assert.equal(ev.response.status, 201);
+      createdEventIds.push(ev.payload?.item?.id);
+    }
+
+    // Pagination: limit=2 returns max 2 items and hasMore flag.
+    const page1 = await getJson(server.baseUrl, `/events?hostUserId=${ownerUser}&limit=2&offset=0`);
+    assert.equal(page1.response.status, 200);
+    assert.equal(page1.payload?.items?.length, 2);
+    assert.equal(page1.payload?.limit, 2);
+    assert.equal(page1.payload?.offset, 0);
+    assert.equal(page1.payload?.hasMore, true);
+
+    // Second page should have 1 remaining item.
+    const page2 = await getJson(server.baseUrl, `/events?hostUserId=${ownerUser}&limit=2&offset=2`);
+    assert.equal(page2.response.status, 200);
+    assert.equal(page2.payload?.items?.length, 1);
+    assert.equal(page2.payload?.hasMore, false);
+
+    // Intruder cannot delete owner's event.
+    const forbidDelete = await deletePath(
+      server.baseUrl,
+      `/events/item/${createdEventIds[0]}?requestingUserId=${intruderUser}`,
+    );
+    assert.equal(forbidDelete.response.status, 403);
+    assert.match(forbidDelete.payload?.error || '', /Hoster/i);
+
+    // Owner can delete own event.
+    const allowDelete = await deletePath(
+      server.baseUrl,
+      `/events/item/${createdEventIds[0]}?requestingUserId=${ownerUser}`,
+    );
+    assert.equal(allowDelete.response.status, 204);
+    createdEventIds.shift(); // Already deleted.
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    if (server) {
+      for (const eventId of createdEventIds) {
+        try { await deletePath(server.baseUrl, `/events/item/${eventId}?requestingUserId=${ownerUser}`); } catch (_) {}
+      }
+      await postJson(server.baseUrl, '/account/delete-data', { userId: ownerUser });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: intruderUser });
+    }
+    await stopServer(server?.child);
+  }
+});
+
+test('family request DELETE removes relationship and intruder cannot delete', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const userA = `it_del_a_${suffix}`;
+  const userB = `it_del_b_${suffix}`;
+  const intruder = `it_del_intruder_${suffix}`;
+  let server;
+
+  try {
+    server = startServer(3033);
+    await waitForHealth(server.baseUrl);
+
+    const createReq = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: userA,
+      toUserId: userB,
+      actingUserId: userA,
+      status: 'accepted',
+    });
+    assert.equal(createReq.response.status, 201);
+    const reqId = createReq.payload?.item?.id;
+    assert.ok(reqId);
+
+    // Intruder cannot delete.
+    const intruderDel = await fetch(`${server.baseUrl}/family/requests/${reqId}?actingUserId=${intruder}`, {
+      method: 'DELETE',
+    });
+    assert.equal(intruderDel.status, 403);
+
+    // Participant (userB) can delete.
+    const validDel = await fetch(`${server.baseUrl}/family/requests/${reqId}?actingUserId=${userB}`, {
+      method: 'DELETE',
+    });
+    assert.equal(validDel.status, 204);
+
+    // Confirm it's gone.
+    const listAfter = await getJson(
+      server.baseUrl,
+      `/family/requests?fromUserId=${userA}&toUserId=${userB}`,
+    );
+    assert.ok(Array.isArray(listAfter.payload?.requests));
+    assert.equal(listAfter.payload.requests.filter(r => r.id === reqId).length, 0);
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    if (server) {
+      await postJson(server.baseUrl, '/account/delete-data', { userId: userA });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: userB });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: intruder });
+    }
+    await stopServer(server?.child);
+  }
+});

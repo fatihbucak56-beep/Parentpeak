@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============================================================================
@@ -30,9 +29,10 @@ model User {
   isPremium             Boolean  @default(false)
   premiumExpiresAt      DateTime?
   
-  // Relations
-  families              Family[]
-  hostedEvents          Event[]  @relation("EventHost")
+  // Relations - unique names for each relation
+  createdFamilies       Family[]        @relation("FamilyCreator")
+  familyMemberships     Family[]        @relation("FamilyMembers")
+  hostedEvents          Event[]         @relation("EventHost")
   eventParticipations   EventParticipation[]
   paymentTransactions   PaymentTransaction[]
   messages              Message[]
@@ -52,10 +52,14 @@ model Family {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   
+  // Creator of family
   createdById           String
-  createdBy             User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdByUser         User     @relation("FamilyCreator", fields: [createdById], references: [id], onDelete: Cascade)
   
-  members               User[]
+  // Members of family
+  memberUsers           User[]   @relation("FamilyMembers")
+  
+  // Child relations
   events                Event[]
   todos                 Todo[]
   shoppingItems         ShoppingItem[]
@@ -84,37 +88,44 @@ model Event {
   title                 String
   description           String?
   
+  // Host/Creator
   hosterId              String
   hoster                User     @relation("EventHost", fields: [hosterId], references: [id], onDelete: Cascade)
   
+  // Family context (optional)
   familyId              String?
   family                Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
   
+  // Timing & Location
   startDate             DateTime
   endDate               DateTime?
   location              String?
   latitude              Float?
   longitude             Float?
-  price                 Decimal? @db.Decimal(10, 2)
+  
+  // Event Status & Type
+  status                String   @default("upcoming") // upcoming, ongoing, completed, cancelled
+  eventType             String   @default("generic") // generic, birthday, meeting, outing, etc.
+  
+  // Pricing (optional)
+  costPerPerson         Decimal? @db.Decimal(10, 2)
+  currency              String   @default("EUR")
   maxParticipants       Int?
-  ageGroupMin           Int?
-  ageGroupMax           Int?
   
-  visibility            String   @default("public") // public, invite-only
-  inviteCode            String?  @unique
-  inviteCodeExpiresAt   DateTime?
-  
+  // Metadata
+  imageUrl              String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   
   // Relations
-  participations        EventParticipation[]
-  chats                 EventChat[]
+  participants          EventParticipation[]
+  chat                  EventChat?
+  paymentTransactions   PaymentTransaction[]
   
   @@index([hosterId])
   @@index([familyId])
+  @@index([status])
   @@index([createdAt])
-  @@index([startDate])
 }
 
 model EventParticipation {
@@ -126,13 +137,13 @@ model EventParticipation {
   userId                String
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  status                String   @default("pending") // pending, approved, declined
+  status                String   @default("invited") // invited, accepted, declined, attended
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   
   @@unique([eventId, userId])
-  @@index([eventId])
   @@index([userId])
+  @@index([status])
 }
 
 // ============================================================================
@@ -142,49 +153,62 @@ model EventParticipation {
 model EventChat {
   id                    String   @id @default(cuid())
   
-  eventId               String
+  eventId               String   @unique
   event                 Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   
-  messages              Message[]
-  
   createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  messages              Message[]
+  reports               ChatReport[]
   
   @@index([eventId])
 }
 
 model Message {
   id                    String   @id @default(cuid())
+  
+  chatId                String
+  chat                  EventChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  authorId              String
+  author                User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
   content               String
-  
-  senderId              String
-  sender                User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  
-  eventChatId           String?
-  eventChat             EventChat? @relation(fields: [eventChatId], references: [id], onDelete: Cascade)
-  
-  hasBeenReported       Boolean  @default(false)
-  reportReason          String?
+  attachmentUrl         String?
   
   createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
   
-  @@index([senderId])
-  @@index([eventChatId])
+  reports               ChatReport[]
+  
+  @@index([chatId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model ChatReport {
   id                    String   @id @default(cuid())
   
-  reporterId            String
-  reporter              User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
-  
   messageId             String
-  reason                String
+  message               Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  
+  reportedById          String
+  reportedBy            User     @relation(fields: [reportedById], references: [id], onDelete: Cascade)
+  
+  chatId                String
+  chat                  EventChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  reason                String   // spam, offensive, inappropriate, etc.
   details               String?
+  status                String   @default("pending") // pending, reviewed, resolved, dismissed
   
   createdAt             DateTime @default(now())
+  resolvedAt            DateTime?
   
-  @@index([reporterId])
   @@index([messageId])
+  @@index([reportedById])
+  @@index([status])
 }
 
 // ============================================================================
@@ -194,96 +218,103 @@ model ChatReport {
 model PaymentTransaction {
   id                    String   @id @default(cuid())
   
-  // Stripe Integration
-  stripePaymentIntentId String?  @unique
-  stripeTxnId           String?
+  eventId               String
+  event                 Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   
-  // User & Amount
   userId                String
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
+  // Payment Details
   amount                Decimal  @db.Decimal(10, 2)
   currency              String   @default("EUR")
-  status                String   @default("initiated") // initiated, pending, completed, failed, refunded
+  stripePaymentIntentId String   @unique
+  stripeChargId         String?
   
-  // Idempotency Key (prevent duplicate charges on retry)
-  idempotencyKey        String?  @unique
+  // Idempotency
+  idempotencyKey        String   @unique
   
-  // Audit Trail
-  createdByType         String   // webhook, api, manual
-  webhookId             String?  // Stripe webhook ID for tracking
-  verifiedAt            DateTime?
-  verificationDetails   String?  @db.Json
+  // Status
+  status                String   @default("pending") // pending, succeeded, failed, refunded
   
-  // Refund Tracking
+  // Refund tracking
   refundedAmount        Decimal? @db.Decimal(10, 2)
   refundedAt            DateTime?
   refundReason          String?
   
-  // Timestamps
+  // Audit trail
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  verifiedAt            DateTime?
+  verifiedByType        String?  // "webhook", "manual", "api"
+  auditDetails          Json?
   
+  @@index([eventId])
   @@index([userId])
   @@index([status])
   @@index([createdAt])
-  @@index([stripeTxnId])
   @@index([stripePaymentIntentId])
 }
 
 // ============================================================================
-// MARKETPLACE
+// MARKETPLACE & PROVIDERS
 // ============================================================================
 
 model Provider {
   id                    String   @id @default(cuid())
   name                  String
-  category              String
   description           String?
+  contactEmail          String
+  contactPhone          String?
   website               String?
-  rating                Decimal? @db.Decimal(3, 2)
-  ratingCount           Int      @default(0)
+  imageUrl              String?
+  
+  // Provider categorization
+  category              String   // catering, decoration, entertainment, venue, etc.
+  
+  // Location
+  city                  String?
+  country               String?
   
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   
   @@index([category])
+  @@index([city])
 }
 
 // ============================================================================
-// TODOS & SHOPPING
+// FAMILY UTILITIES
 // ============================================================================
 
 model Todo {
   id                    String   @id @default(cuid())
+  title                 String
+  description           String?
+  done                  Boolean  @default(false)
   
   familyId              String
   family                Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   
-  title                 String
-  completed             Boolean  @default(false)
-  priority              Int      @default(0)
-  
   createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  dueDate               DateTime?
+  completedAt           DateTime?
   
   @@index([familyId])
-  @@index([completed])
+  @@index([done])
 }
 
 model ShoppingItem {
   id                    String   @id @default(cuid())
+  name                  String
+  quantity              Int      @default(1)
+  bought                Boolean  @default(false)
   
   familyId              String
   family                Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   
-  item                  String
-  quantity              Int      @default(1)
-  completed             Boolean  @default(false)
-  
   createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  boughtAt              DateTime?
   
   @@index([familyId])
-  @@index([completed])
+  @@index([bought])
 }

@@ -313,6 +313,7 @@ test('discover enforces public, familyCircle, privateOnly and inviteOnly visibil
     const familyLink = await postJson(server.baseUrl, '/family/requests', {
       fromUserId: familyHostUser,
       toUserId: viewerUserId,
+      actingUserId: familyHostUser,
       status: 'accepted',
     });
     assert.equal(familyLink.response.status, 201);
@@ -444,6 +445,7 @@ test('family request lifecycle controls familyCircle discover access and blocks 
     const createPending = await postJson(server.baseUrl, '/family/requests', {
       fromUserId: familyHostUser,
       toUserId: viewerUserId,
+      actingUserId: familyHostUser,
       status: 'pending',
     });
     assert.equal(createPending.response.status, 201);
@@ -453,18 +455,21 @@ test('family request lifecycle controls familyCircle discover access and blocks 
     const duplicatePendingReverse = await postJson(server.baseUrl, '/family/requests', {
       fromUserId: viewerUserId,
       toUserId: familyHostUser,
+      actingUserId: viewerUserId,
       status: 'pending',
     });
     assert.equal(duplicatePendingReverse.response.status, 409);
 
     const markAccepted = await putJson(server.baseUrl, `/family/requests/${requestId}`, {
       status: 'accepted',
+      actingUserId: viewerUserId,
     });
     assert.equal(markAccepted.response.status, 200);
 
     const duplicateAfterAccepted = await postJson(server.baseUrl, '/family/requests', {
       fromUserId: viewerUserId,
       toUserId: familyHostUser,
+      actingUserId: viewerUserId,
       status: 'accepted',
     });
     assert.equal(duplicateAfterAccepted.response.status, 409);
@@ -513,6 +518,7 @@ test('family request query filters support fromUserId, toUserId, status and reje
     const pendingReq = await postJson(server.baseUrl, '/family/requests', {
       fromUserId,
       toUserId,
+      actingUserId: fromUserId,
       status: 'pending',
     });
     assert.equal(pendingReq.response.status, 201);
@@ -522,6 +528,7 @@ test('family request query filters support fromUserId, toUserId, status and reje
     const acceptedReq = await postJson(server.baseUrl, '/family/requests', {
       fromUserId: otherUserId,
       toUserId,
+      actingUserId: otherUserId,
       status: 'accepted',
     });
     assert.equal(acceptedReq.response.status, 201);
@@ -558,6 +565,93 @@ test('family request query filters support fromUserId, toUserId, status and reje
       await postJson(server.baseUrl, '/account/delete-data', { userId: fromUserId });
       await postJson(server.baseUrl, '/account/delete-data', { userId: toUserId });
       await postJson(server.baseUrl, '/account/delete-data', { userId: otherUserId });
+    }
+    await stopServer(server?.child);
+  }
+});
+
+test('family request security: actingUserId prevents impersonation and blocks sender from self-accepting', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const senderUser = `it_sec_sender_${suffix}`;
+  const recipientUser = `it_sec_recipient_${suffix}`;
+  const intruderUser = `it_sec_intruder_${suffix}`;
+
+  let server;
+
+  try {
+    server = startServer(3031);
+    await waitForHealth(server.baseUrl);
+
+    // Wrong actingUserId on POST must return 403.
+    const impersonateCreate = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: senderUser,
+      toUserId: recipientUser,
+      actingUserId: intruderUser,
+      status: 'pending',
+    });
+    assert.equal(impersonateCreate.response.status, 403);
+    assert.match(impersonateCreate.payload?.error || '', /actingUserId/i);
+
+    // Create a real pending request as sender.
+    const validCreate = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: senderUser,
+      toUserId: recipientUser,
+      actingUserId: senderUser,
+      status: 'pending',
+    });
+    assert.equal(validCreate.response.status, 201);
+    const requestId = validCreate.payload?.item?.id;
+    assert.ok(requestId);
+
+    // Intruder cannot respond to this request.
+    const intruderRespond = await putJson(server.baseUrl, `/family/requests/${requestId}`, {
+      status: 'accepted',
+      actingUserId: intruderUser,
+    });
+    assert.equal(intruderRespond.response.status, 403);
+
+    // Sender cannot self-accept their own request.
+    const senderSelfAccept = await putJson(server.baseUrl, `/family/requests/${requestId}`, {
+      status: 'accepted',
+      actingUserId: senderUser,
+    });
+    assert.equal(senderSelfAccept.response.status, 403);
+    assert.match(senderSelfAccept.payload?.error || '', /Empf\u00e4nger/i);
+
+    // Sender can withdraw (decline) their own request.
+    const senderWithdraw = await putJson(server.baseUrl, `/family/requests/${requestId}`, {
+      status: 'declined',
+      actingUserId: senderUser,
+    });
+    assert.equal(senderWithdraw.response.status, 200);
+    assert.equal(senderWithdraw.payload?.item?.status, 'declined');
+
+    // Create a fresh pending request for recipient accept test.
+    const validCreate2 = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: senderUser,
+      toUserId: recipientUser,
+      actingUserId: senderUser,
+      status: 'pending',
+    });
+    assert.equal(validCreate2.response.status, 201);
+    const requestId2 = validCreate2.payload?.item?.id;
+    assert.ok(requestId2);
+
+    // Recipient can accept.
+    const recipientAccept = await putJson(server.baseUrl, `/family/requests/${requestId2}`, {
+      status: 'accepted',
+      actingUserId: recipientUser,
+    });
+    assert.equal(recipientAccept.response.status, 200);
+    assert.equal(recipientAccept.payload?.item?.status, 'accepted');
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    if (server) {
+      await postJson(server.baseUrl, '/account/delete-data', { userId: senderUser });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: recipientUser });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: intruderUser });
     }
     await stopServer(server?.child);
   }

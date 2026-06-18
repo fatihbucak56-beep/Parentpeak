@@ -1851,6 +1851,7 @@ app.get('/family/requests', async (req, res) => {
 app.post('/family/requests', async (req, res) => {
   const fromUserId = (req.body.fromUserId || '').toString().trim();
   const toUserId = (req.body.toUserId || '').toString().trim();
+  const actingUserId = (req.body.actingUserId || '').toString().trim();
   const status = (req.body.status || 'pending').toString().trim();
 
   if (!fromUserId || !toUserId) {
@@ -1861,6 +1862,9 @@ app.post('/family/requests', async (req, res) => {
   }
   if (!['pending', 'accepted', 'declined'].includes(status)) {
     return res.status(400).json({ error: 'Ungültiger Status' });
+  }
+  if (actingUserId && actingUserId !== fromUserId) {
+    return res.status(403).json({ error: 'actingUserId muss mit fromUserId übereinstimmen' });
   }
 
   try {
@@ -1942,11 +1946,31 @@ app.post('/family/requests', async (req, res) => {
 
 app.put('/family/requests/:id', async (req, res) => {
   const status = req.body.status;
+  const actingUserId = (req.body.actingUserId || '').toString().trim();
+
   if (!['pending', 'accepted', 'declined'].includes(status)) {
     return res.status(400).json({ error: 'Ungültiger Status' });
   }
 
   try {
+    const current = await prisma.familyRequest.findUnique({ where: { id: req.params.id } });
+    if (!current) {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden' });
+    }
+
+    if (actingUserId) {
+      const isRecipient = actingUserId === current.toUserId;
+      const isSender = actingUserId === current.fromUserId;
+
+      if (!isRecipient && !isSender) {
+        return res.status(403).json({ error: 'Keine Berechtigung, diese Anfrage zu ändern' });
+      }
+      // Only the recipient may accept; the sender may only withdraw (decline).
+      if (isSender && !isRecipient && status === 'accepted') {
+        return res.status(403).json({ error: 'Nur der Empfänger kann eine Anfrage annehmen' });
+      }
+    }
+
     const item = await prisma.familyRequest.update({
       where: { id: req.params.id },
       data: { status },
@@ -1968,13 +1992,25 @@ app.put('/family/requests/:id', async (req, res) => {
     }
 
     console.error('PUT /family/requests/:id fallback (in-memory):', error?.message || error);
-    const index = familyRequests.findIndex(item => item.id === req.params.id);
+    const index = familyRequests.findIndex(entry => entry.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Anfrage nicht gefunden' });
     }
 
+    const entry = familyRequests[index];
+    if (actingUserId) {
+      const isRecipient = actingUserId === entry.toUserId;
+      const isSender = actingUserId === entry.fromUserId;
+      if (!isRecipient && !isSender) {
+        return res.status(403).json({ error: 'Keine Berechtigung, diese Anfrage zu ändern' });
+      }
+      if (isSender && !isRecipient && status === 'accepted') {
+        return res.status(403).json({ error: 'Nur der Empfänger kann eine Anfrage annehmen' });
+      }
+    }
+
     familyRequests[index] = {
-      ...familyRequests[index],
+      ...entry,
       status,
       updatedAt: new Date().toISOString(),
     };

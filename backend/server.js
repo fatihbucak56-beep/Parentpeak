@@ -3,8 +3,10 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { PrismaClient } = require('@prisma/client');
 
 const app = express();
+const prisma = new PrismaClient();
 const PORT = Number.parseInt(process.env.PORT || '3000', 10);
 const backendApiToken = (process.env.BACKEND_API_TOKEN || '').trim();
 const requireAuthForWrites =
@@ -32,6 +34,8 @@ const writeRateMax = Number.parseInt(
   10,
 );
 const writeRateBuckets = new Map();
+const DEMO_USER_ID = 'host_demo_001';
+const DEMO_FAMILY_ID = 'demo-family-001';
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -531,6 +535,87 @@ function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 }
 
+async function ensureDemoFamilyContext(familyId) {
+  const targetFamilyId = (familyId || DEMO_FAMILY_ID).toString().trim() || DEMO_FAMILY_ID;
+
+  await prisma.user.upsert({
+    where: { id: DEMO_USER_ID },
+    update: {},
+    create: {
+      id: DEMO_USER_ID,
+      email: 'demo-host-001@parentpeak.local',
+      passwordHash: 'demo',
+      passwordSalt: 'demo',
+      firstName: 'Demo',
+      lastName: 'Host',
+    },
+  });
+
+  await prisma.family.upsert({
+    where: { id: targetFamilyId },
+    update: {},
+    create: {
+      id: targetFamilyId,
+      name: targetFamilyId === DEMO_FAMILY_ID ? 'Demo Familie' : `Familie ${targetFamilyId}`,
+      createdById: DEMO_USER_ID,
+      memberUsers: {
+        connect: [{ id: DEMO_USER_ID }],
+      },
+    },
+  });
+
+  return targetFamilyId;
+}
+
+function parseTodoDescription(description) {
+  if (!description || typeof description !== 'string') {
+    return { assigneeName: 'Familie', category: 'Allgemein' };
+  }
+
+  try {
+    const parsed = JSON.parse(description);
+    return {
+      assigneeName: (parsed.assigneeName || 'Familie').toString(),
+      category: (parsed.category || 'Allgemein').toString(),
+    };
+  } catch (_) {
+    return { assigneeName: 'Familie', category: 'Allgemein' };
+  }
+}
+
+function buildTodoDescription(meta) {
+  return JSON.stringify({
+    assigneeName: (meta.assigneeName || 'Familie').toString(),
+    category: (meta.category || 'Allgemein').toString(),
+  });
+}
+
+function mapTodoRecordToApiItem(record) {
+  const meta = parseTodoDescription(record.description);
+  return {
+    id: record.id,
+    familyId: record.familyId,
+    title: record.title,
+    completed: Boolean(record.done),
+    assigneeName: meta.assigneeName,
+    category: meta.category,
+    createdAt: record.createdAt,
+    updatedAt: record.completedAt || null,
+  };
+}
+
+function mapShoppingRecordToApiItem(record) {
+  return {
+    id: record.id,
+    familyId: record.familyId,
+    name: record.name,
+    checked: Boolean(record.bought),
+    category: 'Allgemein',
+    createdAt: record.createdAt,
+    updatedAt: record.boughtAt || null,
+  };
+}
+
 function asIsoDate(value) {
   if (!value) return null;
   const parsed = new Date(value);
@@ -972,87 +1057,201 @@ app.post('/api/providers/filter', (req, res) => {
   res.json(providers);
 });
 
-// 8. Todos
-app.get('/todos', (req, res) => {
-  res.json({ items: todos });
-});
-
-app.post('/todos', (req, res) => {
-  const item = {
-    id: generateId('todo'),
-    familyId: req.body.familyId || 'demo-family-001',
-    title: req.body.title || '',
-    completed: Boolean(req.body.completed),
-    assigneeName: req.body.assigneeName || 'Familie',
-    category: req.body.category || 'Allgemein',
-    createdAt: new Date().toISOString(),
-  };
-  todos.unshift(item);
-  res.status(201).json({ item });
-});
-
-app.put('/todos/:id', (req, res) => {
-  const index = todos.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Todo nicht gefunden' });
+// 8. Todos (Prisma-first with in-memory fallback)
+app.get('/todos', async (req, res) => {
+  try {
+    const familyId = (req.query.familyId || '').toString().trim();
+    const items = await prisma.todo.findMany({
+      where: familyId ? { familyId } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ items: items.map(mapTodoRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /todos fallback (in-memory):', error?.message || error);
+    return res.json({ items: todos });
   }
-
-  todos[index] = {
-    ...todos[index],
-    completed: Boolean(req.body.completed),
-    updatedAt: new Date().toISOString(),
-  };
-  res.json({ item: todos[index] });
 });
 
-app.delete('/todos/:id', (req, res) => {
-  const index = todos.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Todo nicht gefunden' });
+app.post('/todos', async (req, res) => {
+  try {
+    const familyId = await ensureDemoFamilyContext(req.body.familyId || DEMO_FAMILY_ID);
+    const completed = Boolean(req.body.completed);
+    const item = await prisma.todo.create({
+      data: {
+        familyId,
+        title: (req.body.title || '').toString(),
+        description: buildTodoDescription({
+          assigneeName: req.body.assigneeName || 'Familie',
+          category: req.body.category || 'Allgemein',
+        }),
+        done: completed,
+        completedAt: completed ? new Date() : null,
+      },
+    });
+    return res.status(201).json({ item: mapTodoRecordToApiItem(item) });
+  } catch (error) {
+    console.error('POST /todos fallback (in-memory):', error?.message || error);
+    const item = {
+      id: generateId('todo'),
+      familyId: req.body.familyId || DEMO_FAMILY_ID,
+      title: req.body.title || '',
+      completed: Boolean(req.body.completed),
+      assigneeName: req.body.assigneeName || 'Familie',
+      category: req.body.category || 'Allgemein',
+      createdAt: new Date().toISOString(),
+    };
+    todos.unshift(item);
+    return res.status(201).json({ item });
   }
-  todos.splice(index, 1);
-  res.status(204).send();
 });
 
-// 9. Shopping
-app.get('/shopping', (req, res) => {
-  res.json({ items: shoppingItems });
-});
+app.put('/todos/:id', async (req, res) => {
+  try {
+    const existing = await prisma.todo.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Todo nicht gefunden' });
+    }
 
-app.post('/shopping', (req, res) => {
-  const item = {
-    id: generateId('shop'),
-    familyId: req.body.familyId || 'demo-family-001',
-    name: req.body.name || '',
-    checked: Boolean(req.body.checked),
-    category: req.body.category || 'Allgemein',
-    createdAt: new Date().toISOString(),
-  };
-  shoppingItems.unshift(item);
-  res.status(201).json({ item });
-});
-
-app.put('/shopping/:id', (req, res) => {
-  const index = shoppingItems.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
+    const currentMeta = parseTodoDescription(existing.description);
+    const completed = Boolean(req.body.completed);
+    const item = await prisma.todo.update({
+      where: { id: req.params.id },
+      data: {
+        done: completed,
+        completedAt: completed ? (existing.completedAt || new Date()) : null,
+        description: buildTodoDescription({
+          assigneeName: req.body.assigneeName || currentMeta.assigneeName,
+          category: req.body.category || currentMeta.category,
+        }),
+      },
+    });
+    return res.json({ item: mapTodoRecordToApiItem(item) });
+  } catch (error) {
+    console.error('PUT /todos fallback (in-memory):', error?.message || error);
+    const index = todos.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Todo nicht gefunden' });
+    }
+    todos[index] = {
+      ...todos[index],
+      completed: Boolean(req.body.completed),
+      updatedAt: new Date().toISOString(),
+    };
+    return res.json({ item: todos[index] });
   }
-
-  shoppingItems[index] = {
-    ...shoppingItems[index],
-    checked: Boolean(req.body.checked),
-    updatedAt: new Date().toISOString(),
-  };
-  res.json({ item: shoppingItems[index] });
 });
 
-app.delete('/shopping/:id', (req, res) => {
-  const index = shoppingItems.findIndex(item => item.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
+app.delete('/todos/:id', async (req, res) => {
+  try {
+    await prisma.todo.delete({ where: { id: req.params.id } });
+    return res.status(204).send();
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'Todo nicht gefunden' });
+    }
+
+    console.error('DELETE /todos fallback (in-memory):', error?.message || error);
+    const index = todos.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Todo nicht gefunden' });
+    }
+    todos.splice(index, 1);
+    return res.status(204).send();
   }
-  shoppingItems.splice(index, 1);
-  res.status(204).send();
+});
+
+// 9. Shopping (Prisma-first with in-memory fallback)
+app.get('/shopping', async (req, res) => {
+  try {
+    const familyId = (req.query.familyId || '').toString().trim();
+    const items = await prisma.shoppingItem.findMany({
+      where: familyId ? { familyId } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ items: items.map(mapShoppingRecordToApiItem) });
+  } catch (error) {
+    console.error('GET /shopping fallback (in-memory):', error?.message || error);
+    return res.json({ items: shoppingItems });
+  }
+});
+
+app.post('/shopping', async (req, res) => {
+  try {
+    const familyId = await ensureDemoFamilyContext(req.body.familyId || DEMO_FAMILY_ID);
+    const checked = Boolean(req.body.checked);
+    const item = await prisma.shoppingItem.create({
+      data: {
+        familyId,
+        name: (req.body.name || '').toString(),
+        quantity: 1,
+        bought: checked,
+        boughtAt: checked ? new Date() : null,
+      },
+    });
+    return res.status(201).json({ item: mapShoppingRecordToApiItem(item) });
+  } catch (error) {
+    console.error('POST /shopping fallback (in-memory):', error?.message || error);
+    const item = {
+      id: generateId('shop'),
+      familyId: req.body.familyId || DEMO_FAMILY_ID,
+      name: req.body.name || '',
+      checked: Boolean(req.body.checked),
+      category: req.body.category || 'Allgemein',
+      createdAt: new Date().toISOString(),
+    };
+    shoppingItems.unshift(item);
+    return res.status(201).json({ item });
+  }
+});
+
+app.put('/shopping/:id', async (req, res) => {
+  try {
+    const checked = Boolean(req.body.checked);
+    const item = await prisma.shoppingItem.update({
+      where: { id: req.params.id },
+      data: {
+        bought: checked,
+        boughtAt: checked ? new Date() : null,
+      },
+    });
+    return res.json({ item: mapShoppingRecordToApiItem(item) });
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
+    }
+
+    console.error('PUT /shopping fallback (in-memory):', error?.message || error);
+    const index = shoppingItems.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
+    }
+
+    shoppingItems[index] = {
+      ...shoppingItems[index],
+      checked: Boolean(req.body.checked),
+      updatedAt: new Date().toISOString(),
+    };
+    return res.json({ item: shoppingItems[index] });
+  }
+});
+
+app.delete('/shopping/:id', async (req, res) => {
+  try {
+    await prisma.shoppingItem.delete({ where: { id: req.params.id } });
+    return res.status(204).send();
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
+    }
+
+    console.error('DELETE /shopping fallback (in-memory):', error?.message || error);
+    const index = shoppingItems.findIndex(item => item.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
+    }
+    shoppingItems.splice(index, 1);
+    return res.status(204).send();
+  }
 });
 
 // 10. Calendar events

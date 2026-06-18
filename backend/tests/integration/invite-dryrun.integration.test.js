@@ -497,3 +497,68 @@ test('family request lifecycle controls familyCircle discover access and blocks 
     await stopServer(server?.child);
   }
 });
+
+test('family request query filters support fromUserId, toUserId, status and reject invalid status', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const fromUserId = `it_filter_from_${suffix}`;
+  const toUserId = `it_filter_to_${suffix}`;
+  const otherUserId = `it_filter_other_${suffix}`;
+
+  let server;
+
+  try {
+    server = startServer(3030);
+    await waitForHealth(server.baseUrl);
+
+    const pendingReq = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId,
+      toUserId,
+      status: 'pending',
+    });
+    assert.equal(pendingReq.response.status, 201);
+    const pendingId = pendingReq.payload?.item?.id;
+    assert.ok(pendingId);
+
+    const acceptedReq = await postJson(server.baseUrl, '/family/requests', {
+      fromUserId: otherUserId,
+      toUserId,
+      status: 'accepted',
+    });
+    assert.equal(acceptedReq.response.status, 201);
+
+    const byToUser = await getJson(server.baseUrl, `/family/requests?toUserId=${toUserId}`);
+    assert.equal(byToUser.response.status, 200);
+    assert.ok(Array.isArray(byToUser.payload?.requests));
+    assert.ok(byToUser.payload.requests.length >= 2);
+
+    const byFromAndStatus = await getJson(
+      server.baseUrl,
+      `/family/requests?fromUserId=${fromUserId}&toUserId=${toUserId}&status=pending`,
+    );
+    assert.equal(byFromAndStatus.response.status, 200);
+    const filtered = byFromAndStatus.payload?.requests || [];
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0]?.id, pendingId);
+    assert.equal(filtered[0]?.status, 'pending');
+
+    // Backward compatibility: userId still maps to toUserId filter.
+    const byLegacyUserId = await getJson(server.baseUrl, `/family/requests?userId=${toUserId}`);
+    assert.equal(byLegacyUserId.response.status, 200);
+    const legacyIds = new Set((byLegacyUserId.payload?.requests || []).map(item => item.id));
+    assert.ok(legacyIds.has(pendingId));
+
+    const invalidStatus = await getJson(server.baseUrl, '/family/requests?status=unknown');
+    assert.equal(invalidStatus.response.status, 400);
+    assert.match(invalidStatus.payload?.error || '', /Ungültiger Status/i);
+  } catch (error) {
+    const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
+    throw new Error(`${error.message}\n\n${extraLogs}`);
+  } finally {
+    if (server) {
+      await postJson(server.baseUrl, '/account/delete-data', { userId: fromUserId });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: toUserId });
+      await postJson(server.baseUrl, '/account/delete-data', { userId: otherUserId });
+    }
+    await stopServer(server?.child);
+  }
+});

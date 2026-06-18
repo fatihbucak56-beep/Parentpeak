@@ -1810,18 +1810,40 @@ app.get('/family/contacts', (req, res) => {
 
 app.get('/family/requests', async (req, res) => {
   const userId = (req.query.userId || '').toString().trim();
+  const toUserId = (req.query.toUserId || userId || '').toString().trim();
+  const fromUserId = (req.query.fromUserId || '').toString().trim();
+  const status = (req.query.status || '').toString().trim();
+  const allowedStatuses = new Set(['pending', 'accepted', 'declined']);
+
+  if (status && !allowedStatuses.has(status)) {
+    return res.status(400).json({ error: 'Ungültiger Status' });
+  }
+
+  const where = {};
+  if (toUserId) {
+    where.toUserId = toUserId;
+  }
+  if (fromUserId) {
+    where.fromUserId = fromUserId;
+  }
+  if (status) {
+    where.status = status;
+  }
 
   try {
     const requests = await prisma.familyRequest.findMany({
-      where: userId ? { toUserId: userId } : undefined,
+      where: Object.keys(where).length > 0 ? where : undefined,
       orderBy: { createdAt: 'desc' },
     });
     return res.json({ requests });
   } catch (error) {
     console.error('GET /family/requests fallback (in-memory):', error?.message || error);
-    const requests = userId
-      ? familyRequests.filter(r => r.toUserId === userId)
-      : familyRequests;
+    const requests = familyRequests.filter(item => {
+      if (toUserId && item.toUserId !== toUserId) return false;
+      if (fromUserId && item.fromUserId !== fromUserId) return false;
+      if (status && item.status !== status) return false;
+      return true;
+    });
     return res.json({ requests });
   }
 });

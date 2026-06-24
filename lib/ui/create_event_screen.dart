@@ -622,6 +622,61 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                Text(
+                  'Event-Foto (optional)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _pickPhoto,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: Text(
+                    _selectedPhotoFile == null
+                        ? 'Foto auswählen'
+                        : 'Foto ändern',
+                  ),
+                ),
+                if (_selectedPhotoFile != null) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      _selectedPhotoFile!,
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _uploadedPhotoUrl == null
+                              ? 'Das Foto wird beim Veröffentlichen hochgeladen.'
+                              : 'Foto bereits hochgeladen.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _isSubmitting
+                            ? null
+                            : () {
+                                setState(() {
+                                  _selectedPhotoFile = null;
+                                  _uploadedPhotoUrl = null;
+                                });
+                              },
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Entfernen'),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 24),
+
                 // Kostenhinweis
                 Container(
                   padding: const EdgeInsets.all(12),

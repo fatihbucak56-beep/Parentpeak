@@ -133,9 +133,27 @@ class AuthService {
   FirebaseAuth? _firebaseAuth;
   final BackendApiClient? _apiClient = BackendServiceFactory.createApiClient();
 
+  static BackendApiClient? Function() backendApiClientFactory =
+      BackendServiceFactory.createApiClient;
+
+  static Future<void> Function({
+    required BackendApiClient apiClient,
+    required String userId,
+  }) fcmUnregisterHandler = _defaultFcmUnregisterHandler;
+
   // Singleton
   static final AuthService instance = AuthService._();
   AuthService._();
+
+  static Future<void> _defaultFcmUnregisterHandler({
+    required BackendApiClient apiClient,
+    required String userId,
+  }) {
+    return NotificationService.instance.unregisterFcmToken(
+      apiClient: apiClient,
+      userId: userId,
+    );
+  }
 
   // ── Initialisierung ────────────────────────────────────────────────────────
 
@@ -323,7 +341,7 @@ class AuthService {
   void _triggerFcmInit(String userId) {
     Future.microtask(() async {
       try {
-        final apiClient = BackendServiceFactory.createApiClient();
+        final apiClient = backendApiClientFactory();
         await NotificationService.instance.initFcm(
           apiClient: apiClient,
           userId: userId,
@@ -335,9 +353,9 @@ class AuthService {
     final currentUserId = _currentUser?.uid;
     if (currentUserId != null) {
       try {
-        final apiClient = BackendServiceFactory.createApiClient();
+        final apiClient = backendApiClientFactory();
         if (apiClient != null) {
-          await NotificationService.instance.unregisterFcmToken(
+          await fcmUnregisterHandler(
             apiClient: apiClient,
             userId: currentUserId,
           );

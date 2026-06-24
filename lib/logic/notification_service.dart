@@ -93,6 +93,20 @@ class NotificationService {
     }
   }
 
+  /// Unregister the currently active FCM token on backend (e.g. on logout).
+  Future<void> unregisterFcmToken({
+    required BackendApiClient apiClient,
+    required String userId,
+  }) async {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null || token.isEmpty) return;
+
+    await apiClient.unregisterFcmToken(
+      userId: userId,
+      token: token,
+    );
+  }
+
   /// Display an immediate local notification (no scheduling).
   Future<void> showLocalNotification({
     required String title,
@@ -106,10 +120,11 @@ class NotificationService {
     );
     const iosDetails = DarwinNotificationDetails();
     await _plugin.show(
-      DateTime.now().millisecondsSinceEpoch % 2147483647,
-      title,
-      body,
-      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      id: DateTime.now().millisecondsSinceEpoch % 2147483647,
+      title: title,
+      body: body,
+      notificationDetails:
+          const NotificationDetails(android: androidDetails, iOS: iosDetails),
     );
   }
 

@@ -257,6 +257,53 @@ class FamilyCircleService {
     }
   }
 
+  /// Deletes an accepted relationship between two users by resolving its
+  /// backend request ID first, then calling [deleteRequest].
+  Future<bool> deleteConnectionWithUser({
+    required String currentUserId,
+    required String otherUserId,
+  }) async {
+    _connectionKeys.remove(_pairKey(currentUserId, otherUserId));
+
+    if (_apiClient != null) {
+      try {
+        final path = APIConfig.getBackendFamilyRequestsPath();
+        final qA =
+            '?fromUserId=${Uri.encodeComponent(currentUserId)}&toUserId=${Uri.encodeComponent(otherUserId)}&status=accepted';
+        final qB =
+            '?fromUserId=${Uri.encodeComponent(otherUserId)}&toUserId=${Uri.encodeComponent(currentUserId)}&status=accepted';
+
+        final resA = await _apiClient!.getJson('$path$qA');
+        final resB = await _apiClient!.getJson('$path$qB');
+        final candidates = [
+          ..._parseRequests(resA),
+          ..._parseRequests(resB),
+        ];
+
+        for (final req in candidates) {
+          final isPair = (req.fromUserId == currentUserId && req.toUserId == otherUserId) ||
+              (req.fromUserId == otherUserId && req.toUserId == currentUserId);
+          if (!isPair) continue;
+
+          await deleteRequest(
+            requestId: req.id,
+            actingUserId: currentUserId,
+          );
+          return true;
+        }
+      } catch (_) {
+        // Fall through to local fallback below.
+      }
+    }
+
+    _incomingRequests.removeWhere((r) {
+      final isPair = (r.fromUserId == currentUserId && r.toUserId == otherUserId) ||
+          (r.fromUserId == otherUserId && r.toUserId == currentUserId);
+      return isPair;
+    });
+    return true;
+  }
+
   bool areUsersConnected({required String userA, required String userB}) {
     return _connectionKeys.contains(_pairKey(userA, userB));
   }

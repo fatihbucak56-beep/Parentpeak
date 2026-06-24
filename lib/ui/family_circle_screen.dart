@@ -123,14 +123,9 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
     );
     if (confirmed != true) return;
 
-    // Find and delete the accepted FamilyRequest that links the two users.
-    // We re-use sendRequest's concept: look up by fromUserId filter.
-    // Simplest approach: POST a declined-status update on behalf of current user
-    // by using deleteRequest if the ID is known. For now we use a local removal
-    // and fire the backend delete via the service.
-    await _service.deleteRequest(
-      requestId: contact.userId, // best-effort: not a real request ID here
-      actingUserId: _currentUserId,
+    await _service.deleteConnectionWithUser(
+      currentUserId: _currentUserId,
+      otherUserId: contact.userId,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -254,6 +249,7 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _ContactRow(
                           contact: c,
+                          onDelete: () => _deleteContact(c),
                         ),
                       ),
                     ),
@@ -416,9 +412,10 @@ class _RequestRow extends StatelessWidget {
 }
 
 class _ContactRow extends StatelessWidget {
-  const _ContactRow({required this.contact});
+  const _ContactRow({required this.contact, required this.onDelete});
 
   final FamilyContact contact;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -460,6 +457,11 @@ class _ContactRow extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          IconButton(
+            tooltip: 'Kontakt entfernen',
+            onPressed: onDelete,
+            icon: const Icon(Icons.person_remove_rounded),
           ),
         ],
       ),

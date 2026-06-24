@@ -3742,16 +3742,22 @@ async function sendPushToUser(userId, { title, body, data = {} }) {
 // ── Image Upload ─────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(uploadsDir));
 
-app.post('/uploads/image', upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Kein Bild empfangen' });
-  }
+app.post('/uploads/image', (req, res) => {
+  upload.single('image')(req, res, err => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Bild-Upload fehlgeschlagen' });
+    }
 
-  const publicBase = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/$/, '');
-  const relPath = `/uploads/${req.file.filename}`;
-  const url = publicBase ? `${publicBase}${relPath}` : relPath;
+    if (!req.file) {
+      return res.status(400).json({ error: 'Kein Bild empfangen' });
+    }
 
-  return res.status(201).json({ url, filename: req.file.filename, size: req.file.size });
+    const publicBase = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/$/, '');
+    const relPath = `/uploads/${req.file.filename}`;
+    const url = publicBase ? `${publicBase}${relPath}` : relPath;
+
+    return res.status(201).json({ url, filename: req.file.filename, size: req.file.size });
+  });
 });
 
 

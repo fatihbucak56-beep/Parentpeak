@@ -896,9 +896,6 @@ test('FCM device token register and unregister', async () => {
 });
 
 test('image upload endpoint accepts valid image and rejects non-image', async () => {
-  const fs = require('node:fs');
-  const os = require('node:os');
-  const path = require('node:path');
   let server;
 
   try {
@@ -911,39 +908,29 @@ test('image upload endpoint accepts valid image and rejects non-image', async ()
       '7a3f560000000a4944415408d76360000000020001e221bc330000000049454e44ae426082',
       'hex',
     );
-    const tmpFile = path.join(os.tmpdir(), `pp_test_${Date.now()}.png`);
-    fs.writeFileSync(tmpFile, pngBytes);
+    assert.equal(typeof FormData, 'function');
+    assert.equal(typeof Blob, 'function');
 
-    try {
-      const FormData = (await import('node:buffer')).Blob
-        ? globalThis.FormData
-        : undefined;
+    const fd = new FormData();
+    fd.append('image', new Blob([pngBytes], { type: 'image/png' }), 'test.png');
+    const okRes = await fetch(`${server.baseUrl}/uploads/image`, {
+      method: 'POST',
+      body: fd,
+    });
+    assert.equal(okRes.status, 201);
+    const okPayload = await okRes.json();
+    assert.ok(typeof okPayload.url === 'string');
+    assert.ok(okPayload.url.includes('uploads'));
 
-      // Use curl-style multipart via fetch with FormData if available.
-      if (typeof FormData !== 'undefined') {
-        const fd = new FormData();
-        const blob = new Blob([pngBytes], { type: 'image/png' });
-        fd.append('image', blob, 'test.png');
-        const res = await fetch(`${server.baseUrl}/uploads/image`, {
-          method: 'POST',
-          body: fd,
-        });
-        assert.equal(res.status, 201);
-        const payload = await res.json();
-        assert.ok(typeof payload.url === 'string');
-        assert.ok(payload.url.includes('uploads'));
-      } else {
-        // FormData not available in this Node version — skip upload assertion.
-        console.log('  [skip] FormData not available, skipping multipart upload assertion');
-      }
-    } finally {
-      try { fs.unlinkSync(tmpFile); } catch (_) {}
-    }
-
-    // Non-image content type should be rejected — test via text upload with curl.
-    // We just verify the endpoint exists and returns JSON (can't easily send bad type via fetch).
-    const healthCheck = await fetch(`${server.baseUrl}/health`);
-    assert.equal(healthCheck.status, 200);
+    const badFd = new FormData();
+    badFd.append('image', new Blob(['not-an-image'], { type: 'text/plain' }), 'bad.txt');
+    const badRes = await fetch(`${server.baseUrl}/uploads/image`, {
+      method: 'POST',
+      body: badFd,
+    });
+    assert.equal(badRes.status, 400);
+    const badPayload = await badRes.json();
+    assert.match(badPayload?.error || '', /JPEG|PNG|WebP|GIF/i);
   } catch (error) {
     const extraLogs = server ? `server logs:\n${server.getLogs()}` : '';
     throw new Error(`${error.message}\n\n${extraLogs}`);

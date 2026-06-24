@@ -332,6 +332,21 @@ class AuthService {
     });
   }
   Future<void> logout() async {
+    final currentUserId = _currentUser?.uid;
+    if (currentUserId != null) {
+      try {
+        final apiClient = BackendServiceFactory.createApiClient();
+        if (apiClient != null) {
+          await NotificationService.instance.unregisterFcmToken(
+            apiClient: apiClient,
+            userId: currentUserId,
+          );
+        }
+      } catch (_) {
+        // Logout should not fail if token unregister fails.
+      }
+    }
+
     if (_firebaseReady) {
       final auth = _firebaseAuth;
       if (auth != null) {

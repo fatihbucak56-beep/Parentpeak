@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -10,6 +11,7 @@ import 'package:trusted_circle_demo/logic/secure_storage.dart';
 import 'package:trusted_circle_demo/logic/background_sync_manager.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
+import 'package:trusted_circle_demo/logic/error_reporting_service.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/home_screen.dart';
 import 'package:trusted_circle_demo/ui/profile_safety_screen.dart';
@@ -38,8 +40,49 @@ const bool _debugBypassAuthGate =
 const String _debugStartTab =
     String.fromEnvironment('PP_DEBUG_START_TAB', defaultValue: 'home');
 
-void main() async {
+void _reportAppError(String context, Object error, StackTrace stackTrace) {
+  debugPrint('AppError[$context]: $error');
+  debugPrint(stackTrace.toString());
+  unawaited(
+    ErrorReportingService.instance.recordError(
+      error,
+      stackTrace,
+      context: context,
+      fatal: true,
+    ),
+  );
+}
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    unawaited(
+      ErrorReportingService.instance.recordFlutterError(
+        details,
+        context: 'FlutterError.onError',
+        fatal: true,
+      ),
+    );
+    _reportAppError(
+      'FlutterError.onError',
+      details.exception,
+      details.stack ?? StackTrace.current,
+    );
+  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stackTrace) {
+    _reportAppError('PlatformDispatcher.onError', error, stackTrace);
+    return true;
+  };
+
+  runZonedGuarded(() async {
+    await _startApp();
+  }, (Object error, StackTrace stackTrace) {
+    _reportAppError('runZonedGuarded', error, stackTrace);
+  });
+}
+
+Future<void> _startApp() async {
   final startupInviteInput = _extractStartupInviteInput();
   try {
     await dotenv.load();
@@ -64,6 +107,8 @@ void main() async {
   if (!kReleaseMode && releaseConfigIssues.isNotEmpty) {
     debugPrint('Konfigurationshinweis: ${releaseConfigIssues.join('; ')}');
   }
+
+  await ErrorReportingService.instance.initialize();
 
   await BackgroundSyncManager.initialize();
   await NotificationService.instance.initialize();

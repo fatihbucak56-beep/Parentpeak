@@ -1,4 +1,5 @@
-import 'dart:async';\nimport 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -69,12 +70,18 @@ void main() async {
   await AuthService.instance.initialize();
 
   // Stripe publishable key (from .env or compile-time dart-define).
-  final stripeKey = APIConfig.getStripePublishableKey();
-  if (stripeKey != null && stripeKey.isNotEmpty) {
-    Stripe.publishableKey = stripeKey;
-    await Stripe.instance.applySettings();
+  final stripeKey = APIConfig.getStripePublishableKey()?.trim();
+  if (APIConfig.isStripePublishableKeyConfigured()) {
+    try {
+      Stripe.publishableKey = stripeKey!;
+      await Stripe.instance.applySettings();
+    } catch (e) {
+      debugPrint('Warnung: Stripe konnte nicht initialisiert werden: $e');
+    }
   } else {
-    debugPrint('Hinweis: STRIPE_PUBLISHABLE_KEY nicht gesetzt — Stripe-PaymentSheet deaktiviert.');
+    debugPrint(
+      'Hinweis: STRIPE_PUBLISHABLE_KEY fehlt/ungueltig (erwartet Prefix pk_) — Stripe-PaymentSheet deaktiviert.',
+    );
   }
 
   // Wire FCM push notifications for the already-authenticated user.

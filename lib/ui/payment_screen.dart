@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
+import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
 import 'package:trusted_circle_demo/models/payment_transaction.dart';
 import 'package:trusted_circle_demo/logic/payment_service.dart';
@@ -28,10 +29,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isProcessing = false;
   bool _agreeToTerms = false;
 
+  bool get _stripeAvailable => APIConfig.isStripePublishableKeyConfigured();
+
   Future<void> _processPayment() async {
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bitte akzeptiere die Bedingungen')),
+      );
+      return;
+    }
+
+    if (_selectedPaymentMethod == 'stripe' && !_stripeAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Stripe ist aktuell nicht konfiguriert. Bitte waehle PayPal oder kontaktiere den Support.',
+          ),
+        ),
       );
       return;
     }
@@ -170,16 +184,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
     } on StripeException catch (e) {
       setState(() => _isProcessing = false);
-      // User cancelled the PaymentSheet — treat as soft abort, not error.
-      final isCancel = e.error.code == FailureCode.Canceled;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              isCancel
-                  ? 'Zahlung abgebrochen'
-                  : 'Stripe-Fehler: ${e.error.localizedMessage ?? e.toString()}',
-            ),
+            content: Text(_mapStripeError(e)),
           ),
         );
       }
@@ -191,6 +199,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
         );
       }
     }
+  }
+
+  String _mapStripeError(StripeException e) {
+    final code = e.error.code;
+    if (code == FailureCode.Canceled) {
+      return 'Zahlung abgebrochen';
+    }
+    if (code == FailureCode.Failed) {
+      return 'Zahlung fehlgeschlagen. Bitte versuche es erneut.';
+    }
+    if (code == FailureCode.Timeout) {
+      return 'Zeitueberschreitung bei der Zahlung. Bitte erneut versuchen.';
+    }
+    return e.error.localizedMessage?.trim().isNotEmpty == true
+        ? 'Stripe-Fehler: ${e.error.localizedMessage}'
+        : 'Stripe-Fehler. Bitte versuche es erneut.';
   }
 
   Future<PaymentTransaction?> _awaitFinalPaymentState(String transactionId) async {

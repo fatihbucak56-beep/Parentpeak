@@ -125,6 +125,11 @@ class APIConfig {
     return _readEnvOrDefine('STRIPE_PUBLISHABLE_KEY');
   }
 
+  static bool isStripePublishableKeyConfigured() {
+    final key = getStripePublishableKey()?.trim();
+    return key != null && key.isNotEmpty && key.startsWith('pk_');
+  }
+
   static String getBackendFamilyId() {
     return _getEnvOrDefault('BACKEND_FAMILY_ID', 'demo-family-001');
   }

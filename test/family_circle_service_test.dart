@@ -19,6 +19,50 @@ BackendApiClient _clientWith(http.Client httpClient) {
 /// FamilyCircleService end-to-end through its public API with mock injections
 /// where the service exposes constructor injection.
 void main() {
+  group('FamilyCircleService.deleteConnectionWithUser', () {
+    test('removes accepted connection for a user pair', () async {
+      final service = FamilyCircleService.instance;
+      const currentUserId = 'unlink_test_current_user';
+      const otherUserId = 'unlink_test_other_user';
+
+      final req = await service.sendRequest(
+        fromUserId: otherUserId,
+        toUserId: currentUserId,
+        fromDisplayName: 'Other User',
+      );
+
+      expect(req, isNotNull);
+
+      await service.respondToRequest(
+        requestId: req!.id,
+        accept: true,
+        actingUserId: currentUserId,
+      );
+
+      expect(
+        service.areUsersConnected(
+          userA: currentUserId,
+          userB: otherUserId,
+        ),
+        isTrue,
+      );
+
+      final removed = await service.deleteConnectionWithUser(
+        currentUserId: currentUserId,
+        otherUserId: otherUserId,
+      );
+
+      expect(removed, isTrue);
+      expect(
+        service.areUsersConnected(
+          userA: currentUserId,
+          userB: otherUserId,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('BackendApiClient.registerFcmToken', () {
     test('sends POST /devices/register-token with correct body', () async {
       http.Request? captured;

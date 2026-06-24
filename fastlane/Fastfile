@@ -1,0 +1,94 @@
+default_platform(:ios)
+
+platform :ios do
+
+  # ── Zertifikate & Profile via match ──────────────────────────────────────
+  desc "Sync App Store signing certificates and provisioning profiles"
+  lane :certificates do
+    match(
+      type: "appstore",
+      app_identifier: "com.parentpeak.app",
+      readonly: false,
+      git_url: "https://github.com/fatihbucak56-beep/Parentpeak-certificates.git"
+    )
+  end
+
+  # ── TestFlight Build & Upload ─────────────────────────────────────────────
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    # 1. Sync certificates
+    match(
+      type: "appstore",
+      app_identifier: "com.parentpeak.app",
+      readonly: true,
+      git_url: "https://github.com/fatihbucak56-beep/Parentpeak-certificates.git"
+    )
+
+    # 2. Build Flutter IPA
+    sh("cd .. && flutter build ipa --release --export-options-plist ios/ExportOptions.plist")
+
+    # 3. Upload to TestFlight
+    upload_to_testflight(
+      ipa: "../build/ios/ipa/Parentpeak.ipa",
+      skip_waiting_for_build_processing: true
+    )
+
+    puts "✅ Uploaded to TestFlight!"
+  end
+
+  # ── App Store Release ─────────────────────────────────────────────────────
+  desc "Submit to App Store"
+  lane :release do
+    match(
+      type: "appstore",
+      app_identifier: "com.parentpeak.app",
+      readonly: true
+    )
+
+    sh("cd .. && flutter build ipa --release --export-options-plist ios/ExportOptions.plist")
+
+    deliver(
+      ipa: "../build/ios/ipa/Parentpeak.ipa",
+      submit_for_review: false,
+      automatic_release: false
+    )
+  end
+
+end
+
+platform :android do
+
+  # ── Google Play Beta Upload ───────────────────────────────────────────────
+  desc "Upload AAB to Google Play internal testing"
+  lane :beta do
+    sh("cd .. && flutter build appbundle --release")
+
+    upload_to_play_store(
+      track: "internal",
+      aab: "../build/app/outputs/bundle/release/app-release.aab",
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+
+    puts "✅ Uploaded to Google Play Internal Testing!"
+  end
+
+  # ── Google Play Production ────────────────────────────────────────────────
+  desc "Promote to Google Play production"
+  lane :release do
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to: "production",
+      aab: "../build/app/outputs/bundle/release/app-release.aab",
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+
+    puts "✅ Promoted to Google Play Production!"
+  end
+
+end

@@ -33,3 +33,8 @@ lib/ui/oracleJdk-25/
 
 # Local test artifacts
 screenshots/
+certs_temp/
+*.p12
+*.cer
+fastlane/report.xml
+fastlane/.env

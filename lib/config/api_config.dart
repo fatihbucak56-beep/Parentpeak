@@ -1,4 +1,5 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 /// Konfiguration für externe APIs
 ///
@@ -52,6 +53,11 @@ class APIConfig {
   /// Gibt fehlende Pflicht-Secrets für produktive Builds zurück.
   static List<String> getMissingRequiredSecrets() {
     final missing = <String>[];
+
+    // Web bundles are public. Do not require privileged tokens there.
+    if (kIsWeb) {
+      return missing;
+    }
 
     if (!isGeminiApiKeyConfigured()) {
       missing.add('GEMINI_API_KEY');
@@ -385,7 +391,12 @@ class APIConfig {
       if (envValue != null && envValue.isNotEmpty) {
         return envValue;
       }
-    } catch (_) {}
+    } catch (e) {
+      final message = e.toString();
+      if (!message.contains('NotInitializedError')) {
+        debugPrint('APIConfig._readEnvOrDefine(): dotenv read failed for $key: $e');
+      }
+    }
     return null;
   }
 

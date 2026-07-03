@@ -323,3 +323,48 @@ model ShoppingItem {
   @@index([familyId])
   @@index([bought])
 }
+
+// ============================================================================
+// PARENT MATCHING
+// ============================================================================
+
+model ParentMatchingProfile {
+  id                    String   @id @default(cuid())
+  externalId            String?  @unique
+  name                  String
+  age                   Int
+  city                  String
+  bio                   String?
+  interests             String[]
+  languages             String[]
+  valuesFocus           String[]
+  childAges             String[]
+  familyForm            String
+  verificationLevel     String   @default("basic")
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  actions               ParentMatchingAction[]
+
+  @@index([city])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model ParentMatchingAction {
+  id                    String   @id @default(cuid())
+  familyId              String
+  profileId             String
+  action                String
+  createdAt             DateTime @default(now())
+  actorUserId           String?
+
+  profile               ParentMatchingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([profileId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([actorUserId])
+}

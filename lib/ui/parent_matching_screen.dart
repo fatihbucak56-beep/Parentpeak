@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/parent_matching_backend_service.dart';
 import 'package:trusted_circle_demo/ui/match_conversation_screen.dart';
@@ -47,6 +48,12 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
 
   int _currentIndex = 0;
   bool _isRestoring = true;
+
+  String? get _currentUserId {
+    final value = AuthService.instance.currentUser?.uid.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
 
   @override
   void initState() {
@@ -149,7 +156,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         _currentIndex = (decoded['currentIndex'] as num?)?.toInt() ?? 0;
         _isRestoring = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ParentMatchingScreen._restoreState(): failed: $e');
       if (!mounted) return;
       setState(() => _isRestoring = false);
     }
@@ -297,7 +305,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
 
     _moveNext();
     _persistState();
-    _service.sendAction(profileId: profile.id, action: 'like');
+    _service.sendAction(
+      profileId: profile.id,
+      action: 'like',
+      userId: _currentUserId,
+    );
   }
 
   void _reportCurrent() {
@@ -320,7 +332,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       ),
     );
 
-    _service.sendAction(profileId: profile.id, action: 'report');
+    _service.sendAction(
+      profileId: profile.id,
+      action: 'report',
+      userId: _currentUserId,
+    );
   }
 
   void _blockCurrent() {
@@ -342,7 +358,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       ),
     );
 
-    _service.sendAction(profileId: profile.id, action: 'block');
+    _service.sendAction(
+      profileId: profile.id,
+      action: 'block',
+      userId: _currentUserId,
+    );
   }
 
   void _openSafetyInfo() {

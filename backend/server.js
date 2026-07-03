@@ -510,6 +510,68 @@ const parentProfiles = [
 ];
 
 const parentMatchingActions = [];
+const parentMatchingAllowedActions = new Set(['like', 'report', 'block']);
+
+function mapParentMatchingProfileForClient(profile) {
+  return {
+    id: profile.id,
+    name: profile.name,
+    age: profile.age,
+    city: profile.city,
+    bio: profile.bio || '',
+    interests: Array.isArray(profile.interests) ? profile.interests : [],
+    languages: Array.isArray(profile.languages) ? profile.languages : [],
+    valuesFocus: Array.isArray(profile.valuesFocus) ? profile.valuesFocus : [],
+    childAges: Array.isArray(profile.childAges) ? profile.childAges : [],
+    familyForm: profile.familyForm || 'Kernfamilie',
+    verificationLevel: profile.verificationLevel || 'basic',
+  };
+}
+
+async function ensureParentMatchingProfilesSeeded() {
+  const existingCount = await prisma.parentMatchingProfile.count({
+    where: { isActive: true },
+  });
+
+  if (existingCount > 0) {
+    return;
+  }
+
+  await prisma.$transaction(
+    parentProfiles.map(profile =>
+      prisma.parentMatchingProfile.upsert({
+        where: { externalId: profile.id },
+        update: {
+          name: profile.name,
+          age: Number(profile.age) || 30,
+          city: profile.city || 'Unbekannt',
+          bio: profile.bio || '',
+          interests: Array.isArray(profile.interests) ? profile.interests : [],
+          languages: Array.isArray(profile.languages) ? profile.languages : [],
+          valuesFocus: Array.isArray(profile.valuesFocus) ? profile.valuesFocus : [],
+          childAges: Array.isArray(profile.childAges) ? profile.childAges : [],
+          familyForm: profile.familyForm || 'Kernfamilie',
+          verificationLevel: profile.verificationLevel || 'basic',
+          isActive: true,
+        },
+        create: {
+          externalId: profile.id,
+          name: profile.name,
+          age: Number(profile.age) || 30,
+          city: profile.city || 'Unbekannt',
+          bio: profile.bio || '',
+          interests: Array.isArray(profile.interests) ? profile.interests : [],
+          languages: Array.isArray(profile.languages) ? profile.languages : [],
+          valuesFocus: Array.isArray(profile.valuesFocus) ? profile.valuesFocus : [],
+          childAges: Array.isArray(profile.childAges) ? profile.childAges : [],
+          familyForm: profile.familyForm || 'Kernfamilie',
+          verificationLevel: profile.verificationLevel || 'basic',
+          isActive: true,
+        },
+      }),
+    ),
+  );
+}
 
 const familyContacts = [
   {
@@ -1305,7 +1367,9 @@ function countAccountDataByUserIdInMemory(userId) {
     removed += messages.filter(item => item?.userId === userId).length;
   }
 
-  removed += parentMatchingActions.filter(item => item.userId === userId).length;
+  removed += parentMatchingActions.filter(
+    item => item.userId === userId || item.actorUserId === userId,
+  ).length;
 
   return removed;
 }
@@ -1369,7 +1433,10 @@ function deleteAccountDataByUserIdInMemory(userId) {
     }
   }
 
-  removed += removeMatching(parentMatchingActions, item => item.userId === userId);
+  removed += removeMatching(
+    parentMatchingActions,
+    item => item.userId === userId || item.actorUserId === userId,
+  );
 
   return removed;
 }
@@ -1396,10 +1463,17 @@ async function deleteAccountDataByUserIdPrisma(userId, options = {}) {
   });
 
   const userCount = await prisma.user.count({ where: { id: userId } });
+  const parentMatchingActionCount =
+    typeof prisma.parentMatchingAction?.count === 'function'
+      ? await prisma.parentMatchingAction.count({
+          where: { actorUserId: userId },
+        })
+      : 0;
 
   if (options.dryRun === true) {
     return {
-      removed: familyRequestCount + hostAuditPaymentCount + userCount,
+      removed: familyRequestCount + hostAuditPaymentCount + userCount + parentMatchingActionCount,
+      parentMatchingActionCount,
       hostedEventIds: hostedEvents.map(item => item.id),
       dryRun: true,
     };
@@ -1420,6 +1494,12 @@ async function deleteAccountDataByUserIdPrisma(userId, options = {}) {
       },
     },
   })).count;
+
+  if (typeof prisma.parentMatchingAction?.deleteMany === 'function') {
+    removed += (await prisma.parentMatchingAction.deleteMany({
+      where: { actorUserId: userId },
+    })).count;
+  }
 
   removed += (await prisma.user.deleteMany({ where: { id: userId } })).count;
 
@@ -1874,20 +1954,80 @@ app.post('/photos', (req, res) => {
 });
 
 // 12. Parent matching
-app.get('/parent-matching/profiles', (req, res) => {
-  res.json({ profiles: parentProfiles });
+app.get('/parent-matching/profiles', async (req, res) => {
+  try {
+    await ensureParentMatchingProfilesSeeded();
+    const profiles = await prisma.parentMatchingProfile.findMany({
+      where: { isActive: true },
+      orderBy: [{ verificationLevel: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    return res.json({
+      profiles: profiles.map(mapParentMatchingProfileForClient),
+    });
+  } catch (error) {
+    console.error('GET /parent-matching/profiles fallback (in-memory):', error?.message || error);
+    return res.json({ profiles: parentProfiles });
+  }
 });
 
-app.post('/parent-matching/actions', (req, res) => {
-  const action = {
-    id: generateId('match-action'),
-    familyId: req.body.familyId || 'demo-family-001',
-    profileId: req.body.profileId || '',
-    action: req.body.action || 'unknown',
-    createdAt: req.body.createdAt || new Date().toISOString(),
-  };
-  parentMatchingActions.unshift(action);
-  res.status(201).json({ item: action });
+app.post('/parent-matching/actions', async (req, res) => {
+  const familyId = (req.body.familyId || 'demo-family-001').toString().trim();
+  const profileIdInput = (req.body.profileId || '').toString().trim();
+  const actionValue = (req.body.action || 'unknown').toString().trim().toLowerCase();
+  const actorUserId = (req.body.userId || '').toString().trim();
+  const createdAtInput = (req.body.createdAt || '').toString().trim();
+
+  if (!profileIdInput) {
+    return res.status(400).json({ error: 'profileId fehlt' });
+  }
+
+  if (!parentMatchingAllowedActions.has(actionValue)) {
+    return res.status(400).json({ error: 'Ungültige Aktion' });
+  }
+
+  try {
+    let targetProfile = await prisma.parentMatchingProfile.findUnique({
+      where: { id: profileIdInput },
+      select: { id: true },
+    });
+
+    if (!targetProfile) {
+      targetProfile = await prisma.parentMatchingProfile.findUnique({
+        where: { externalId: profileIdInput },
+        select: { id: true },
+      });
+    }
+
+    if (!targetProfile) {
+      return res.status(404).json({ error: 'Profil nicht gefunden' });
+    }
+
+    const createdAt = createdAtInput ? new Date(createdAtInput) : new Date();
+    const createdAction = await prisma.parentMatchingAction.create({
+      data: {
+        familyId,
+        profileId: targetProfile.id,
+        action: actionValue,
+        createdAt: Number.isNaN(createdAt.getTime()) ? new Date() : createdAt,
+        actorUserId: actorUserId || null,
+      },
+    });
+
+    return res.status(201).json({ item: createdAction });
+  } catch (error) {
+    console.error('POST /parent-matching/actions fallback (in-memory):', error?.message || error);
+    const action = {
+      id: generateId('match-action'),
+      familyId,
+      profileId: profileIdInput,
+      action: actionValue,
+      createdAt: createdAtInput || new Date().toISOString(),
+      userId: actorUserId || null,
+    };
+    parentMatchingActions.unshift(action);
+    return res.status(201).json({ item: action, source: 'in-memory-fallback' });
+  }
 });
 
 // 13. Family circle

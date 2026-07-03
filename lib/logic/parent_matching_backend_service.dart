@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 
@@ -12,6 +13,8 @@ class ParentMatchingBackendService {
   String? lastSyncError;
 
   static const String _profilesStorageKey = 'backend.parent_matching.profiles.v1';
+
+  bool get _allowSeedFallback => !kReleaseMode;
 
   Future<List<Map<String, dynamic>>> fetchProfiles() async {
     lastSyncError = null;
@@ -35,14 +38,19 @@ class ParentMatchingBackendService {
       return local;
     }
 
-    final seeded = _seedProfiles();
-    await _persistProfiles(seeded);
-    return seeded;
+    if (_allowSeedFallback) {
+      final seeded = _seedProfiles();
+      await _persistProfiles(seeded);
+      return seeded;
+    }
+
+    return [];
   }
 
   Future<void> sendAction({
     required String profileId,
     required String action,
+    String? userId,
   }) async {
     if (apiClient == null) return;
 
@@ -53,6 +61,7 @@ class ParentMatchingBackendService {
           'familyId': APIConfig.getBackendFamilyId(),
           'profileId': profileId,
           'action': action,
+          'userId': userId,
           'createdAt': DateTime.now().toUtc().toIso8601String(),
           'schemaVersion': APIConfig.getBackendApiVersion(),
         },

@@ -35,9 +35,31 @@ jobs:
 
       - name: Build web
         shell: bash
+        env:
+          BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
+          PRIVACY_POLICY_URL: ${{ vars.PRIVACY_POLICY_URL }}
+          TERMS_OF_SERVICE_URL: ${{ vars.TERMS_OF_SERVICE_URL }}
+          CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
+          CONTACT_SUPPORT_URL: ${{ vars.CONTACT_SUPPORT_URL }}
+          STRIPE_PUBLISHABLE_KEY: ${{ vars.STRIPE_PUBLISHABLE_KEY }}
+          GEMINI_MODEL_NAME: ${{ vars.GEMINI_MODEL_NAME }}
         run: |
           set -o pipefail
-          flutter build web --release 2>&1 | tee flutter-build.log
+          BACKEND_BASE_URL="${BACKEND_BASE_URL:-https://parentpeak.onrender.com}"
+          PRIVACY_POLICY_URL="${PRIVACY_POLICY_URL:-https://parentpeak.de/privacy}"
+          TERMS_OF_SERVICE_URL="${TERMS_OF_SERVICE_URL:-https://parentpeak.de/terms}"
+          CONTACT_EMAIL="${CONTACT_EMAIL:-parentpeakapp@gmail.com}"
+          CONTACT_SUPPORT_URL="${CONTACT_SUPPORT_URL:-https://parentpeak.de}"
+
+          flutter build web --release \
+            --dart-define=BACKEND_BASE_URL="$BACKEND_BASE_URL" \
+            --dart-define=PRIVACY_POLICY_URL="$PRIVACY_POLICY_URL" \
+            --dart-define=TERMS_OF_SERVICE_URL="$TERMS_OF_SERVICE_URL" \
+            --dart-define=CONTACT_EMAIL="$CONTACT_EMAIL" \
+            --dart-define=CONTACT_SUPPORT_URL="$CONTACT_SUPPORT_URL" \
+            --dart-define=STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY}" \
+            --dart-define=GEMINI_MODEL_NAME="${GEMINI_MODEL_NAME}" \
+            2>&1 | tee flutter-build.log
 
       - name: Upload build log on failure
         if: failure()

@@ -127,9 +127,7 @@ Future<void> _startApp() async {
   final stripeKey = APIConfig.getStripePublishableKey()?.trim();
   final stripeSupported = APIConfig.isStripePaymentSheetSupportedPlatform();
   if (kIsWeb) {
-    debugPrint(
-      'Hinweis: Stripe-PaymentSheet ist auf Web nicht verfuegbar.',
-    );
+    // Web does not use Stripe PaymentSheet; keep startup logs clean.
   } else if (stripeSupported && APIConfig.isStripePublishableKeyConfigured()) {
     try {
       Stripe.publishableKey = stripeKey!;

@@ -511,6 +511,83 @@ const parentProfiles = [
 
 const parentMatchingActions = [];
 const parentMatchingAllowedActions = new Set(['like', 'report', 'block']);
+let parentMatchingSchemaEnsured = false;
+
+async function ensureParentMatchingSchemaReady() {
+  if (parentMatchingSchemaEnsured) {
+    return;
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ParentMatchingProfile" (
+      "id" TEXT PRIMARY KEY,
+      "externalId" TEXT,
+      "name" TEXT NOT NULL,
+      "age" INTEGER NOT NULL,
+      "city" TEXT NOT NULL,
+      "bio" TEXT,
+      "interests" TEXT[] DEFAULT ARRAY[]::TEXT[],
+      "languages" TEXT[] DEFAULT ARRAY[]::TEXT[],
+      "valuesFocus" TEXT[] DEFAULT ARRAY[]::TEXT[],
+      "childAges" TEXT[] DEFAULT ARRAY[]::TEXT[],
+      "familyForm" TEXT NOT NULL,
+      "verificationLevel" TEXT NOT NULL DEFAULT 'basic',
+      "isActive" BOOLEAN NOT NULL DEFAULT true,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ParentMatchingAction" (
+      "id" TEXT PRIMARY KEY,
+      "familyId" TEXT NOT NULL,
+      "profileId" TEXT NOT NULL,
+      "action" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "actorUserId" TEXT
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "ParentMatchingProfile_externalId_key"
+    ON "ParentMatchingProfile"("externalId");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingProfile_city_idx"
+    ON "ParentMatchingProfile"("city");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingProfile_isActive_idx"
+    ON "ParentMatchingProfile"("isActive");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingProfile_createdAt_idx"
+    ON "ParentMatchingProfile"("createdAt");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingAction_familyId_idx"
+    ON "ParentMatchingAction"("familyId");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingAction_profileId_idx"
+    ON "ParentMatchingAction"("profileId");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingAction_action_idx"
+    ON "ParentMatchingAction"("action");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingAction_createdAt_idx"
+    ON "ParentMatchingAction"("createdAt");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingAction_actorUserId_idx"
+    ON "ParentMatchingAction"("actorUserId");
+  `);
+
+  parentMatchingSchemaEnsured = true;
+}
 
 function mapParentMatchingProfileForClient(profile) {
   return {
@@ -529,6 +606,8 @@ function mapParentMatchingProfileForClient(profile) {
 }
 
 async function ensureParentMatchingProfilesSeeded() {
+  await ensureParentMatchingSchemaReady();
+
   const existingCount = await prisma.parentMatchingProfile.count({
     where: { isActive: true },
   });
@@ -1987,6 +2066,8 @@ app.post('/parent-matching/actions', async (req, res) => {
   }
 
   try {
+    await ensureParentMatchingSchemaReady();
+
     let targetProfile = await prisma.parentMatchingProfile.findUnique({
       where: { id: profileIdInput },
       select: { id: true },

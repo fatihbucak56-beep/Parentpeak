@@ -14,6 +14,8 @@ class APIConfig {
       String.fromEnvironment('BACKEND_API_TOKEN', defaultValue: '');
   static const String _backendBaseUrlDefine =
       String.fromEnvironment('BACKEND_BASE_URL', defaultValue: '');
+    static const String _stripePublishableKeyDefine =
+      String.fromEnvironment('STRIPE_PUBLISHABLE_KEY', defaultValue: '');
   static const String _geminiModelNameDefine =
       String.fromEnvironment('GEMINI_MODEL_NAME', defaultValue: '');
     static const String _privacyPolicyUrlDefine =
@@ -410,6 +412,10 @@ class APIConfig {
             : null;
       case 'BACKEND_BASE_URL':
         return _backendBaseUrlDefine.isNotEmpty ? _backendBaseUrlDefine : null;
+      case 'STRIPE_PUBLISHABLE_KEY':
+        return _stripePublishableKeyDefine.isNotEmpty
+            ? _stripePublishableKeyDefine
+            : null;
       case 'GEMINI_MODEL_NAME':
         return _geminiModelNameDefine.isNotEmpty
             ? _geminiModelNameDefine

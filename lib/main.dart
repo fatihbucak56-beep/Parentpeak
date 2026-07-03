@@ -125,13 +125,18 @@ Future<void> _startApp() async {
 
   // Stripe publishable key (from .env or compile-time dart-define).
   final stripeKey = APIConfig.getStripePublishableKey()?.trim();
-  if (APIConfig.isStripePublishableKeyConfigured()) {
+  final stripeSupported = APIConfig.isStripePaymentSheetSupportedPlatform();
+  if (stripeSupported && APIConfig.isStripePublishableKeyConfigured()) {
     try {
       Stripe.publishableKey = stripeKey!;
       await Stripe.instance.applySettings();
     } catch (e) {
       debugPrint('Warnung: Stripe konnte nicht initialisiert werden: $e');
     }
+  } else if (!stripeSupported) {
+    debugPrint(
+      'Hinweis: Stripe-PaymentSheet ist auf dieser Plattform nicht verfuegbar.',
+    );
   } else {
     debugPrint(
       'Hinweis: STRIPE_PUBLISHABLE_KEY fehlt/ungueltig (erwartet Prefix pk_) — Stripe-PaymentSheet deaktiviert.',

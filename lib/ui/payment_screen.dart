@@ -29,7 +29,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isProcessing = false;
   bool _agreeToTerms = false;
 
-  bool get _stripeAvailable => APIConfig.isStripePublishableKeyConfigured();
+  bool get _stripeAvailable =>
+      APIConfig.isStripePaymentSheetSupportedPlatform() &&
+      APIConfig.isStripePublishableKeyConfigured();
 
   Future<void> _processPayment() async {
     if (!_agreeToTerms) {

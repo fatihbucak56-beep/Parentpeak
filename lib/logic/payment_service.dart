@@ -62,6 +62,13 @@ class PaymentService {
     required double amount,
   }) async {
     lastSyncError = null;
+
+    if (!APIConfig.isStripePaymentSheetSupportedPlatform()) {
+      throw StateError(
+        'Stripe PaymentSheet wird auf dieser Plattform nicht unterstuetzt.',
+      );
+    }
+
     String? clientSecret;
 
     if (_apiClient != null) {
@@ -322,8 +329,10 @@ class PaymentService {
     await Future.delayed(const Duration(milliseconds: 200));
 
     try {
-      return _transactions.firstWhere((transaction) => transaction.id == transactionId);
-    } catch (_) {
+      return _transactions
+          .firstWhere((transaction) => transaction.id == transactionId);
+    } catch (e) {
+      debugPrint('PaymentService.getTransaction(): local lookup failed: $e');
       return null;
     }
   }

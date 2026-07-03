@@ -138,6 +138,16 @@ class APIConfig {
     return key != null && key.isNotEmpty && key.startsWith('pk_');
   }
 
+  /// Stripe PaymentSheet is currently only supported on Android and iOS.
+  static bool isStripePaymentSheetSupportedPlatform() {
+    if (kIsWeb) {
+      return false;
+    }
+
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
   static String getBackendFamilyId() {
     return _getEnvOrDefault('BACKEND_FAMILY_ID', 'demo-family-001');
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
@@ -54,28 +55,28 @@ void _reportAppError(String context, Object error, StackTrace stackTrace) {
 }
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    unawaited(
-      ErrorReportingService.instance.recordFlutterError(
-        details,
-        context: 'FlutterError.onError',
-        fatal: true,
-      ),
-    );
-    _reportAppError(
-      'FlutterError.onError',
-      details.exception,
-      details.stack ?? StackTrace.current,
-    );
-  };
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stackTrace) {
-    _reportAppError('PlatformDispatcher.onError', error, stackTrace);
-    return true;
-  };
-
   runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      unawaited(
+        ErrorReportingService.instance.recordFlutterError(
+          details,
+          context: 'FlutterError.onError',
+          fatal: true,
+        ),
+      );
+      _reportAppError(
+        'FlutterError.onError',
+        details.exception,
+        details.stack ?? StackTrace.current,
+      );
+    };
+    PlatformDispatcher.instance.onError = (Object error, StackTrace stackTrace) {
+      _reportAppError('PlatformDispatcher.onError', error, stackTrace);
+      return true;
+    };
+
     await _startApp();
   }, (Object error, StackTrace stackTrace) {
     _reportAppError('runZonedGuarded', error, stackTrace);
@@ -84,11 +85,7 @@ void main() {
 
 Future<void> _startApp() async {
   final startupInviteInput = _extractStartupInviteInput();
-  try {
-    await dotenv.load();
-  } catch (e) {
-    debugPrint('Warnung: .env konnte nicht geladen werden: $e');
-  }
+  final hasDotEnv = await _loadOptionalDotEnv();
 
   final missingSecrets = APIConfig.getMissingRequiredSecrets();
   final releaseConfigIssues = APIConfig.getReleaseConfigIssues();
@@ -100,11 +97,11 @@ Future<void> _startApp() async {
     throw StateError(
         'Unsichere Release-Konfiguration: ${releaseConfigIssues.join('; ')}');
   }
-  if (!kReleaseMode && missingSecrets.isNotEmpty) {
+  if (!kReleaseMode && hasDotEnv && missingSecrets.isNotEmpty) {
     debugPrint(
         'Konfigurationshinweis: Fehlende Secrets (${missingSecrets.join(', ')}).');
   }
-  if (!kReleaseMode && releaseConfigIssues.isNotEmpty) {
+  if (!kReleaseMode && hasDotEnv && releaseConfigIssues.isNotEmpty) {
     debugPrint('Konfigurationshinweis: ${releaseConfigIssues.join('; ')}');
   }
 
@@ -145,6 +142,27 @@ Future<void> _startApp() async {
     key: demoAppKey,
     startupInviteInput: startupInviteInput,
   ));
+}
+
+Future<bool> _loadOptionalDotEnv() async {
+  // Web deployments (e.g. GitHub Pages) do not ship a root .env asset.
+  if (kIsWeb) {
+    return false;
+  }
+
+  try {
+    await rootBundle.loadString('.env');
+  } on FlutterError {
+    return false;
+  }
+
+  try {
+    await dotenv.load(fileName: '.env');
+    return true;
+  } catch (e) {
+    debugPrint('Warnung: .env konnte nicht geladen werden: $e');
+    return true;
+  }
 }
 
 String? _extractStartupInviteInput() {

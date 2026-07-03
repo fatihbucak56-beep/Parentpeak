@@ -89,13 +89,25 @@ Future<void> _startApp() async {
 
   final missingSecrets = APIConfig.getMissingRequiredSecrets();
   final releaseConfigIssues = APIConfig.getReleaseConfigIssues();
-  if (kReleaseMode && missingSecrets.isNotEmpty) {
+  final isBlockingReleaseConfig = kReleaseMode && !kIsWeb;
+
+  if (isBlockingReleaseConfig && missingSecrets.isNotEmpty) {
     throw StateError(
         'Fehlende Pflicht-Secrets für Release: ${missingSecrets.join(', ')}');
   }
-  if (kReleaseMode && releaseConfigIssues.isNotEmpty) {
+  if (isBlockingReleaseConfig && releaseConfigIssues.isNotEmpty) {
     throw StateError(
         'Unsichere Release-Konfiguration: ${releaseConfigIssues.join('; ')}');
+  }
+  if (kReleaseMode && kIsWeb && missingSecrets.isNotEmpty) {
+    debugPrint(
+      'Web Release Hinweis: Secrets fehlen (${missingSecrets.join(', ')}). Features werden ggf. deaktiviert.',
+    );
+  }
+  if (kReleaseMode && kIsWeb && releaseConfigIssues.isNotEmpty) {
+    debugPrint(
+      'Web Release Hinweis: ${releaseConfigIssues.join('; ')}. App startet im degradieren Modus.',
+    );
   }
   if (!kReleaseMode && hasDotEnv && missingSecrets.isNotEmpty) {
     debugPrint(

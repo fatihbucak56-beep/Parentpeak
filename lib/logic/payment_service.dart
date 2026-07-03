@@ -63,7 +63,7 @@ class PaymentService {
   }) async {
     lastSyncError = null;
 
-    if (!APIConfig.isStripePaymentSheetSupportedPlatform()) {
+    if (kIsWeb || !APIConfig.isStripePaymentSheetSupportedPlatform()) {
       throw StateError(
         'Stripe PaymentSheet wird auf dieser Plattform nicht unterstuetzt.',
       );

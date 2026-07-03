@@ -126,7 +126,11 @@ Future<void> _startApp() async {
   // Stripe publishable key (from .env or compile-time dart-define).
   final stripeKey = APIConfig.getStripePublishableKey()?.trim();
   final stripeSupported = APIConfig.isStripePaymentSheetSupportedPlatform();
-  if (stripeSupported && APIConfig.isStripePublishableKeyConfigured()) {
+  if (kIsWeb) {
+    debugPrint(
+      'Hinweis: Stripe-PaymentSheet ist auf Web nicht verfuegbar.',
+    );
+  } else if (stripeSupported && APIConfig.isStripePublishableKeyConfigured()) {
     try {
       Stripe.publishableKey = stripeKey!;
       await Stripe.instance.applySettings();

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +56,6 @@ class _LoginSuccessHarnessState extends State<_LoginSuccessHarness> {
 void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    AuthService.disableFirebaseInitForTesting = true;
     await AuthService.instance.logout();
   });
 
@@ -120,7 +121,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await AuthService.instance.debugSeedSessionForTesting(
+    await _seedSession(
       registeredAt: DateTime.now().subtract(const Duration(days: 30)),
       isPremium: false,
       serverHasFullAccess: false,
@@ -287,8 +288,10 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await AuthService.instance.debugSeedSessionForTesting(
+    await _seedSession(
+      registeredAt: DateTime.now().subtract(const Duration(days: 30)),
       isPremium: false,
+      serverHasFullAccess: false,
       serverTrialDaysRemaining: 0,
     );
 
@@ -384,7 +387,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 600));
 
-    await AuthService.instance.debugSeedSessionForTesting(
+    await _seedSession(
       registeredAt: DateTime.now().subtract(const Duration(days: 30)),
       isPremium: false,
       serverHasFullAccess: false,
@@ -404,4 +407,23 @@ void main() {
     expect(find.byType(PaywallScreen), findsOneWidget);
     expect(find.text('Parentpeak Premium'), findsOneWidget);
   });
+}
+
+Future<void> _seedSession({
+  required DateTime registeredAt,
+  bool isPremium = false,
+  bool? serverHasFullAccess,
+  int? serverTrialDaysRemaining,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final user = ParentUser(
+    uid: 'debug_demo_user',
+    email: 'demo@parentpeak.app',
+    displayName: 'Demo Eltern',
+    registeredAt: registeredAt,
+    isPremium: isPremium,
+    serverHasFullAccess: serverHasFullAccess,
+    serverTrialDaysRemaining: serverTrialDaysRemaining,
+  );
+  await prefs.setString('pp_current_user', jsonEncode(user.toJson()));
 }

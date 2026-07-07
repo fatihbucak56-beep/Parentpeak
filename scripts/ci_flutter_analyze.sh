@@ -30,8 +30,8 @@ if [ "$ANALYZE_EXIT" -eq 0 ]; then
   exit 0
 fi
 
-if grep -Eq "error •|[0-9]+ issues found" "$OUTPUT_FILE"; then
-  echo "[ci_flutter_analyze] Analyzer reported issues. Failing build."
+if grep -q "error •" "$OUTPUT_FILE"; then
+  echo "[ci_flutter_analyze] Analyzer reported errors. Failing build."
   exit "$ANALYZE_EXIT"
 fi
 

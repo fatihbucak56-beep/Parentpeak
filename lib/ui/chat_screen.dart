@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
@@ -56,7 +57,8 @@ class _ChatScreenState extends State<ChatScreen> {
             ..addAll(decoded.map((k, v) => MapEntry(k, (v as num).toInt())));
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ChatScreen._loadTopicInsights(): ignoring corrupted local analytics data: $e');
       // Ignore corrupted local analytics data.
     }
   }
@@ -90,9 +92,17 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final apiKey = APIConfig.getGeminiApiKey();
       if (apiKey == null || apiKey.isEmpty) {
-        _chatBackend = PedagogicalChatBackend();
-        setState(() => _initError = null);
-        debugPrint('⚠️ Gemini API-Key fehlt, Fallback-Chat wird verwendet');
+        if (kDebugMode) {
+          _chatBackend = PedagogicalChatBackend();
+          setState(() => _initError = null);
+          debugPrint('Gemini API-Key fehlt, Debug-Fallback-Chat wird verwendet');
+        } else {
+          _chatBackend = null;
+          setState(() {
+            _initError =
+                'KI-Beratung ist aktuell nicht verfuegbar (API-Konfiguration fehlt).';
+          });
+        }
         return;
       }
       _geminiService = GeminiAIService(apiKey: apiKey);

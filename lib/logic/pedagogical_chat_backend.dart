@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/logic/chat_service.dart';
 import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
 
@@ -157,8 +158,12 @@ class PedagogicalChatBackend {
     }
 
     if (_geminiService == null) {
-      final fallback = await _fallbackService.sendMessage(message);
-      yield fallback;
+      if (kDebugMode) {
+        final fallback = await _fallbackService.sendMessage(message);
+        yield fallback;
+      } else {
+        yield _providerUnavailableResponse();
+      }
       return;
     }
 
@@ -167,8 +172,12 @@ class PedagogicalChatBackend {
 
     final response = await _geminiService!.chatWithHistory(preparedHistory);
     if (_looksLikeProviderError(response)) {
-      final fallback = await _fallbackService.sendMessage(message);
-      yield fallback;
+      if (kDebugMode) {
+        final fallback = await _fallbackService.sendMessage(message);
+        yield fallback;
+      } else {
+        yield _providerUnavailableResponse();
+      }
       return;
     }
     if (_containsAny(response.toLowerCase(), _diagnosisKeywords)) {
@@ -277,5 +286,10 @@ class PedagogicalChatBackend {
         'Bitte hole jetzt direkte menschliche Hilfe: '
         'Im Notfall 112, Telefonseelsorge 0800 111 0 111 oder 0800 111 0 222 (24/7), '
         'bei medizinischer Dringlichkeit 116117 und bei Kindeswohlgefaehrdung das zustaendige Jugendamt.';
+  }
+
+  String _providerUnavailableResponse() {
+    return 'Die KI-Beratung ist aktuell nicht verfuegbar. '
+        'Bitte versuche es spaeter erneut oder kontaktiere den Support, falls das Problem bestehen bleibt.';
   }
 }

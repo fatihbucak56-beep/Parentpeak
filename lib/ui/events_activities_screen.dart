@@ -66,7 +66,19 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
     });
 
     try {
-      final viewerUserId = AuthService.instance.currentUser?.uid ?? 'guest_user';
+      final viewerUserId = AuthService.instance.currentUser?.uid;
+      if (viewerUserId == null || viewerUserId.trim().isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _aiEvents = const [];
+          _communityEvents = const [];
+          _invitations = const [];
+          _eventTitlesById = const {};
+          _errorMessage = 'Bitte melde dich an, um Events zu sehen.';
+          _isLoading = false;
+        });
+        return;
+      }
       final coords = _coordsForCity(city);
       final aiFuture = _agent.discoverEvents(
         city: city,
@@ -107,7 +119,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
         _eventTitlesById = titleMap;
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EventsActivitiesScreen._refreshFeed(): failed: $e');
       if (!mounted) return;
       setState(() {
         _errorMessage =
@@ -118,7 +131,10 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
   }
 
   Future<List<MeetupEvent>> _loadCommunityEventsForCity((double, double) coords) async {
-    final viewerUserId = AuthService.instance.currentUser?.uid ?? 'guest_user';
+    final viewerUserId = AuthService.instance.currentUser?.uid;
+    if (viewerUserId == null || viewerUserId.trim().isEmpty) {
+      return const <MeetupEvent>[];
+    }
 
     return _eventService.getDiscoverableEventsForUser(
       viewerUserId: viewerUserId,
@@ -455,7 +471,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
         ),
       );
       await _refreshFeed();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EventsActivitiesScreen._respondInvitation(): failed: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

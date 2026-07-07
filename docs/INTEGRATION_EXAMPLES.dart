@@ -2,10 +2,22 @@
 // INTEGRATIONS-BEISPIEL FÜR FAMILY PROFILE SCREEN
 // ============================================================
 // Diese Datei zeigt wie der Family Profile Screen in der App integriert wird
+// ignore_for_file: file_names
 
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+
+Future<bool> _mockOnRevoke(String deviceUuid, String deviceName) async {
+  return true;
+}
+
+Widget _buildFamilyProfileDemoScreen() {
+  return const FamilyProfileScreen(
+    devices: [],
+    onRevoke: _mockOnRevoke,
+  );
+}
 
 // ============================================================
 // 1. IMPORT IN MAIN.DART
@@ -19,7 +31,7 @@ import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 void navigateToFamilyProfile(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (context) => const FamilyProfileScreen(),
+      builder: (context) => _buildFamilyProfileDemoScreen(),
     ),
   );
 }
@@ -62,7 +74,7 @@ class _ExampleAppShellWithFamilyProfileState
       case 1:
         return const Center(child: Text('Chat Screen'));
       case 2:
-        return const FamilyProfileScreen(); // ✅ Hier wird der Screen verwendet
+        return _buildFamilyProfileDemoScreen(); // ✅ Hier wird der Screen verwendet
       default:
         return const SizedBox();
     }
@@ -102,12 +114,16 @@ class LanguageSwitchExample extends StatefulWidget {
 class _LanguageSwitchExampleState extends State<LanguageSwitchExample> {
   String _currentLang = 'de';
 
+  String _nativeLanguageName(String langCode) {
+    return AppStringsManager.getString(langCode, 'language');
+  }
+
   void _switchLanguage(String langCode) {
     setState(() => _currentLang = langCode);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Sprache geändert zu: ${AppStringsManager.languages[langCode]?['nativeName']}',
+          'Sprache geaendert zu: ${_nativeLanguageName(langCode)}',
         ),
       ),
     );
@@ -119,9 +135,8 @@ class _LanguageSwitchExampleState extends State<LanguageSwitchExample> {
       appBar: AppBar(title: const Text('Language Selector')),
       body: GridView.count(
         crossAxisCount: 3,
-        children: AppStringsManager.languages.entries.map((entry) {
+        children: AppStringsManager.allStrings.entries.map((entry) {
           final code = entry.key;
-          final lang = entry.value;
           final isSelected = code == _currentLang;
 
           return InkWell(
@@ -131,14 +146,14 @@ class _LanguageSwitchExampleState extends State<LanguageSwitchExample> {
                 border: isSelected
                     ? Border.all(color: Colors.blue, width: 3)
                     : null,
-                color: isSelected ? Colors.blue.withOpacity(0.2) : null,
+                color: isSelected ? Colors.blue.withValues(alpha: 0.2) : null,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(lang['flag'] ?? '🌐', style: const TextStyle(fontSize: 40)),
+                  const Text('🌐', style: TextStyle(fontSize: 40)),
                   const SizedBox(height: 8),
-                  Text(lang['nativeName'] ?? '', textAlign: TextAlign.center),
+                  Text(_nativeLanguageName(code), textAlign: TextAlign.center),
                 ],
               ),
             ),
@@ -158,7 +173,7 @@ class LocalizationExampleWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // RTL-Sprache
-    final isArabic = true;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final langCode = isArabic ? 'ar' : 'de';
 
     return Scaffold(
@@ -214,12 +229,12 @@ class _RtlAwareLayoutState extends State<RtlAwareLayout> {
       body: Column(
         children: [
           Wrap(
-            children: AppStringsManager.languages.entries.map((entry) {
+            children: AppStringsManager.allStrings.entries.map((entry) {
               return Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: ElevatedButton(
                   onPressed: () => setState(() => _language = entry.key),
-                  child: Text(entry.value['flag'] ?? ''),
+                  child: Text(entry.key.toUpperCase()),
                 ),
               );
             }).toList(),
@@ -227,21 +242,23 @@ class _RtlAwareLayoutState extends State<RtlAwareLayout> {
           const Divider(),
           Expanded(
             child: Container(
-              color: Colors.blue.withOpacity(0.2),
+              color: Colors.blue.withValues(alpha: 0.2),
               child: Column(
                 crossAxisAlignment:
                     isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
-                  PaddingDirectional(
-                    start: 20,
-                    end: 20,
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 20,
+                      end: 20,
+                    ),
                     child: Column(
                       crossAxisAlignment: isRtl
                           ? CrossAxisAlignment.end
                           : CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${AppStringsManager.languages[_language]?['nativeName']} (${isRtl ? 'RTL' : 'LTR'})',
+                          '${AppStringsManager.getString(_language, 'language')} (${isRtl ? 'RTL' : 'LTR'})',
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,

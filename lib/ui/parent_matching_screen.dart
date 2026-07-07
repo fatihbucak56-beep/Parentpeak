@@ -710,7 +710,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                   children: _matchedProfiles
                       .map((p) => Chip(
                             avatar: CircleAvatar(
-                              child: Text(p.name[0]),
+                              child: Text(_safeInitial(p.name)),
                             ),
                             label: Text(p.name),
                             onDeleted: () => _openMatchChat(p),
@@ -801,7 +801,7 @@ class _ProfileCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: Colors.white.withValues(alpha: 0.25),
-                  child: Text(profile.name[0],
+                  child: Text(_safeInitial(profile.name),
                       style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1054,6 +1054,30 @@ class _ParentProfile {
   final _VerificationLevel verificationLevel;
 }
 
+String _safeProfileName(dynamic value) {
+  final parsed = (value ?? '').toString().trim();
+  if (parsed.isEmpty) {
+    return 'Unbekannt';
+  }
+  return parsed;
+}
+
+String _safeInitial(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) {
+    return '?';
+  }
+  return trimmed.substring(0, 1).toUpperCase();
+}
+
+String _safeTextValue(dynamic value, String fallback) {
+  final parsed = (value ?? '').toString().trim();
+  if (parsed.isEmpty) {
+    return fallback;
+  }
+  return parsed;
+}
+
 enum _VerificationLevel { basic, checked, recommended }
 
 class _VerificationBadge extends StatelessWidget {
@@ -1110,16 +1134,19 @@ _ParentProfile _profileFromMap(Map<String, dynamic> raw) {
   }
 
   return _ParentProfile(
-    id: (raw['id'] ?? DateTime.now().microsecondsSinceEpoch.toString()).toString(),
-    name: (raw['name'] ?? 'Unbekannt').toString(),
+    id: _safeTextValue(
+      raw['id'],
+      DateTime.now().microsecondsSinceEpoch.toString(),
+    ),
+    name: _safeProfileName(raw['name']),
     age: (raw['age'] is num) ? (raw['age'] as num).toInt() : int.tryParse('${raw['age']}') ?? 30,
-    city: (raw['city'] ?? 'Unbekannt').toString(),
+    city: _safeTextValue(raw['city'], 'Unbekannt'),
     bio: (raw['bio'] ?? '').toString(),
     interests: toStringList(raw['interests']),
     languages: toStringList(raw['languages']),
     valuesFocus: toStringList(raw['valuesFocus']),
     childAges: toStringList(raw['childAges']),
-    familyForm: (raw['familyForm'] ?? 'Kernfamilie').toString(),
+    familyForm: _safeTextValue(raw['familyForm'], 'Kernfamilie'),
     verificationLevel:
         parseVerificationLevel(raw['verificationLevel']?.toString()),
   );

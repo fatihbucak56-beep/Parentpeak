@@ -33,10 +33,8 @@ class EventDiscoveryAgent {
   }) async {
     final apiKey = APIConfig.getGeminiApiKey();
     if (apiKey == null || apiKey.isEmpty) {
-      debugPrint(
-        'EventDiscoveryAgent: Kein API-Key, nutze ${kDebugMode ? 'Debug-Fallback' : 'leere Ergebnisliste'}.',
-      );
-      return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
+      debugPrint('EventDiscoveryAgent: Kein API-Key, nutze leere Ergebnisliste.');
+      return <DiscoveredEvent>[];
     }
 
     final cleanCity = _sanitize(city);
@@ -107,7 +105,7 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       return _parseAgentResponse(raw, city);
     } catch (e) {
       debugPrint('EventDiscoveryAgent: Fehler beim API-Call: $e');
-      return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
+      return <DiscoveredEvent>[];
     }
   }
 
@@ -118,7 +116,7 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       final repairedJson = _extractAndRepairJsonArray(raw);
       if (repairedJson == null || repairedJson.isEmpty) {
         debugPrint('EventDiscoveryAgent: Kein gültiges JSON-Array gefunden.');
-        return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
+        return <DiscoveredEvent>[];
       }
 
       final list = jsonDecode(repairedJson) as List<dynamic>;
@@ -165,7 +163,7 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       }).toList();
     } catch (e) {
       debugPrint('EventDiscoveryAgent: JSON-Parsing fehlgeschlagen: $e');
-      return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
+      return <DiscoveredEvent>[];
     }
   }
 
@@ -226,135 +224,6 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       default:
         return DiscoveredEventCategory.sonstiges;
     }
-  }
-
-  // ─── Fallback-Events ───────────────────────────────────────────────────────
-
-  List<DiscoveredEvent> _fallbackEvents(String city) {
-    final now = DateTime.now();
-    return [
-      DiscoveredEvent(
-        id: 'fb_1',
-        title: 'Familientheater – Das tapfere Schneiderlein',
-        description:
-            'Ein bezauberndes Märchenspektakel für die ganze Familie mit viel Musik und Spaß.',
-        category: DiscoveredEventCategory.theater,
-        ageLabels: ['3–10 Jahre'],
-        location: 'Stadttheater $city',
-        cityHint: city,
-        eventDate: now.add(const Duration(days: 5)),
-        price: '8 €',
-        organizer: 'Stadttheater $city',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-      DiscoveredEvent(
-        id: 'fb_2',
-        title: 'Kinderfilm-Matinee: Paw Patrol',
-        description: 'Sonntagsmatinee für die Kleinen – Popcorn inklusive!',
-        category: DiscoveredEventCategory.kino,
-        ageLabels: ['2–8 Jahre'],
-        location: 'CineStar $city',
-        cityHint: city,
-        eventDate: now.add(const Duration(days: 3)),
-        price: '6 €',
-        organizer: 'CineStar',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-      DiscoveredEvent(
-        id: 'fb_3',
-        title: 'Eltern-Kind-Turnen',
-        description:
-            'Altersgerechtes Bewegen und Spielen für Kleinkinder mit Elternteil.',
-        category: DiscoveredEventCategory.sport,
-        ageLabels: ['1–4 Jahre'],
-        location: 'TSV $city – Sporthalle',
-        cityHint: city,
-        isRecurring: true,
-        recurringNote: 'Jeden Dienstag 9:30–10:30 Uhr',
-        price: 'kostenlos',
-        organizer: 'TSV $city',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-      DiscoveredEvent(
-        id: 'fb_4',
-        title: 'Kinder-Bastelnachmittag',
-        description: 'Kreativzeit mit Naturmaterialien – jedes Kind nimmt sein Werk mit nach Hause.',
-        category: DiscoveredEventCategory.basteln,
-        ageLabels: ['4–10 Jahre'],
-        location: 'Familienzentrum $city',
-        cityHint: city,
-        eventDate: now.add(const Duration(days: 8)),
-        price: '3 €',
-        organizer: 'Familienzentrum $city',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-      DiscoveredEvent(
-        id: 'fb_5',
-        title: 'Familienführung im Stadtmuseum',
-        description:
-            'Interaktive Führung extra für Familien – Kinder entdecken Geschichte mit Rätseln.',
-        category: DiscoveredEventCategory.museum,
-        ageLabels: ['6–14 Jahre'],
-        location: 'Stadtmuseum $city',
-        cityHint: city,
-        isRecurring: true,
-        recurringNote: 'Jeden ersten Sonntag im Monat, 11 Uhr',
-        price: 'kostenlos',
-        organizer: 'Stadtmuseum $city',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-      DiscoveredEvent(
-        id: 'fb_6',
-        title: 'Naturerkundung im Stadtwald',
-        description:
-            'Geführte Wanderung für Familien: Tiere, Pflanzen und Abenteuer entdecken.',
-        category: DiscoveredEventCategory.natur,
-        ageLabels: ['5–12 Jahre'],
-        location: 'Stadtwald $city – Parkplatz Haupteingang',
-        cityHint: city,
-        eventDate: now.add(const Duration(days: 6)),
-        price: 'kostenlos',
-        organizer: 'NABU $city',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-      DiscoveredEvent(
-        id: 'fb_7',
-        title: 'Kinder-Musikworkshop',
-        description:
-            'Trommeln, Singen, Tanzen – ein musikalisches Erlebnis für die Kleinen.',
-        category: DiscoveredEventCategory.musik,
-        ageLabels: ['2–6 Jahre'],
-        location: 'Musikschule $city',
-        cityHint: city,
-        isRecurring: true,
-        recurringNote: 'Jeden Samstag 10–11 Uhr',
-        price: '5 €',
-        organizer: 'Musikschule $city',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-      DiscoveredEvent(
-        id: 'fb_8',
-        title: 'Sommerfest im Familienzentrum',
-        description:
-            'Grillen, Spielen, Kennenlernen – das große Sommerfest für alle Familien im Viertel.',
-        category: DiscoveredEventCategory.festival,
-        ageLabels: ['Alle Altersgruppen'],
-        location: 'Familienzentrum $city – Außengelände',
-        cityHint: city,
-        eventDate: now.add(const Duration(days: 14)),
-        price: 'kostenlos',
-        organizer: 'Familienzentrum $city',
-        source: DiscoveredEventSource.kiAgent,
-        discoveredAt: now,
-      ),
-    ];
   }
 
   // ─── Hilfsmethoden ────────────────────────────────────────────────────────

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:just_audio/just_audio.dart';
@@ -34,12 +33,9 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   late final List<Recipe> _recipes = _buildRecipes();
-    late final List<CommunitySnack> _fallbackSnacks =
-      kDebugMode ? _buildSnacks() : const <CommunitySnack>[];
-    late final List<AudioHack> _fallbackAudioHacks =
-      kDebugMode ? _buildAudioHacks() : const <AudioHack>[];
-    late final List<IngredientShare> _fallbackShares =
-      kDebugMode ? _buildShares() : const <IngredientShare>[];
+      final List<CommunitySnack> _fallbackSnacks = const <CommunitySnack>[];
+      final List<AudioHack> _fallbackAudioHacks = const <AudioHack>[];
+      final List<IngredientShare> _fallbackShares = const <IngredientShare>[];
 
   List<CommunitySnack> _snacks = const [];
   List<AudioHack> _audioHacks = const [];
@@ -1039,101 +1035,4 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
     ];
   }
 
-  List<CommunitySnack> _buildSnacks() {
-    return const [
-      CommunitySnack(
-        id: 'snack-1',
-        title: 'Brokkoli unsichtbar in 15 Sekunden',
-        videoUrl: 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
-        linkedRecipeId: 'recipe-brokkoli-pasta',
-        authorId: 'anna',
-        viewsCount: 1230,
-        likesCount: 91,
-        locationCoordinates: GeoCoordinates(latitude: 52.5211, longitude: 13.4061),
-      ),
-      CommunitySnack(
-        id: 'snack-2',
-        title: '3 Zutaten retten den Nachmittag',
-        videoUrl: 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
-        linkedRecipeId: 'recipe-3-zutaten-snack',
-        authorId: 'maria',
-        viewsCount: 980,
-        likesCount: 74,
-        locationCoordinates: GeoCoordinates(latitude: 52.5195, longitude: 13.4074),
-      ),
-      CommunitySnack(
-        id: 'snack-3',
-        title: 'Linsen-Lasagne ohne Diskussion',
-        videoUrl: 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
-        linkedRecipeId: 'recipe-linsen-lasagne',
-        authorId: 'sarah',
-        viewsCount: 1500,
-        likesCount: 128,
-        locationCoordinates: GeoCoordinates(latitude: 52.5185, longitude: 13.4048),
-      ),
-    ];
-  }
-
-  List<AudioHack> _buildAudioHacks() {
-    return const [
-      AudioHack(
-        id: 'hack-1',
-        recipeId: 'recipe-brokkoli-pasta',
-        userId: 'Leonie',
-        audioUrl: 'https://cdn.freesound.org/previews/66/66717_931655-lq.mp3',
-        durationSeconds: 14,
-        upvotes: 42,
-        transcript: 'Nimm doppelt Frischkaese, dann wird es cremig und die Kinder merken den Brokkoli kaum.',
-      ),
-      AudioHack(
-        id: 'hack-2',
-        recipeId: 'recipe-brokkoli-pasta',
-        userId: 'Samir',
-        audioUrl: 'https://cdn.freesound.org/previews/276/276033_2735408-lq.mp3',
-        durationSeconds: 11,
-        upvotes: 21,
-        transcript: 'Erst fein mixen, dann direkt mit Nudelwasser glattziehen.',
-      ),
-      AudioHack(
-        id: 'hack-3',
-        recipeId: 'recipe-3-zutaten-snack',
-        userId: 'Kaya',
-        audioUrl: 'https://cdn.freesound.org/previews/63/63933_634166-lq.mp3',
-        durationSeconds: 9,
-        upvotes: 34,
-        transcript: 'Mit etwas Zimt schmeckt es sofort besser und spart Zucker.',
-      ),
-    ];
-  }
-
-  List<IngredientShare> _buildShares() {
-    return const [
-      IngredientShare(
-        id: 'share-1',
-        userId: 'Anna',
-        ingredientName: 'Frischkaese',
-        status: IngredientShareStatus.available,
-        geoHash: 'u33dc1',
-        location: GeoCoordinates(latitude: 52.5207, longitude: 13.4060),
-        note: 'Fast neu, nur 2 EL genutzt.',
-      ),
-      IngredientShare(
-        id: 'share-2',
-        userId: 'Mehmet',
-        ingredientName: 'Rote Linsen',
-        status: IngredientShareStatus.available,
-        geoHash: 'u33dc2',
-        location: GeoCoordinates(latitude: 52.5198, longitude: 13.4044),
-        note: 'Ungeoeffnet.',
-      ),
-      IngredientShare(
-        id: 'share-3',
-        userId: 'Julia',
-        ingredientName: 'Mandelmus',
-        status: IngredientShareStatus.reserved,
-        geoHash: 'u33dc0',
-        location: GeoCoordinates(latitude: 52.5189, longitude: 13.4039),
-      ),
-    ];
-  }
 }

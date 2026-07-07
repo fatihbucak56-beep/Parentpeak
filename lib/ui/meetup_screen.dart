@@ -34,7 +34,15 @@ class _MeetupScreenState extends State<MeetupScreen> {
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
     try {
-      final viewerUserId = AuthService.instance.currentUser?.uid ?? 'guest_user';
+      final viewerUserId = AuthService.instance.currentUser?.uid;
+      if (viewerUserId == null || viewerUserId.trim().isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _events = const [];
+          _isLoading = false;
+        });
+        return;
+      }
       final events = await _eventService.getDiscoverableEventsForUser(
         viewerUserId: viewerUserId,
         viewerLatitude: _viewerLatitude,

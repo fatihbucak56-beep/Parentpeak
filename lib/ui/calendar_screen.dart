@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/calendar_backend_service.dart';
@@ -64,14 +63,6 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (!mounted) return;
 
     if (saved.isEmpty) {
-      // Keep demo seeding only for debug sessions; production should show real data.
-      if (kDebugMode) {
-        _seedDemoEvents();
-        await _calendarService.seedIfEmpty(
-          _events.map((e) => e.toJson()).toList(),
-        );
-      }
-
       if (!mounted) return;
       setState(() {
         _syncError = syncError;
@@ -95,60 +86,6 @@ class _CalendarScreenState extends State<CalendarScreen>
   void dispose() {
     _titleController.dispose();
     super.dispose();
-  }
-
-  void _seedDemoEvents() {
-    final now = DateTime.now();
-    _events
-      ..clear()
-      ..addAll([
-        _CalendarEvent(
-          id: 'demo_${now.millisecondsSinceEpoch}_1',
-          title: 'Elternabend',
-          start: DateTime(now.year, now.month, now.day, 18, 0),
-          end: DateTime(now.year, now.month, now.day, 19, 30),
-          person: 'Eltern',
-          location: 'Kita Sonnenschein',
-          recurrence: 'Einmalig',
-          reminderMinutes: _smartReminderValue,
-          recurrenceEndMode: 'Kein Ende',
-        ),
-        _CalendarEvent(
-          id: 'demo_${now.millisecondsSinceEpoch}_2',
-          title: 'Impfung Mia',
-          start: DateTime(now.year, now.month, now.day + 1, 10, 0),
-          end: DateTime(now.year, now.month, now.day + 1, 10, 30),
-          person: 'Mia',
-          location: 'Kinderarzt',
-          recurrence: 'Einmalig',
-          reminderMinutes: _smartReminderValue,
-          recurrenceEndMode: 'Kein Ende',
-        ),
-        _CalendarEvent(
-          id: 'demo_${now.millisecondsSinceEpoch}_3',
-          title: 'Fußballtraining',
-          start: DateTime(now.year, now.month, now.day + 2, 16, 0),
-          end: DateTime(now.year, now.month, now.day + 2, 17, 30),
-          person: 'Ben',
-          location: 'Sporthalle',
-          recurrence: 'Wöchentlich',
-          reminderMinutes: _smartReminderValue,
-          recurrenceEndMode: '5 Termine',
-          recurrenceCount: 5,
-        ),
-        _CalendarEvent(
-          id: 'demo_${now.millisecondsSinceEpoch}_4',
-          title: 'Vorschule Ausflug',
-          start: DateTime(now.year, now.month, now.day + 3, 9, 0),
-          end: DateTime(now.year, now.month, now.day + 3, 13, 0),
-          person: 'Kindergarten',
-          location: 'Naturpark',
-          allDay: false,
-          recurrence: 'Einmalig',
-          reminderMinutes: _smartReminderValue,
-          recurrenceEndMode: 'Kein Ende',
-        ),
-      ]);
   }
 
   List<_CalendarEvent> _expandRecurrence(_CalendarEvent base) {

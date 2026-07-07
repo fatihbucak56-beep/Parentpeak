@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -238,23 +237,13 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                               ),
                               ActionChip(
                                 avatar: const Icon(Icons.favorite_rounded, size: 18),
-                                label: const Text(
-                                  kDebugMode
-                                      ? 'Care-Bonus buchen'
-                                      : 'Care-Eintrag erfassen',
-                                ),
-                                onPressed:
-                                    kDebugMode ? _bookMockCareBonus : _addManualCareActivity,
+                                label: const Text('Care-Eintrag erfassen'),
+                                onPressed: _addManualCareActivity,
                               ),
                               ActionChip(
                                 avatar: const Icon(Icons.sell_rounded, size: 18),
-                                label: const Text(
-                                  kDebugMode
-                                      ? 'Spar-Alarm ausloesen'
-                                      : 'Sparchance erfassen',
-                                ),
-                                onPressed:
-                                    kDebugMode ? _runMockSecondHandDeal : _addManualSavingsOpportunity,
+                                label: const Text('Sparchance erfassen'),
+                                onPressed: _addManualSavingsOpportunity,
                               ),
                               ActionChip(
                                 avatar: const Icon(Icons.add_card_rounded, size: 18),
@@ -947,37 +936,6 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
           },
         );
       },
-    );
-  }
-
-  void _bookMockCareBonus() {
-    _provider.addCareActivity(
-      CareActivity(
-        id: 'care-${DateTime.now().millisecondsSinceEpoch}',
-        parentId: _mamaId,
-        activityType: CareActivityType.childSickCare,
-        durationHours: 8,
-        financialCreditValue: 40,
-        date: _provider.selectedMonth,
-        note: 'Kind mit Fieber zuhause betreut',
-      ),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Care-Bonus gebucht: +40,00 EUR fuer den Monatsausgleich.'),
-      ),
-    );
-  }
-
-  void _runMockSecondHandDeal() {
-    final hit = _provider.mockSecondHandDetection(goal: 'Fahrrad 16 Zoll');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Treffer: ${hit.marketplace} in ${hit.distanceKm.toStringAsFixed(1)} km. Potenzial ${_currency(hit.savings)}.',
-        ),
-      ),
     );
   }
 

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-import 'package:trusted_circle_demo/logic/chat_service.dart';
 import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
 
 class PedagogicalChatBackend {
@@ -7,7 +5,6 @@ class PedagogicalChatBackend {
       : _geminiService = geminiService;
 
   final GeminiAIService? _geminiService;
-  final ChatService _fallbackService = ChatService();
 
   static const List<String> _violentKeywords = [
     'schlagen',
@@ -158,12 +155,7 @@ class PedagogicalChatBackend {
     }
 
     if (_geminiService == null) {
-      if (kDebugMode) {
-        final fallback = await _fallbackService.sendMessage(message);
-        yield fallback;
-      } else {
-        yield _providerUnavailableResponse();
-      }
+      yield _providerUnavailableResponse();
       return;
     }
 
@@ -172,12 +164,7 @@ class PedagogicalChatBackend {
 
     final response = await _geminiService!.chatWithHistory(preparedHistory);
     if (_looksLikeProviderError(response)) {
-      if (kDebugMode) {
-        final fallback = await _fallbackService.sendMessage(message);
-        yield fallback;
-      } else {
-        yield _providerUnavailableResponse();
-      }
+      yield _providerUnavailableResponse();
       return;
     }
     if (_containsAny(response.toLowerCase(), _diagnosisKeywords)) {

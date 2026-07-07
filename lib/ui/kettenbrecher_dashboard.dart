@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/kettenbrecher_ai_service.dart';
@@ -50,10 +49,8 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
   );
 
   late final Recipe _baseRecipe = _buildBaseRecipe();
-  late GuerillaRecipe _recipe =
-      kDebugMode ? _buildDemoRecipe() : _buildInitialRecipe();
-  late CookingHub _hub =
-      kDebugMode ? _buildDemoHub() : _buildInitialHub();
+    late GuerillaRecipe _recipe = _buildInitialRecipe();
+    late CookingHub _hub = _buildInitialHub();
   List<DayPlan> _weekPlans = const [];
   List<LocalHelpProfile> _helpProfiles = [];
   final Map<String, KitchenSosResponse> _responderStates = {};
@@ -150,12 +147,10 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
       _loading = true;
     });
 
-    final fallbackHub = kDebugMode ? _buildDemoHub() : _buildInitialHub();
-    final fallbackProfiles =
-      kDebugMode ? _defaultHelpProfiles() : const <LocalHelpProfile>[];
+    final fallbackHub = _buildInitialHub();
+    const fallbackProfiles = <LocalHelpProfile>[];
     final weekStart = _currentWeekStart();
-    final fallbackWeekPlans =
-      kDebugMode ? _fallbackWeekPlans(weekStart) : _emptyWeekPlans(weekStart);
+    final fallbackWeekPlans = _emptyWeekPlans(weekStart);
 
     final loadedHub = await _backend.loadCookingHub(fallbackHub: fallbackHub);
     final loadedProfiles = await _backend.loadLocalHelpProfiles(
@@ -181,22 +176,6 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day)
         .subtract(Duration(days: now.weekday - 1));
-  }
-
-  List<DayPlan> _fallbackWeekPlans(DateTime weekStart) {
-    return List<DayPlan>.generate(
-      7,
-      (index) {
-        final date = weekStart.add(Duration(days: index));
-        return DayPlan(
-          date: date,
-          dinnerRecipeId: index == 0 ? _baseRecipe.id : null,
-          kitaLunch: '',
-          isChaosDay: false,
-          leftoverCode: null,
-        );
-      },
-    );
   }
 
   List<DayPlan> _emptyWeekPlans(DateTime weekStart) {
@@ -921,74 +900,8 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
     return labels[userId] ?? userId;
   }
 
-  Map<String, GeoCoordinates> _mockNearbyParents() {
-    return const {
-      'leonie': GeoCoordinates(latitude: 52.5209, longitude: 13.4046),
-      'samir': GeoCoordinates(latitude: 52.5222, longitude: 13.4029),
-      'jasmin': GeoCoordinates(latitude: 52.5282, longitude: 13.4121),
-      'mueller': GeoCoordinates(latitude: 52.5182, longitude: 13.3988),
-    };
-  }
-
   Map<String, GeoCoordinates> _nearbyParentsForSos() {
-    if (kDebugMode) {
-      return _mockNearbyParents();
-    }
     return const <String, GeoCoordinates>{};
-  }
-
-  CookingHub _buildDemoHub() {
-    final now = DateTime.now();
-    final monday = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
-
-    return _service.generateFairWeeklyRotation(
-      id: 'hub-kita-sonnenschein',
-      hubName: 'Kita Sonnenschein Hub',
-      memberUserIds: const ['mama_fatih', 'mueller', 'kaya', 'nguyen'],
-      weekStart: monday,
-      childAllergiesByUserId: const {
-        'mama_fatih': ['nuesse'],
-        'kaya': ['laktose'],
-      },
-      childPreferencesByUserId: const {
-        'mueller': ['mild', 'fingerfood'],
-        'nguyen': ['vegetarisch'],
-      },
-    );
-  }
-
-  List<LocalHelpProfile> _defaultHelpProfiles() {
-    return const [
-      LocalHelpProfile(
-        userId: 'leonie',
-        displayName: 'Leonie',
-        optedInForKitchenSos: true,
-        maxSupportRadiusMeters: 600,
-        trustedByUserIds: ['mama_fatih'],
-      ),
-      LocalHelpProfile(
-        userId: 'samir',
-        displayName: 'Samir',
-        optedInForKitchenSos: true,
-        maxSupportRadiusMeters: 450,
-        trustedByUserIds: ['mama_fatih'],
-      ),
-      LocalHelpProfile(
-        userId: 'jasmin',
-        displayName: 'Jasmin',
-        optedInForKitchenSos: false,
-        maxSupportRadiusMeters: 500,
-        trustedByUserIds: ['mama_fatih'],
-      ),
-      LocalHelpProfile(
-        userId: 'mueller',
-        displayName: 'Familie Mueller',
-        optedInForKitchenSos: true,
-        maxSupportRadiusMeters: 700,
-        trustedByUserIds: ['mama_fatih', 'kaya'],
-      ),
-    ];
   }
 
   Recipe _buildBaseRecipe() {
@@ -1020,13 +933,6 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
     return _service.generateGuerillaRecipe(
       baseRecipe: _baseRecipe,
       dislikedHealthyIngredients: const [],
-    );
-  }
-
-  GuerillaRecipe _buildDemoRecipe() {
-    return _service.generateGuerillaRecipe(
-      baseRecipe: _baseRecipe,
-      dislikedHealthyIngredients: const ['zucchini', 'linsen', 'spinat'],
     );
   }
 

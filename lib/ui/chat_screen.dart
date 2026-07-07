@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
@@ -92,17 +91,11 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final apiKey = APIConfig.getGeminiApiKey();
       if (apiKey == null || apiKey.isEmpty) {
-        if (kDebugMode) {
-          _chatBackend = PedagogicalChatBackend();
-          setState(() => _initError = null);
-          debugPrint('Gemini API-Key fehlt, Debug-Fallback-Chat wird verwendet');
-        } else {
-          _chatBackend = null;
-          setState(() {
-            _initError =
-                'KI-Beratung ist aktuell nicht verfuegbar (API-Konfiguration fehlt).';
-          });
-        }
+        _chatBackend = null;
+        setState(() {
+          _initError =
+              'KI-Beratung ist aktuell nicht verfuegbar (API-Konfiguration fehlt).';
+        });
         return;
       }
       _geminiService = GeminiAIService(apiKey: apiKey);

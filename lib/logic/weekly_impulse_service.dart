@@ -43,11 +43,7 @@ class WeeklyImpulseService {
       return cachedImpulse;
     }
 
-    if (!kDebugMode) {
-      throw StateError('Weekly impulse unavailable: no backend data and no cache');
-    }
-
-    return WeeklyImpulse.fromJson(_fallbackImpulseJson());
+    throw StateError('Weekly impulse unavailable: no backend data and no cache');
   }
 
   WeeklyImpulse? _parseIfValid(dynamic decoded) {
@@ -96,19 +92,4 @@ class WeeklyImpulseService {
     }
   }
 
-  Map<String, dynamic> _fallbackImpulseJson() {
-    final now = DateTime.now();
-    return {
-      'id': 'imp_3y_gfk_w2',
-      'title': 'Warum-Phase ohne Machtkampf begleiten',
-      'content_body':
-          'Dein Kind stellt gerade viele Warum-Fragen und testet Grenzen. Das ist kein Trotz gegen dich, sondern echte Entwicklung.\n\nAntworte kurz, klar und in einfachen Bildern. So bleibt ihr in Verbindung, auch wenn es im Alltag schnell gehen muss.\n\nWenn eine Grenze noetig ist, bleib bei Ich-Botschaften statt Vorwuerfen.',
-      'practical_tip':
-          'Heute bei der naechsten Warum-Frage: Erst Gefuehl spiegeln, dann eine kurze Antwort geben und eine klare Grenze freundlich benennen.',
-      'audio_script':
-          'Hallo, schoen dass du da bist. Die Warum-Phase zeigt, dass dein Kind die Welt verstehen will. Mit kurzen Antworten und klaren Grenzen auf Augenhoehe gibst du Sicherheit und Verbindung. Du machst das gut.',
-      'category': 'gfk',
-      'publish_date': now.toIso8601String(),
-    };
-  }
 }

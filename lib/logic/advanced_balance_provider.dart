@@ -266,20 +266,6 @@ class AdvancedBalanceProvider extends ChangeNotifier {
     return items;
   }
 
-  SavingsOpportunity mockSecondHandDetection({required String goal}) {
-    final suggestion = SavingsOpportunity(
-      id: 'deal-${DateTime.now().millisecondsSinceEpoch}',
-      goal: goal,
-      retailPrice: 150,
-      secondHandPrice: 40,
-      distanceKm: 3.0,
-      marketplace: 'Kleinanzeigen',
-    );
-
-    addSavingsOpportunity(suggestion);
-    return suggestion;
-  }
-
   Map<String, double> _resolveSplit(Expense item) {
     switch (item.splitType) {
       case ExpenseSplitType.standardSplit:

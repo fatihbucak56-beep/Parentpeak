@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
@@ -88,19 +87,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         initialStatus: 'pending',
       );
 
-      final isMockBackend =
-          (initResponse['mode']?.toString().trim().toLowerCase() ?? '') ==
-              'mock_backend';
-
-      final transaction = (kDebugMode && isMockBackend)
-          ? await _paymentService.reportProviderEvent(
-              transactionId: pendingTransaction.id,
-              provider: _selectedPaymentMethod,
-              providerTransactionRef: providerTransactionRef,
-              status: 'completed',
-              verified: true,
-            )
-          : await _awaitFinalPaymentState(pendingTransaction.id);
+      final transaction = await _awaitFinalPaymentState(pendingTransaction.id);
 
       if (transaction == null || transaction.status != 'completed') {
         throw StateError('Zahlung ist noch nicht abgeschlossen (Status: ${transaction?.status ?? 'unknown'}).');

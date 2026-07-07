@@ -479,7 +479,7 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
     final responders = _service.findTrustedNearbyResponders(
       requesterUserId: _me,
       senderLocation: sos.geoCoordinates,
-      allParents: _mockNearbyParents(),
+      allParents: _nearbyParentsForSos(),
       helpProfiles: _helpProfiles,
       radiusMeters: 500,
     );
@@ -653,7 +653,7 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
     final responders = _service.findTrustedNearbyResponders(
       requesterUserId: _me,
       senderLocation: sos.geoCoordinates,
-      allParents: _mockNearbyParents(),
+      allParents: _nearbyParentsForSos(),
       helpProfiles: _helpProfiles,
       radiusMeters: 500,
     );
@@ -928,6 +928,13 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
       'jasmin': GeoCoordinates(latitude: 52.5282, longitude: 13.4121),
       'mueller': GeoCoordinates(latitude: 52.5182, longitude: 13.3988),
     };
+  }
+
+  Map<String, GeoCoordinates> _nearbyParentsForSos() {
+    if (kDebugMode) {
+      return _mockNearbyParents();
+    }
+    return const <String, GeoCoordinates>{};
   }
 
   CookingHub _buildDemoHub() {

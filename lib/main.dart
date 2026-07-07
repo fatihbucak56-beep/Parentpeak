@@ -89,7 +89,7 @@ Future<void> _startApp() async {
 
   final missingSecrets = APIConfig.getMissingRequiredSecrets();
   final releaseConfigIssues = APIConfig.getReleaseConfigIssues();
-  final isBlockingReleaseConfig = kReleaseMode && !kIsWeb;
+  const isBlockingReleaseConfig = kReleaseMode && !kIsWeb;
 
   if (isBlockingReleaseConfig && missingSecrets.isNotEmpty) {
     throw StateError(

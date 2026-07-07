@@ -43,6 +43,10 @@ class WeeklyImpulseService {
       return cachedImpulse;
     }
 
+    if (!kDebugMode) {
+      throw StateError('Weekly impulse unavailable: no backend data and no cache');
+    }
+
     return WeeklyImpulse.fromJson(_fallbackImpulseJson());
   }
 

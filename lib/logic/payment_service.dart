@@ -17,8 +17,6 @@ class PaymentService {
 
   bool get isBackendEnabled => _apiClient != null;
 
-  bool get _allowMockFallback => !isBackendEnabled || !kReleaseMode;
-
   Never _throwBackendRequired(String context) {
     throw StateError(
       lastSyncError ??
@@ -91,18 +89,12 @@ class PaymentService {
         clientSecret = data['clientSecret']?.toString();
       } catch (e) {
         lastSyncError = 'Stripe-Initialisierung fehlgeschlagen: $e';
-        if (!_allowMockFallback) {
-          _throwBackendRequired('Stripe-Initialisierung');
-        }
+        _throwBackendRequired('Stripe-Initialisierung');
       }
     }
 
     if (clientSecret == null) {
-      if (!_allowMockFallback) {
-        _throwBackendRequired('Stripe-Initialisierung');
-      }
-      await Future.delayed(const Duration(milliseconds: 400));
-      clientSecret = 'pi_mock_${DateTime.now().millisecondsSinceEpoch}_secret_mock';
+      _throwBackendRequired('Stripe-Initialisierung');
     }
 
     // Only show PaymentSheet for real Stripe client secrets (not mocks).
@@ -156,22 +148,11 @@ class PaymentService {
         }
       } catch (e) {
         lastSyncError = 'PayPal-Initialisierung fehlgeschlagen: $e';
-        if (!_allowMockFallback) {
-          _throwBackendRequired('PayPal-Initialisierung');
-        }
+        _throwBackendRequired('PayPal-Initialisierung');
       }
     }
 
-    if (!_allowMockFallback) {
-      _throwBackendRequired('PayPal-Initialisierung');
-    }
-
-    await Future.delayed(const Duration(milliseconds: 1000));
-    return {
-      'approvalUrl':
-          'https://paypal.com/mock/approve/${DateTime.now().millisecondsSinceEpoch}',
-      'token': 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
-    };
+    _throwBackendRequired('PayPal-Initialisierung');
   }
 
   Future<PaymentTransaction> confirmPayment({
@@ -213,31 +194,11 @@ class PaymentService {
         }
       } catch (e) {
         lastSyncError = 'Zahlungsbestaetigung fehlgeschlagen: $e';
-        if (!_allowMockFallback) {
-          _throwBackendRequired('Zahlungsbestaetigung');
-        }
+        _throwBackendRequired('Zahlungsbestaetigung');
       }
     }
 
-    if (!_allowMockFallback) {
-      _throwBackendRequired('Zahlungsbestaetigung');
-    }
-
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    final transaction = PaymentTransaction(
-      id: 'txn_${DateTime.now().millisecondsSinceEpoch}',
-      eventId: eventId,
-      hosterId: hosterId,
-      amount: amount,
-      status: initialStatus,
-      paymentMethod: paymentMethod,
-      stripePaymentIntentId: stripePaymentIntentId,
-      createdAt: DateTime.now(),
-      completedAt: initialStatus == 'completed' ? DateTime.now() : null,
-    );
-
-    return _storeLocalTransaction(transaction);
+    _throwBackendRequired('Zahlungsbestaetigung');
   }
 
   Future<PaymentTransaction?> reportProviderEvent({
@@ -274,35 +235,11 @@ class PaymentService {
         return null;
       } catch (e) {
         lastSyncError = 'Provider-Event konnte nicht verarbeitet werden: $e';
-        if (!_allowMockFallback) {
-          _throwBackendRequired('Provider-Event Verarbeitung');
-        }
+        _throwBackendRequired('Provider-Event Verarbeitung');
       }
     }
 
-    if (!_allowMockFallback) {
-      _throwBackendRequired('Provider-Event Verarbeitung');
-    }
-
-    final index = _transactions.indexWhere((transaction) => transaction.id == transactionId);
-    if (index == -1) {
-      return null;
-    }
-
-    final current = _transactions[index];
-    final updated = PaymentTransaction(
-      id: current.id,
-      eventId: current.eventId,
-      hosterId: current.hosterId,
-      amount: current.amount,
-      status: status,
-      paymentMethod: current.paymentMethod,
-      stripePaymentIntentId: current.stripePaymentIntentId,
-      createdAt: current.createdAt,
-      completedAt: status == 'completed' ? DateTime.now() : current.completedAt,
-    );
-
-    return _storeLocalTransaction(updated);
+    _throwBackendRequired('Provider-Event Verarbeitung');
   }
 
   Future<PaymentTransaction?> getTransaction(String transactionId) async {

@@ -30,10 +30,11 @@ class TreasureListingService {
           return List<TreasureListing>.from(_cache!);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      // Continue with empty state when persisted data cannot be read.
+    }
 
-    _cache = _fallbackListings();
-    await _persist();
+    _cache = [];
     return List<TreasureListing>.from(_cache!);
   }
 
@@ -59,7 +60,9 @@ class TreasureListingService {
       if (decoded is Map) {
         return Map<String, dynamic>.from(decoded);
       }
-    } catch (_) {}
+    } catch (e) {
+      // Ignore corrupted drafts and continue with empty state.
+    }
     return null;
   }
 
@@ -67,14 +70,18 @@ class TreasureListingService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_draftStorageKey, jsonEncode(draft));
-    } catch (_) {}
+    } catch (e) {
+      // Ignore transient local persistence failures.
+    }
   }
 
   Future<void> clearDraft() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_draftStorageKey);
-    } catch (_) {}
+    } catch (e) {
+      // Ignore transient local persistence failures.
+    }
   }
 
   Future<void> _persist() async {
@@ -84,44 +91,8 @@ class TreasureListingService {
         _storageKey,
         jsonEncode(_cache?.map((item) => item.toMap()).toList() ?? const []),
       );
-    } catch (_) {}
-  }
-
-  List<TreasureListing> _fallbackListings() {
-    return [
-      TreasureListing(
-        id: 'treasure-1',
-        title: 'Rotes Laufrad',
-        category: 'Fahrzeuge',
-        sizeAge: '2-4 Jahre',
-        conditionKey: 'round2',
-        distanceMeters: 200,
-        colorLabel: 'Rot',
-        note: 'Faellt im Alltag sofort auf und rollt noch super.',
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      TreasureListing(
-        id: 'treasure-2',
-        title: 'Winterjacke',
-        category: 'Kleidung',
-        sizeAge: 'Größe 92',
-        conditionKey: 'studio',
-        distanceMeters: 420,
-        colorLabel: 'Navy',
-        note: 'Sehr gepflegt und sofort bereit fuer die naechste Runde.',
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      TreasureListing(
-        id: 'treasure-3',
-        title: 'Sandkasten-Set',
-        category: 'Spielzeug',
-        sizeAge: '3-5 Jahre',
-        conditionKey: 'wild',
-        distanceMeters: 650,
-        colorLabel: 'Bunt',
-        note: 'Mit Gebrauchsspuren, aber perfekt fuer draussen.',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-    ];
+    } catch (e) {
+      // Ignore transient local persistence failures.
+    }
   }
 }

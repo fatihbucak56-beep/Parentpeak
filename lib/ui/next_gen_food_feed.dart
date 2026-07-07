@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:just_audio/just_audio.dart';
@@ -33,9 +34,12 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   late final List<Recipe> _recipes = _buildRecipes();
-  late final List<CommunitySnack> _fallbackSnacks = _buildSnacks();
-  late final List<AudioHack> _fallbackAudioHacks = _buildAudioHacks();
-  late final List<IngredientShare> _fallbackShares = _buildShares();
+    late final List<CommunitySnack> _fallbackSnacks =
+      kDebugMode ? _buildSnacks() : const <CommunitySnack>[];
+    late final List<AudioHack> _fallbackAudioHacks =
+      kDebugMode ? _buildAudioHacks() : const <AudioHack>[];
+    late final List<IngredientShare> _fallbackShares =
+      kDebugMode ? _buildShares() : const <IngredientShare>[];
 
   List<CommunitySnack> _snacks = const [];
   List<AudioHack> _audioHacks = const [];
@@ -937,7 +941,8 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
       setState(() {
         _videoReady = true;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('NextGenFoodFeed._initVideoForIndex(): failed: $e');
       if (!mounted) return;
       setState(() {
         _videoReady = false;
@@ -980,7 +985,8 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
       setState(() {
         _audioPlaying = autoplay;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('NextGenFoodFeed._queueRecipeAudioHacksIfNeeded(): failed: $e');
       if (!mounted) return;
       setState(() {
         _audioPlaying = false;

@@ -33,8 +33,10 @@ class EventDiscoveryAgent {
   }) async {
     final apiKey = APIConfig.getGeminiApiKey();
     if (apiKey == null || apiKey.isEmpty) {
-      debugPrint('EventDiscoveryAgent: Kein API-Key, nutze Fallback-Events.');
-      return _fallbackEvents(city);
+      debugPrint(
+        'EventDiscoveryAgent: Kein API-Key, nutze ${kDebugMode ? 'Debug-Fallback' : 'leere Ergebnisliste'}.',
+      );
+      return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
     }
 
     final cleanCity = _sanitize(city);
@@ -105,7 +107,7 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       return _parseAgentResponse(raw, city);
     } catch (e) {
       debugPrint('EventDiscoveryAgent: Fehler beim API-Call: $e');
-      return _fallbackEvents(city);
+      return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
     }
   }
 
@@ -116,7 +118,7 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       final repairedJson = _extractAndRepairJsonArray(raw);
       if (repairedJson == null || repairedJson.isEmpty) {
         debugPrint('EventDiscoveryAgent: Kein gültiges JSON-Array gefunden.');
-        return _fallbackEvents(city);
+        return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
       }
 
       final list = jsonDecode(repairedJson) as List<dynamic>;
@@ -136,7 +138,11 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
         if (map['eventDate'] != null) {
           try {
             eventDate = DateTime.parse(map['eventDate'] as String);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint(
+              'EventDiscoveryAgent._parseAgentResponse(): invalid eventDate ignored: $e',
+            );
+          }
         }
 
         return DiscoveredEvent(
@@ -159,7 +165,7 @@ Antworte NUR mit einem gültigen JSON-Array, kein Markdown, keine Erklärung:
       }).toList();
     } catch (e) {
       debugPrint('EventDiscoveryAgent: JSON-Parsing fehlgeschlagen: $e');
-      return _fallbackEvents(city);
+      return kDebugMode ? _fallbackEvents(city) : <DiscoveredEvent>[];
     }
   }
 

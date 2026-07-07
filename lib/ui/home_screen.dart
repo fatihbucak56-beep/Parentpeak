@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
@@ -40,12 +41,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const String _recentTilesStorageKey = 'home.recent_tiles.v1';
+  static const int _recentTilesLimit = 3;
+
   bool _initialInviteHandled = false;
+  List<String> _recentTileLabels = const [];
 
   @override
   void initState() {
     super.initState();
     languageService.addListener(_onLanguageChanged);
+    _restoreRecentTiles();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openInitialInviteIfNeeded();
     });
@@ -67,6 +73,45 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (_) => EventInvitationsScreen(initialInviteInput: input),
       ),
+    );
+  }
+
+  Future<void> _restoreRecentTiles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getStringList(_recentTilesStorageKey) ?? const [];
+    if (!mounted) return;
+    setState(() {
+      _recentTileLabels = stored;
+    });
+  }
+
+  Future<void> _storeRecentTileTap(String label) async {
+    final normalized = label.trim();
+    if (normalized.isEmpty) return;
+
+    final updated = <String>[normalized];
+    for (final item in _recentTileLabels) {
+      if (item != normalized && updated.length < _recentTilesLimit) {
+        updated.add(item);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _recentTileLabels = updated;
+      });
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_recentTilesStorageKey, updated);
+  }
+
+  Future<void> _openFeature(_FeatureAction action) async {
+    await _storeRecentTileTap(action.label);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: action.builder),
     );
   }
 
@@ -176,6 +221,13 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     final visibleGridActions = featureActions;
+    final actionByLabel = <String, _FeatureAction>{
+      for (final action in visibleGridActions) action.label: action,
+    };
+    final recentActions = _recentTileLabels
+        .map((label) => actionByLabel[label])
+        .whereType<_FeatureAction>()
+        .toList();
 
     final displayName = AuthService.instance.currentUser?.displayName.trim() ?? '';
     final familyGreeting = displayName.isEmpty
@@ -215,6 +267,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(horizontalPadding, 14, horizontalPadding, 24),
+                  sliver: recentActions.isEmpty
+                      ? const SliverToBoxAdapter(child: SizedBox.shrink())
+                      : SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final action in recentActions)
+                                  ActionChip(
+                                    avatar: Icon(action.icon, size: 16, color: action.color),
+                                    label: Text(action.label),
+                                    onPressed: () => _openFeature(action),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 24),
                   sliver: SliverGrid(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -226,10 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: action.icon,
                           color: action.color,
                           compact: true,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: action.builder),
-                          ),
+                          onTap: () => _openFeature(action),
                         );
                       },
                       childCount: visibleGridActions.length,

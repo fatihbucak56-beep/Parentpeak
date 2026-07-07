@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -237,13 +238,23 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                               ),
                               ActionChip(
                                 avatar: const Icon(Icons.favorite_rounded, size: 18),
-                                label: const Text('Care-Bonus buchen'),
-                                onPressed: _bookMockCareBonus,
+                                label: const Text(
+                                  kDebugMode
+                                      ? 'Care-Bonus buchen'
+                                      : 'Care-Eintrag erfassen',
+                                ),
+                                onPressed:
+                                    kDebugMode ? _bookMockCareBonus : _addManualCareActivity,
                               ),
                               ActionChip(
                                 avatar: const Icon(Icons.sell_rounded, size: 18),
-                                label: const Text('Spar-Alarm ausloesen'),
-                                onPressed: _runMockSecondHandDeal,
+                                label: const Text(
+                                  kDebugMode
+                                      ? 'Spar-Alarm ausloesen'
+                                      : 'Sparchance erfassen',
+                                ),
+                                onPressed:
+                                    kDebugMode ? _runMockSecondHandDeal : _addManualSavingsOpportunity,
                               ),
                               ActionChip(
                                 avatar: const Icon(Icons.add_card_rounded, size: 18),
@@ -399,7 +410,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
         SnackBar(content: Text(error.message)),
       );
       _addManualExpense();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('FinanceBudgetScreen._importReceiptFromPhoto(): failed: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('OCR-Import fehlgeschlagen. Bitte erneut versuchen.')),
@@ -964,6 +976,128 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
       SnackBar(
         content: Text(
           'Treffer: ${hit.marketplace} in ${hit.distanceKm.toStringAsFixed(1)} km. Potenzial ${_currency(hit.savings)}.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addManualCareActivity() async {
+    final draft = CareActivity(
+      id: 'care-${DateTime.now().millisecondsSinceEpoch}',
+      parentId: _mamaId,
+      activityType: CareActivityType.other,
+      durationHours: 1,
+      financialCreditValue: 10,
+      date: _provider.selectedMonth,
+      note: '',
+    );
+
+    final created = await _openCareEditor(draft);
+    if (!mounted || created == null) return;
+
+    _provider.addCareActivity(created);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Care-Eintrag gespeichert.')),
+    );
+  }
+
+  Future<void> _addManualSavingsOpportunity() async {
+    final goalController = TextEditingController();
+    final retailController = TextEditingController(text: '100');
+    final secondHandController = TextEditingController(text: '60');
+    final distanceController = TextEditingController(text: '2');
+    final marketplaceController = TextEditingController(text: 'Kleinanzeigen');
+
+    final created = await showDialog<SavingsOpportunity>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Sparchance erfassen'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: goalController,
+                  decoration: const InputDecoration(labelText: 'Produkt / Ziel'),
+                ),
+                TextField(
+                  controller: retailController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Neupreis (€)'),
+                ),
+                TextField(
+                  controller: secondHandController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Second-Hand Preis (€)'),
+                ),
+                TextField(
+                  controller: distanceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Entfernung (km)'),
+                ),
+                TextField(
+                  controller: marketplaceController,
+                  decoration: const InputDecoration(labelText: 'Marktplatz'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final goal = goalController.text.trim();
+                final retail =
+                    double.tryParse(retailController.text.trim().replaceAll(',', '.'));
+                final secondHand =
+                    double.tryParse(secondHandController.text.trim().replaceAll(',', '.'));
+                final distance =
+                    double.tryParse(distanceController.text.trim().replaceAll(',', '.'));
+                final marketplace = marketplaceController.text.trim();
+
+                if (goal.isEmpty ||
+                    retail == null ||
+                    secondHand == null ||
+                    distance == null ||
+                    marketplace.isEmpty) {
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop(
+                  SavingsOpportunity(
+                    id: 'deal-${DateTime.now().millisecondsSinceEpoch}',
+                    goal: goal,
+                    retailPrice: retail,
+                    secondHandPrice: secondHand,
+                    distanceKm: distance,
+                    marketplace: marketplace,
+                  ),
+                );
+              },
+              child: const Text('Speichern'),
+            ),
+          ],
+        );
+      },
+    );
+
+    goalController.dispose();
+    retailController.dispose();
+    secondHandController.dispose();
+    distanceController.dispose();
+    marketplaceController.dispose();
+
+    if (!mounted || created == null) return;
+
+    _provider.addSavingsOpportunity(created);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Sparchance gespeichert: ${created.marketplace}, Potenzial ${_currency(created.savings)}.',
         ),
       ),
     );

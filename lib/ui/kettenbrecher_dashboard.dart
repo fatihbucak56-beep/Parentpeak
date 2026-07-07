@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/kettenbrecher_ai_service.dart';
@@ -49,8 +50,10 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
   );
 
   late final Recipe _baseRecipe = _buildBaseRecipe();
-  late GuerillaRecipe _recipe = _buildDemoRecipe();
-  late CookingHub _hub = _buildDemoHub();
+  late GuerillaRecipe _recipe =
+      kDebugMode ? _buildDemoRecipe() : _buildInitialRecipe();
+  late CookingHub _hub =
+      kDebugMode ? _buildDemoHub() : _buildInitialHub();
   List<DayPlan> _weekPlans = const [];
   List<LocalHelpProfile> _helpProfiles = [];
   final Map<String, KitchenSosResponse> _responderStates = {};
@@ -147,10 +150,12 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
       _loading = true;
     });
 
-    final fallbackHub = _buildDemoHub();
-    final fallbackProfiles = _defaultHelpProfiles();
+    final fallbackHub = kDebugMode ? _buildDemoHub() : _buildInitialHub();
+    final fallbackProfiles =
+      kDebugMode ? _defaultHelpProfiles() : const <LocalHelpProfile>[];
     final weekStart = _currentWeekStart();
-    final fallbackWeekPlans = _fallbackWeekPlans(weekStart);
+    final fallbackWeekPlans =
+      kDebugMode ? _fallbackWeekPlans(weekStart) : _emptyWeekPlans(weekStart);
 
     final loadedHub = await _backend.loadCookingHub(fallbackHub: fallbackHub);
     final loadedProfiles = await _backend.loadLocalHelpProfiles(
@@ -186,6 +191,22 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
         return DayPlan(
           date: date,
           dinnerRecipeId: index == 0 ? _baseRecipe.id : null,
+          kitaLunch: '',
+          isChaosDay: false,
+          leftoverCode: null,
+        );
+      },
+    );
+  }
+
+  List<DayPlan> _emptyWeekPlans(DateTime weekStart) {
+    return List<DayPlan>.generate(
+      7,
+      (index) {
+        final date = weekStart.add(Duration(days: index));
+        return DayPlan(
+          date: date,
+          dinnerRecipeId: null,
           kitaLunch: '',
           isChaosDay: false,
           leftoverCode: null,
@@ -976,6 +997,22 @@ class _KettenbrecherDashboardState extends State<KettenbrecherDashboard> {
       isPickEaterFriendly: true,
       isOnePot: false,
       hideVegetables: true,
+    );
+  }
+
+  CookingHub _buildInitialHub() {
+    return const CookingHub(
+      id: 'hub-empty',
+      hubName: 'Essensplaner',
+      memberUserIds: [],
+      weeklyRotationalPlanner: {},
+    );
+  }
+
+  GuerillaRecipe _buildInitialRecipe() {
+    return _service.generateGuerillaRecipe(
+      baseRecipe: _baseRecipe,
+      dislikedHealthyIngredients: const [],
     );
   }
 

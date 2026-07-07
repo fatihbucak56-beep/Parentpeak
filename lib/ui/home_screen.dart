@@ -145,6 +145,25 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setStringList(_tileOrderStorageKey, updated);
   }
 
+  Future<void> _resetTileOrder() async {
+    if (_customTileOrderLabels.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _customTileOrderLabels = const [];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kachel-Sortierung wurde zurueckgesetzt.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tileOrderStorageKey);
+  }
+
   List<_FeatureAction> _applyCustomOrder(List<_FeatureAction> actions) {
     if (_customTileOrderLabels.isEmpty) {
       return actions;
@@ -312,7 +331,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(horizontalPadding, 10, horizontalPadding, 8),
-                    child: _buildHeroCard(theme, familyGreeting),
+                    child: _buildHeroCard(
+                      theme,
+                      familyGreeting,
+                      showResetTileOrder: _customTileOrderLabels.isNotEmpty,
+                      onResetTileOrder: _resetTileOrder,
+                    ),
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -389,7 +413,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeroCard(ThemeData theme, String familyGreeting) {
+  Widget _buildHeroCard(
+    ThemeData theme,
+    String familyGreeting, {
+    required bool showResetTileOrder,
+    required VoidCallback onResetTileOrder,
+  }) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -413,14 +442,26 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Parentpeak',
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
-              fontFamily: 'SF Pro Rounded',
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Parentpeak',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                    fontFamily: 'SF Pro Rounded',
+                  ),
+                ),
+              ),
+              if (showResetTileOrder)
+                IconButton(
+                  tooltip: 'Kachel-Sortierung zuruecksetzen',
+                  onPressed: onResetTileOrder,
+                  icon: const Icon(Icons.restart_alt_rounded, color: Colors.white),
+                ),
+            ],
           ),
           const SizedBox(height: 6),
           Row(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/models/family_contact.dart';
@@ -8,83 +9,19 @@ class FamilyCircleService {
   static final FamilyCircleService instance = FamilyCircleService._();
   static final _apiClient = BackendServiceFactory.createApiClient();
 
-  static final List<FamilyContact> _contacts = [
-    const FamilyContact(
-      userId: 'host_001',
-      displayName: 'Mia Schneider',
-      city: 'Berlin',
-      childrenSummary: 'Kind: 4 Jahre',
-    ),
-    const FamilyContact(
-      userId: 'host_002',
-      displayName: 'Lena Yilmaz',
-      city: 'Berlin',
-      childrenSummary: 'Kinder: 7 und 10 Jahre',
-    ),
-    const FamilyContact(
-      userId: 'host_003',
-      displayName: 'Noah Weber',
-      city: 'Berlin',
-      childrenSummary: 'Kind: 2 Jahre',
-    ),
-    const FamilyContact(
-      userId: 'host_demo_001',
-      displayName: 'Du',
-      city: 'Berlin',
-      childrenSummary: 'Familienprofil',
-    ),
-  ];
+  static void _logIgnoredError(String context, Object error) {
+    debugPrint('$context: $error');
+  }
 
-  static final Set<String> _connectionKeys = {
-    _pairKey('host_demo_001', 'host_001'),
-    _pairKey('host_demo_001', 'host_002'),
-  };
+  static final List<FamilyContact> _contacts = [];
 
-  static final List<FamilyConnectionRequest> _incomingRequests = [
-    FamilyConnectionRequest(
-      id: 'req_1',
-      fromUserId: 'host_003',
-      toUserId: 'host_demo_001',
-      fromDisplayName: 'Noah Weber',
-      sentAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-  ];
+  static final Set<String> _connectionKeys = {};
+
+  static final List<FamilyConnectionRequest> _incomingRequests = [];
 
   static String _pairKey(String a, String b) {
     final sorted = [a, b]..sort();
     return '${sorted[0]}::${sorted[1]}';
-  }
-
-  List<FamilyContact> _localContactsFor(String userId) {
-    return [
-      ..._contacts.where((contact) => contact.userId != 'host_demo_001'),
-      FamilyContact(
-        userId: userId,
-        displayName: 'Du',
-        city: 'Berlin',
-        childrenSummary: 'Familienprofil',
-      ),
-    ];
-  }
-
-  Set<String> _localConnectionKeysFor(String userId) {
-    return {
-      _pairKey(userId, 'host_001'),
-      _pairKey(userId, 'host_002'),
-      ..._connectionKeys.where((key) => !key.contains('host_demo_001')),
-    };
-  }
-
-  List<FamilyConnectionRequest> _localRequestsFor(String userId) {
-    return [
-      FamilyConnectionRequest(
-        id: 'req_1',
-        fromUserId: 'host_003',
-        toUserId: userId,
-        fromDisplayName: 'Noah Weber',
-        sentAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-    ];
   }
 
   Future<List<FamilyContact>> getConnectedContacts({required String userId}) async {
@@ -94,17 +31,18 @@ class FamilyCircleService {
             .getJson('${APIConfig.getBackendFamilyContactsPath()}?userId=$userId');
         final remote = _parseContacts(payload);
         if (remote.isNotEmpty) return remote;
-      } catch (_) {
-        // Fallback below.
+      } catch (e) {
+        _logIgnoredError(
+          'FamilyCircleService.getConnectedContacts(): backend unavailable, using local state',
+          e,
+        );
       }
     }
 
     await Future.delayed(const Duration(milliseconds: 180));
-    final contacts = _localContactsFor(userId);
-    final connectionKeys = _localConnectionKeysFor(userId);
-    return contacts.where((c) {
+    return _contacts.where((c) {
       if (c.userId == userId) return false;
-      return connectionKeys.contains(_pairKey(userId, c.userId));
+      return _connectionKeys.contains(_pairKey(userId, c.userId));
     }).toList();
   }
 
@@ -122,13 +60,16 @@ class FamilyCircleService {
                   r.toUserId == userId && r.status == FamilyRequestStatus.pending)
               .toList();
         }
-      } catch (_) {
-        // Fallback below.
+      } catch (e) {
+        _logIgnoredError(
+          'FamilyCircleService.getIncomingRequests(): backend unavailable, using local state',
+          e,
+        );
       }
     }
 
     await Future.delayed(const Duration(milliseconds: 180));
-    return _localRequestsFor(userId)
+    return _incomingRequests
         .where((r) => r.toUserId == userId && r.status == FamilyRequestStatus.pending)
         .toList();
   }
@@ -138,7 +79,23 @@ class FamilyCircleService {
     required bool accept,
     String? actingUserId,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 180));
+    if (_apiClient == null) {
+      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
+    }
+
+    final path = APIConfig.getBackendFamilyRequestsPath();
+    final normalizedPath = path.endsWith('/')
+        ? '${path.substring(0, path.length - 1)}/$requestId'
+        : '$path/$requestId';
+    await _apiClient!.putJson(
+      normalizedPath,
+      {
+        'status': accept ? 'accepted' : 'declined',
+        if (actingUserId != null) 'actingUserId': actingUserId,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        'schemaVersion': APIConfig.getBackendApiVersion(),
+      },
+    );
 
     final index = _incomingRequests.indexWhere((r) => r.id == requestId);
     if (index == -1) return;
@@ -156,26 +113,6 @@ class FamilyCircleService {
     if (accept) {
       _connectionKeys.add(_pairKey(req.fromUserId, req.toUserId));
     }
-
-    if (_apiClient != null) {
-      try {
-        final path = APIConfig.getBackendFamilyRequestsPath();
-        final normalizedPath = path.endsWith('/')
-            ? '${path.substring(0, path.length - 1)}/$requestId'
-            : '$path/$requestId';
-        await _apiClient!.putJson(
-          normalizedPath,
-          {
-            'status': accept ? 'accepted' : 'declined',
-            if (actingUserId != null) 'actingUserId': actingUserId,
-            'updatedAt': DateTime.now().toUtc().toIso8601String(),
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-      } catch (_) {
-        // Local state remains source of truth if backend update fails.
-      }
-    }
   }
 
   /// Sends a new connection request to [toUserId] from [fromUserId].
@@ -185,52 +122,37 @@ class FamilyCircleService {
     required String toUserId,
     String? fromDisplayName,
   }) async {
-    // Optimistically add to local state.
-    final localReq = FamilyConnectionRequest(
-      id: 'req_local_${DateTime.now().microsecondsSinceEpoch}',
+    if (_apiClient == null) {
+      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
+    }
+
+    final payload = await _apiClient!.postJson(
+      APIConfig.getBackendFamilyRequestsPath(),
+      {
+        'fromUserId': fromUserId,
+        'toUserId': toUserId,
+        'actingUserId': fromUserId,
+        'status': 'pending',
+        'schemaVersion': APIConfig.getBackendApiVersion(),
+      },
+    );
+    final raw = payload['item'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(payload['item'] as Map)
+        : payload;
+    if ((raw['id'] ?? '').toString().isEmpty) {
+      return null;
+    }
+
+    final serverReq = FamilyConnectionRequest(
+      id: raw['id'].toString(),
       fromUserId: fromUserId,
       toUserId: toUserId,
       fromDisplayName: fromDisplayName ?? fromUserId,
-      sentAt: DateTime.now(),
+      sentAt: DateTime.tryParse((raw['createdAt'] ?? '').toString()) ??
+          DateTime.now(),
     );
-    _incomingRequests.add(localReq);
-
-    if (_apiClient != null) {
-      try {
-        final payload = await _apiClient!.postJson(
-          APIConfig.getBackendFamilyRequestsPath(),
-          {
-            'fromUserId': fromUserId,
-            'toUserId': toUserId,
-            'actingUserId': fromUserId,
-            'status': 'pending',
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-        final raw = payload['item'] is Map<String, dynamic>
-            ? Map<String, dynamic>.from(payload['item'] as Map)
-            : payload;
-        if ((raw['id'] ?? '').toString().isNotEmpty) {
-          // Replace the optimistic entry with the server-issued one.
-          final idx = _incomingRequests.indexWhere((r) => r.id == localReq.id);
-          final serverReq = FamilyConnectionRequest(
-            id: raw['id'].toString(),
-            fromUserId: fromUserId,
-            toUserId: toUserId,
-            fromDisplayName: fromDisplayName ?? fromUserId,
-            sentAt: DateTime.tryParse((raw['createdAt'] ?? '').toString()) ??
-                DateTime.now(),
-          );
-          if (idx != -1) {
-            _incomingRequests[idx] = serverReq;
-          }
-          return serverReq;
-        }
-      } catch (_) {
-        // Local optimistic entry stays.
-      }
-    }
-    return localReq;
+    _incomingRequests.add(serverReq);
+    return serverReq;
   }
 
   /// Removes a family connection request by [requestId].
@@ -239,22 +161,19 @@ class FamilyCircleService {
     required String requestId,
     String? actingUserId,
   }) async {
-    _incomingRequests.removeWhere((r) => r.id == requestId);
-
-    if (_apiClient != null) {
-      try {
-        final basePath = APIConfig.getBackendFamilyRequestsPath();
-        final normalizedPath = basePath.endsWith('/')
-            ? '${basePath.substring(0, basePath.length - 1)}/$requestId'
-            : '$basePath/$requestId';
-        final queryParam = actingUserId != null
-            ? '?actingUserId=${Uri.encodeComponent(actingUserId)}'
-            : '';
-        await _apiClient!.delete('$normalizedPath$queryParam');
-      } catch (_) {
-        // Local deletion already applied.
-      }
+    if (_apiClient == null) {
+      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
     }
+
+    final basePath = APIConfig.getBackendFamilyRequestsPath();
+    final normalizedPath = basePath.endsWith('/')
+        ? '${basePath.substring(0, basePath.length - 1)}/$requestId'
+        : '$basePath/$requestId';
+    final queryParam = actingUserId != null
+        ? '?actingUserId=${Uri.encodeComponent(actingUserId)}'
+        : '';
+    await _apiClient!.delete('$normalizedPath$queryParam');
+    _incomingRequests.removeWhere((r) => r.id == requestId);
   }
 
   /// Deletes an accepted relationship between two users by resolving its
@@ -263,45 +182,37 @@ class FamilyCircleService {
     required String currentUserId,
     required String otherUserId,
   }) async {
-    _connectionKeys.remove(_pairKey(currentUserId, otherUserId));
-
-    if (_apiClient != null) {
-      try {
-        final path = APIConfig.getBackendFamilyRequestsPath();
-        final qA =
-            '?fromUserId=${Uri.encodeComponent(currentUserId)}&toUserId=${Uri.encodeComponent(otherUserId)}&status=accepted';
-        final qB =
-            '?fromUserId=${Uri.encodeComponent(otherUserId)}&toUserId=${Uri.encodeComponent(currentUserId)}&status=accepted';
-
-        final resA = await _apiClient!.getJson('$path$qA');
-        final resB = await _apiClient!.getJson('$path$qB');
-        final candidates = [
-          ..._parseRequests(resA),
-          ..._parseRequests(resB),
-        ];
-
-        for (final req in candidates) {
-          final isPair = (req.fromUserId == currentUserId && req.toUserId == otherUserId) ||
-              (req.fromUserId == otherUserId && req.toUserId == currentUserId);
-          if (!isPair) continue;
-
-          await deleteRequest(
-            requestId: req.id,
-            actingUserId: currentUserId,
-          );
-          return true;
-        }
-      } catch (_) {
-        // Fall through to local fallback below.
-      }
+    if (_apiClient == null) {
+      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
     }
 
-    _incomingRequests.removeWhere((r) {
-      final isPair = (r.fromUserId == currentUserId && r.toUserId == otherUserId) ||
-          (r.fromUserId == otherUserId && r.toUserId == currentUserId);
-      return isPair;
-    });
-    return true;
+    final path = APIConfig.getBackendFamilyRequestsPath();
+    final qA =
+        '?fromUserId=${Uri.encodeComponent(currentUserId)}&toUserId=${Uri.encodeComponent(otherUserId)}&status=accepted';
+    final qB =
+        '?fromUserId=${Uri.encodeComponent(otherUserId)}&toUserId=${Uri.encodeComponent(currentUserId)}&status=accepted';
+
+    final resA = await _apiClient!.getJson('$path$qA');
+    final resB = await _apiClient!.getJson('$path$qB');
+    final candidates = [
+      ..._parseRequests(resA),
+      ..._parseRequests(resB),
+    ];
+
+    for (final req in candidates) {
+      final isPair = (req.fromUserId == currentUserId && req.toUserId == otherUserId) ||
+          (req.fromUserId == otherUserId && req.toUserId == currentUserId);
+      if (!isPair) continue;
+
+      await deleteRequest(
+        requestId: req.id,
+        actingUserId: currentUserId,
+      );
+      _connectionKeys.remove(_pairKey(currentUserId, otherUserId));
+      return true;
+    }
+
+    return false;
   }
 
   bool areUsersConnected({required String userA, required String userB}) {

@@ -6,6 +6,12 @@ class ParticipationService {
   static final List<EventParticipation> _participations = [];
   final EventBackendService _backend = EventBackendService();
 
+  Never _throwBackendRequired(String action) {
+    throw StateError(
+      _backend.lastSyncError ?? '$action ist aktuell nicht mit dem Backend verbunden.',
+    );
+  }
+
   void _storeLocal(EventParticipation participation) {
     final index = _participations.indexWhere((p) => p.id == participation.id);
     if (index == -1) {
@@ -20,101 +26,56 @@ class ParticipationService {
     required String eventId,
     required String userId,
   }) async {
-    if (_backend.isEnabled) {
-      final remote = await _backend.requestParticipation(
-        eventId: eventId,
-        userId: userId,
-      );
-      if (remote != null) {
-        _storeLocal(remote);
-        return remote;
-      }
+    if (!_backend.isEnabled) {
+      _throwBackendRequired('Teilnahmeanfrage');
     }
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    final participation = EventParticipation(
-      id: 'participation_${DateTime.now().millisecondsSinceEpoch}',
+    final remote = await _backend.requestParticipation(
       eventId: eventId,
       userId: userId,
-      requestedAt: DateTime.now(),
-      status: ParticipationStatus.pending,
     );
+    if (remote == null) {
+      _throwBackendRequired('Teilnahmeanfrage');
+    }
 
-    _storeLocal(participation);
-    return participation;
+    _storeLocal(remote);
+    return remote;
   }
 
   // Genehmige Teilnahme-Anfrage
   Future<bool> approveParticipation(String participationId) async {
-    if (_backend.isEnabled) {
-      final remote = await _backend.respondToParticipation(
-        participationId: participationId,
-        accept: true,
-      );
-      if (remote != null) {
-        _storeLocal(remote);
-        return true;
-      }
+    if (!_backend.isEnabled) {
+      _throwBackendRequired('Teilnahme genehmigen');
     }
 
-    await Future.delayed(const Duration(milliseconds: 400));
-
-    try {
-      final index =
-          _participations.indexWhere((p) => p.id == participationId);
-      if (index != -1) {
-        final existing = _participations[index];
-        _participations[index] = EventParticipation(
-          id: existing.id,
-          eventId: existing.eventId,
-          userId: existing.userId,
-          requestedAt: existing.requestedAt,
-          approvedAt: DateTime.now(),
-          status: ParticipationStatus.approved,
-        );
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
+    final remote = await _backend.respondToParticipation(
+      participationId: participationId,
+      accept: true,
+    );
+    if (remote == null) {
+      _throwBackendRequired('Teilnahme genehmigen');
     }
+
+    _storeLocal(remote);
+    return true;
   }
 
   // Lehne Teilnahme-Anfrage ab
   Future<bool> declineParticipation(String participationId) async {
-    if (_backend.isEnabled) {
-      final remote = await _backend.respondToParticipation(
-        participationId: participationId,
-        accept: false,
-      );
-      if (remote != null) {
-        _storeLocal(remote);
-        return true;
-      }
+    if (!_backend.isEnabled) {
+      _throwBackendRequired('Teilnahme ablehnen');
     }
 
-    await Future.delayed(const Duration(milliseconds: 400));
-
-    try {
-      final index =
-          _participations.indexWhere((p) => p.id == participationId);
-      if (index != -1) {
-        final existing = _participations[index];
-        _participations[index] = EventParticipation(
-          id: existing.id,
-          eventId: existing.eventId,
-          userId: existing.userId,
-          requestedAt: existing.requestedAt,
-          declinedAt: DateTime.now(),
-          status: ParticipationStatus.declined,
-        );
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
+    final remote = await _backend.respondToParticipation(
+      participationId: participationId,
+      accept: false,
+    );
+    if (remote == null) {
+      _throwBackendRequired('Teilnahme ablehnen');
     }
+
+    _storeLocal(remote);
+    return true;
   }
 
   // Hole Partizipation-Details

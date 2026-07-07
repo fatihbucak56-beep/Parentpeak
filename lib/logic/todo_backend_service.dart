@@ -34,9 +34,7 @@ class TodoBackendService {
       return local;
     }
 
-    final seeded = _seedTodos();
-    await _persist(seeded);
-    return seeded;
+    return const <Map<String, dynamic>>[];
   }
 
   Future<Map<String, dynamic>> addTodo({
@@ -154,9 +152,7 @@ class TodoBackendService {
   Future<List<Map<String, dynamic>>> _readOrSeed() async {
     final current = await _readLocal();
     if (current.isNotEmpty) return current;
-    final seeded = _seedTodos();
-    await _persist(seeded);
-    return seeded;
+    return <Map<String, dynamic>>[];
   }
 
   Future<List<Map<String, dynamic>>> _readLocal() async {
@@ -178,38 +174,5 @@ class TodoBackendService {
   Future<void> _persist(List<Map<String, dynamic>> todos) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_storageKey, jsonEncode(todos));
-  }
-
-  List<Map<String, dynamic>> _seedTodos() {
-    return [
-      {
-        'id': 'todo-1',
-        'title': 'Hausaufgaben machen',
-        'done': false,
-        'assignee': 'Leon',
-        'category': 'Schule',
-      },
-      {
-        'id': 'todo-2',
-        'title': 'Arzttermin buchen',
-        'done': false,
-        'assignee': 'Mama',
-        'category': 'Gesundheit',
-      },
-      {
-        'id': 'todo-3',
-        'title': 'Fußballschuhe kaufen',
-        'done': true,
-        'assignee': 'Papa',
-        'category': 'Sport',
-      },
-      {
-        'id': 'todo-4',
-        'title': 'Geburtstag vorbereiten',
-        'done': false,
-        'assignee': 'Familie',
-        'category': 'Ereignis',
-      },
-    ];
   }
 }

@@ -641,28 +641,4 @@ class AuthService {
     return null;
   }
 
-  Future<void> debugSeedSessionForTesting({
-    String uid = 'debug_demo_user',
-    String email = 'demo@parentpeak.app',
-    String displayName = 'Demo Eltern',
-    DateTime? registeredAt,
-    bool isPremium = false,
-    bool? serverHasFullAccess,
-    int? serverTrialDaysRemaining,
-  }) async {
-    if (!kDebugMode) return;
-    final user = ParentUser(
-      uid: uid,
-      email: email,
-      displayName: displayName,
-      registeredAt:
-          registeredAt ?? DateTime.now().subtract(const Duration(days: 2)),
-      isPremium: isPremium,
-      serverHasFullAccess: serverHasFullAccess,
-      serverTrialDaysRemaining: serverTrialDaysRemaining,
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await _persistSession(prefs, user);
-    _currentUser = user;
-  }
 }

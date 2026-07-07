@@ -97,28 +97,23 @@ class PaymentService {
       _throwBackendRequired('Stripe-Initialisierung');
     }
 
-    // Only show PaymentSheet for real Stripe client secrets (not mocks).
-    if (!clientSecret.contains('_mock_')) {
-      try {
-        await Stripe.instance.initPaymentSheet(
-          paymentSheetParameters: SetupPaymentSheetParameters(
-            paymentIntentClientSecret: clientSecret,
-            merchantDisplayName: 'Parentpeak',
-            style: ThemeMode.system,
-          ),
-        );
-        await Stripe.instance.presentPaymentSheet();
-      } on StripeException catch (e) {
-        lastSyncError = 'Stripe-Zahlung fehlgeschlagen: ${e.error.localizedMessage ?? e.toString()}';
-        rethrow;
-      }
+    try {
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Parentpeak',
+          style: ThemeMode.system,
+        ),
+      );
+      await Stripe.instance.presentPaymentSheet();
+    } on StripeException catch (e) {
+      lastSyncError = 'Stripe-Zahlung fehlgeschlagen: ${e.error.localizedMessage ?? e.toString()}';
+      rethrow;
     }
 
     return {
       'clientSecret': clientSecret,
-      'status': clientSecret.contains('_mock_')
-          ? 'mock_succeeded'
-          : 'succeeded',
+      'status': 'succeeded',
     };
   }
 

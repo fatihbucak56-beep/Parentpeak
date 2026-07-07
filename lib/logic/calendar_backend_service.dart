@@ -48,12 +48,6 @@ class CalendarBackendService {
     }
   }
 
-  Future<void> seedIfEmpty(List<Map<String, dynamic>> seedEvents) async {
-    final current = await _readLocal();
-    if (current.isNotEmpty) return;
-    await _persist(seedEvents);
-  }
-
   Future<List<Map<String, dynamic>>> _readLocal() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_storageKey);

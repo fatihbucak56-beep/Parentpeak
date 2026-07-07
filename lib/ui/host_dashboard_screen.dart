@@ -23,9 +23,9 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
   List<EventParticipation> _pendingRequests = [];
   Map<String, FamilyContact> _contactsById = {};
   bool _isLoading = true;
+    String? _errorMessage;
 
-  String get _currentUserId =>
-      AuthService.instance.currentUser?.uid ?? 'host_demo_001';
+    String? get _currentUserId => AuthService.instance.currentUser?.uid;
   String get _currentUserName =>
       AuthService.instance.currentUser?.displayName ?? 'Du';
 
@@ -36,10 +36,22 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
   }
 
   Future<void> _loadDashboardData() async {
+    final currentHostId = _currentUserId;
+    if (currentHostId == null || currentHostId.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _hostedEvents = [];
+        _pendingRequests = [];
+        _contactsById = {};
+        _errorMessage = 'Bitte melde dich an, um dein Host-Dashboard zu sehen.';
+        _isLoading = false;
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final currentHostId = _currentUserId;
       final myEvents = await _eventService.getDiscoverableEventsForUser(
         viewerUserId: currentHostId,
         viewerLatitude: 52.5200,
@@ -54,6 +66,7 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
         _hostedEvents = hostedEvents;
         _pendingRequests = requests;
         _contactsById = {for (final contact in contacts) contact.userId: contact};
+        _errorMessage = null;
         _isLoading = false;
       });
     } catch (e) {
@@ -122,6 +135,16 @@ class _HostDashboardScreenState extends State<HostDashboardScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(

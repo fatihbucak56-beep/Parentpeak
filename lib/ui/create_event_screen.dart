@@ -56,7 +56,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Future<void> _loadFamilyContacts() async {
-    final userId = AuthService.instance.currentUser?.uid ?? 'host_demo_001';
+    final userId = AuthService.instance.currentUser?.uid;
+    if (userId == null || userId.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _familyContacts = [];
+      });
+      return;
+    }
     final contacts = await _familyCircleService.getConnectedContacts(userId: userId);
     if (!mounted) return;
     setState(() {
@@ -138,6 +145,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Future<void> _submitForm() async {
+    final currentUserId = AuthService.instance.currentUser?.uid;
+    if (currentUserId == null || currentUserId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte melde dich an, um ein Event zu erstellen.')),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAgeGroups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -172,7 +187,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
       final event = MeetupEvent(
         id: 'event_${DateTime.now().millisecondsSinceEpoch}',
-        hosterId: AuthService.instance.currentUser?.uid ?? 'host_demo_001',
+        hosterId: currentUserId,
         title: _titleController.text,
         description: _descriptionController.text,
         category: _selectedCategory,

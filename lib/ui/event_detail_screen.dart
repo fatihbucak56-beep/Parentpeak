@@ -19,9 +19,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   bool _isApproved = false;
   bool _isDeclined = false;
   bool _isLoading = false;
+  String? _errorMessage;
 
-  String get _currentUserId =>
-      AuthService.instance.currentUser?.uid ?? 'user_demo_001';
+  String? get _currentUserId => AuthService.instance.currentUser?.uid;
 
   @override
   void initState() {
@@ -30,8 +30,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> _checkParticipationStatus() async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Bitte melde dich an, um an Events teilzunehmen.';
+      });
+      return;
+    }
+
     final participation = await _participationService.getParticipationByUserAndEvent(
-      userId: _currentUserId,
+      userId: currentUserId,
       eventId: widget.event.id,
     );
 
@@ -41,16 +50,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       _isDeclined = participation?.status == ParticipationStatus.declined;
       _hasRequested = participation?.status == ParticipationStatus.pending ||
           participation?.status == ParticipationStatus.approved;
+      _errorMessage = null;
     });
   }
 
   Future<void> _requestParticipation() async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte melde dich an, um teilzunehmen.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
       await _participationService.requestParticipation(
         eventId: widget.event.id,
-        userId: _currentUserId,
+        userId: currentUserId,
       );
 
       if (!mounted) return;
@@ -84,6 +102,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+              ),
             Container(
               width: double.infinity,
               height: 220,

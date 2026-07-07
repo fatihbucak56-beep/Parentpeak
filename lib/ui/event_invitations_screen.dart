@@ -26,9 +26,9 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
   Map<String, List<EventInvitation>> _acceptedByEvent = {};
   Map<String, FamilyContact> _contactsById = {};
   bool _isLoading = true;
+  String? _errorMessage;
 
-  String get _currentUserId =>
-      AuthService.instance.currentUser?.uid ?? 'host_demo_001';
+  String? get _currentUserId => AuthService.instance.currentUser?.uid;
 
   @override
   void initState() {
@@ -52,11 +52,26 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
   }
 
   Future<void> _load() async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _invitations = [];
+        _eventsById = {};
+        _hostedInviteEvents = [];
+        _acceptedByEvent = {};
+        _contactsById = {};
+        _errorMessage = 'Bitte melde dich an, um Einladungen zu sehen.';
+        _isLoading = false;
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
-    final invites = await _eventService.getInvitationsForUser(_currentUserId);
-    final hosted = await _eventService.getHostedInviteOnlyEvents(_currentUserId);
+    final invites = await _eventService.getInvitationsForUser(currentUserId);
+    final hosted = await _eventService.getHostedInviteOnlyEvents(currentUserId);
     final contacts =
-        await _familyCircleService.getConnectedContacts(userId: _currentUserId);
+        await _familyCircleService.getConnectedContacts(userId: currentUserId);
 
     final map = <String, MeetupEvent>{};
     for (final i in invites) {
@@ -83,6 +98,7 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
       _hostedInviteEvents = hosted;
       _acceptedByEvent = acceptedByEvent;
       _contactsById = {for (final c in contacts) c.userId: c};
+      _errorMessage = null;
       _isLoading = false;
     });
   }
@@ -104,12 +120,14 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
   }
 
   Future<void> _joinByCode() async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) return;
     final input = _codeCtrl.text.trim();
     if (input.isEmpty) return;
 
     final invite = await _eventService.joinEventByInviteCode(
       code: input,
-      userId: _currentUserId,
+      userId: currentUserId,
     );
 
     if (!mounted) return;
@@ -150,6 +168,16 @@ class _EventInvitationsScreenState extends State<EventInvitationsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(

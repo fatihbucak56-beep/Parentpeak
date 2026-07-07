@@ -16,9 +16,9 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
   List<FamilyContact> _contacts = [];
   List<FamilyConnectionRequest> _requests = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
-  String get _currentUserId =>
-      AuthService.instance.currentUser?.uid ?? 'host_demo_001';
+  String? get _currentUserId => AuthService.instance.currentUser?.uid;
 
   @override
   void initState() {
@@ -27,23 +27,46 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
   }
 
   Future<void> _load() async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _contacts = [];
+        _requests = [];
+        _errorMessage = 'Bitte melde dich an, um deinen Familienkreis zu sehen.';
+        _isLoading = false;
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
-    final contacts = await _service.getConnectedContacts(userId: _currentUserId);
-    final requests = await _service.getIncomingRequests(userId: _currentUserId);
+    final contacts = await _service.getConnectedContacts(userId: currentUserId);
+    final requests = await _service.getIncomingRequests(userId: currentUserId);
     if (!mounted) return;
     setState(() {
       _contacts = contacts;
       _requests = requests;
+      _errorMessage = null;
       _isLoading = false;
     });
   }
 
   Future<void> _respond(FamilyConnectionRequest request, bool accept) async {
-    await _service.respondToRequest(
-      requestId: request.id,
-      accept: accept,
-      actingUserId: _currentUserId,
-    );
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) return;
+    try {
+      await _service.respondToRequest(
+        requestId: request.id,
+        accept: accept,
+        actingUserId: currentUserId,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Anfrage konnte nicht synchronisiert werden: $e')),
+      );
+      return;
+    }
     if (!mounted) return;
     await _load();
     if (!mounted) return;
@@ -57,6 +80,8 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
   }
 
   Future<void> _sendNewRequest() async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) return;
     final controller = TextEditingController();
     final targetUserId = await showDialog<String>(
       context: context,
@@ -84,7 +109,7 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
     );
 
     if (targetUserId == null || targetUserId.isEmpty) return;
-    if (targetUserId == _currentUserId) {
+    if (targetUserId == currentUserId) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Du kannst keine Anfrage an dich selbst senden.')),
@@ -92,10 +117,18 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
       return;
     }
 
-    await _service.sendRequest(
-      fromUserId: _currentUserId,
-      toUserId: targetUserId,
-    );
+    try {
+      await _service.sendRequest(
+        fromUserId: currentUserId,
+        toUserId: targetUserId,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Anfrage konnte nicht gesendet werden: $e')),
+      );
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Anfrage an $targetUserId gesendet')),
@@ -104,6 +137,8 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
   }
 
   Future<void> _deleteContact(FamilyContact contact) async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null || currentUserId.trim().isEmpty) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -123,10 +158,18 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
     );
     if (confirmed != true) return;
 
-    await _service.deleteConnectionWithUser(
-      currentUserId: _currentUserId,
-      otherUserId: contact.userId,
-    );
+    try {
+      await _service.deleteConnectionWithUser(
+        currentUserId: currentUserId,
+        otherUserId: contact.userId,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kontakt konnte nicht entfernt werden: $e')),
+      );
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${contact.displayName} entfernt')),
@@ -149,6 +192,17 @@ class _FamilyCircleScreenState extends State<FamilyCircleScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  ),
+                )
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(

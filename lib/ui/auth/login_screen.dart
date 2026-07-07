@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/ui/auth/register_screen.dart';
 
@@ -58,7 +57,8 @@ class _LoginScreenState extends State<LoginScreen> {
               'Login fehlgeschlagen. Bitte erneut versuchen.',
         );
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('LoginScreen._submit(): unexpected login error: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -164,24 +164,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      if (kDebugMode) ...[
-                        Align(
-                          alignment: Alignment.center,
-                          child: TextButton.icon(
-                            onPressed: _isLoading
-                                ? null
-                                : () async {
-                                    await AuthService.instance
-                                        .debugSeedSessionForTesting();
-                                    if (!mounted) return;
-                                    widget.onLoginSuccess?.call();
-                                  },
-                            icon: const Icon(Icons.bolt_rounded),
-                            label: const Text('Demo öffnen'),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                      ],
                       _buildRegisterLink(theme),
                     ],
                   ),
@@ -468,8 +450,9 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE1ECEA)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
             'Noch kein Konto? ',

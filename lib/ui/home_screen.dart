@@ -42,16 +42,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const String _recentTilesStorageKey = 'home.recent_tiles.v1';
+  static const String _tileOrderStorageKey = 'home.tile_order.v1';
   static const int _recentTilesLimit = 3;
 
   bool _initialInviteHandled = false;
   List<String> _recentTileLabels = const [];
+  List<String> _customTileOrderLabels = const [];
 
   @override
   void initState() {
     super.initState();
     languageService.addListener(_onLanguageChanged);
     _restoreRecentTiles();
+    _restoreTileOrder();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openInitialInviteIfNeeded();
     });
@@ -104,6 +107,70 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_recentTilesStorageKey, updated);
+  }
+
+  Future<void> _restoreTileOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getStringList(_tileOrderStorageKey) ?? const [];
+    if (!mounted) return;
+    setState(() {
+      _customTileOrderLabels = stored;
+    });
+  }
+
+  Future<void> _prioritizeTile(String label) async {
+    final normalized = label.trim();
+    if (normalized.isEmpty) return;
+
+    final updated = <String>[normalized];
+    for (final item in _customTileOrderLabels) {
+      if (item != normalized) {
+        updated.add(item);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _customTileOrderLabels = updated;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"$normalized" ist jetzt weiter oben angeordnet.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_tileOrderStorageKey, updated);
+  }
+
+  List<_FeatureAction> _applyCustomOrder(List<_FeatureAction> actions) {
+    if (_customTileOrderLabels.isEmpty) {
+      return actions;
+    }
+
+    final byLabel = <String, _FeatureAction>{
+      for (final action in actions) action.label: action,
+    };
+    final ordered = <_FeatureAction>[];
+    final used = <String>{};
+
+    for (final label in _customTileOrderLabels) {
+      final action = byLabel[label];
+      if (action != null) {
+        ordered.add(action);
+        used.add(label);
+      }
+    }
+
+    for (final action in actions) {
+      if (!used.contains(action.label)) {
+        ordered.add(action);
+      }
+    }
+
+    return ordered;
   }
 
   Future<void> _openFeature(_FeatureAction action) async {
@@ -220,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ];
 
-    final visibleGridActions = featureActions;
+    final visibleGridActions = _applyCustomOrder(featureActions);
     final actionByLabel = <String, _FeatureAction>{
       for (final action in visibleGridActions) action.label: action,
     };
@@ -301,6 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: action.color,
                           compact: true,
                           onTap: () => _openFeature(action),
+                          onLongPress: () => _prioritizeTile(action.label),
                         );
                       },
                       childCount: visibleGridActions.length,
@@ -430,12 +498,14 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     bool compact = false,
     VoidCallback? onTap,
+    VoidCallback? onLongPress,
   }) {
     final theme = Theme.of(context);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compactTile =

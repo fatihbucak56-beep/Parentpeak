@@ -156,17 +156,6 @@ class MeetupChatService {
   }
 
   Future<List<MeetupChatReport>> getAllReports() async {
-    final apiClient = _requireApiClient();
-    final payload = await apiClient.getJson('/events/chat/reports');
-    if (payload is Map<String, dynamic> && payload['items'] is List) {
-      final items = (payload['items'] as List)
-          .whereType<Map>()
-          .map((item) => MeetupChatReport.fromJson(Map<String, dynamic>.from(item)))
-          .toList();
-      _reports
-        ..clear()
-        ..addAll(items);
-    }
     return List.from(_reports);
   }
 

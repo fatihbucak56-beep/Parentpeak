@@ -75,6 +75,7 @@ case_rows=()
 summary_dir="${AI_DAILY_SUMMARY_DIR:-artifacts/ai-daily-check}"
 summary_md="${summary_dir}/summary.md"
 summary_txt="${summary_dir}/summary.txt"
+summary_json="${summary_dir}/summary.json"
 
 add_case_row() {
   local severity="$1"
@@ -94,6 +95,36 @@ write_summary() {
     echo "warnings=${warnings}"
     echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$summary_txt"
+
+  {
+    echo "{"
+    echo "  \"status\": \"${final_status}\"," 
+    echo "  \"failures\": ${failures},"
+    echo "  \"warnings\": ${warnings},"
+    echo "  \"generated_at_utc\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"," 
+    echo "  \"cases\": ["
+
+    local idx=0
+    local total_rows=${#case_rows[@]}
+    local row severity case_name result note comma
+    for row in "${case_rows[@]}"; do
+      IFS='|' read -r severity case_name result note <<< "$row"
+      idx=$((idx + 1))
+      comma=","
+      if [[ "$idx" -eq "$total_rows" ]]; then
+        comma=""
+      fi
+      printf '    {"severity":"%s","case":"%s","result":"%s","note":%s}%s\n' \
+        "$severity" \
+        "$case_name" \
+        "$result" \
+        "$(printf '%s' "$note" | jq -Rs .)" \
+        "$comma"
+    done
+
+    echo "  ]"
+    echo "}"
+  } > "$summary_json"
 
   {
     echo "# Pedagogical AI Daily Check"

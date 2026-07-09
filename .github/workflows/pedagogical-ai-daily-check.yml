@@ -1,0 +1,25 @@
+name: Pedagogical AI Daily Check
+
+on:
+  schedule:
+    - cron: '15 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  daily-ai-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run daily pedagogical AI quality and safety check
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+        run: |
+          chmod +x scripts/pedagogical_ai_daily_check.sh
+          scripts/pedagogical_ai_daily_check.sh

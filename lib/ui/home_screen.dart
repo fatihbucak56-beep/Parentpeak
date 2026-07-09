@@ -262,9 +262,9 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const FamilyCircleScreen(),
       ),
       _FeatureAction(
-        label: l10n.t('treasureTileTitle', fallback: 'Kinder-Schatzkiste'),
+        label: l10n.t('treasureTileTitle', fallback: 'Verschenkmarkt'),
         description:
-            l10n.t('treasureDateOrSwap', fallback: 'Date oder Geister-Tausch'),
+            l10n.t('treasureTileSubtitle', fallback: 'Verschenken, austauschen, Eltern verbinden'),
         icon: Icons.inventory_2_rounded,
         color: const Color(0xFF1E5CD7),
         builder: (_) => const TreasureHandoverScreen(),

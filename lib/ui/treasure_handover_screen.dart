@@ -65,7 +65,7 @@ class _TreasureHandoverScreenState extends State<TreasureHandoverScreen> {
         elevation: 0,
         foregroundColor: const Color(0xFF172538),
         title: Text(
-          l10n.t('treasureTileTitle', fallback: 'Kinder-Schatzkiste'),
+          l10n.t('treasureTileTitle', fallback: 'Verschenkmarkt'),
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [

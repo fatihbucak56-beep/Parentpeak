@@ -61,7 +61,7 @@ class TreasureHandoverCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.t('treasureTileTitle', fallback: 'Kinder-Schatzkiste'),
+                        l10n.t('treasureTileTitle', fallback: 'Verschenkmarkt'),
                         style: const TextStyle(
                           fontSize: 18,
                           color: Color(0xFF122033),
@@ -70,7 +70,7 @@ class TreasureHandoverCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        l10n.t('treasureDateOrSwap', fallback: 'Date oder Geister-Tausch'),
+                        l10n.t('treasureTileSubtitle', fallback: 'Verschenken, austauschen, Eltern verbinden'),
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF4A5E75),

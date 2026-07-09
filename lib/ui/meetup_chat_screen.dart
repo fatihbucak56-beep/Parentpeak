@@ -25,11 +25,11 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
   bool _isSending = false;
   bool _hasAccess = false;
   Timer? _refreshTimer;
+    bool _requiresSignIn = false;
 
-  String get _currentUserId =>
-      AuthService.instance.currentUser?.uid ?? 'user_demo_001';
-  String get _currentUserName =>
-      AuthService.instance.currentUser?.displayName ?? 'Du';
+    String get _currentUserId => AuthService.instance.currentUser?.uid ?? '';
+    String get _currentUserName =>
+      AuthService.instance.currentUser?.displayName ?? 'Unbekannt';
   String get _currentUserAvatar => '';
 
   @override
@@ -41,6 +41,16 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
   }
 
   Future<void> _bootstrap() async {
+    if (_currentUserId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _requiresSignIn = true;
+        _hasAccess = false;
+        _isLoading = false;
+      });
+      return;
+    }
+
     final access = await _chatService.hasAccessToChat(
       eventId: widget.event.id,
       userId: _currentUserId,
@@ -285,8 +295,10 @@ class _MeetupChatScreenState extends State<MeetupChatScreen> {
                               Icon(Icons.lock_outline_rounded,
                                   size: 56, color: Colors.grey[400]),
                               const SizedBox(height: 12),
-                              const Text(
-                                'Chat nur für bestätigte Teilnehmer',
+                              Text(
+                                _requiresSignIn
+                                    ? 'Bitte melde dich an, um den Chat zu nutzen.'
+                                    : 'Chat nur für bestätigte Teilnehmer',
                                 textAlign: TextAlign.center,
                               ),
                             ],

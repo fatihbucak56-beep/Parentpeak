@@ -22,14 +22,6 @@ class _ShoppingScreenState extends State<ShoppingScreen>
 
   final TextEditingController _controller = TextEditingController();
 
-  static String _itemTranslation(String key) {
-    return AppStringsManager.getString(languageService.currentLanguage, key);
-  }
-
-  static String _categoryTranslation(String key) {
-    return AppStringsManager.getString(languageService.currentLanguage, key);
-  }
-
   String _t(String key) {
     return AppStringsManager.getString(languageService.currentLanguage, key);
   }
@@ -43,46 +35,6 @@ class _ShoppingScreenState extends State<ShoppingScreen>
   Future<void> _loadItems() async {
     final items = await _shoppingService.fetchItems();
     if (!mounted) return;
-
-    if (items.isEmpty) {
-      final seeded = [
-        {
-          'name': _itemTranslation('milk'),
-          'category': _categoryTranslation('food')
-        },
-        {
-          'name': _itemTranslation('bread'),
-          'category': _categoryTranslation('food')
-        },
-        {
-          'name': _itemTranslation('apples'),
-          'category': _categoryTranslation('fruits_vegetables')
-        },
-        {
-          'name': _itemTranslation('diapers'),
-          'category': _categoryTranslation('baby')
-        },
-        {
-          'name': _itemTranslation('toothpaste'),
-          'category': _categoryTranslation('drugstore')
-        },
-      ];
-
-      for (final item in seeded) {
-        await _shoppingService.addItem(
-          name: item['name']!,
-          category: item['category']!,
-        );
-      }
-
-      final refreshed = await _shoppingService.fetchItems();
-      if (!mounted) return;
-      setState(() {
-        _items = refreshed;
-        _loading = false;
-      });
-      return;
-    }
 
     setState(() {
       _items = items;

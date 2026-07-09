@@ -34,9 +34,7 @@ class PhotoBackendService {
       return local;
     }
 
-    final seeded = _seedAlbums();
-    await _persist(seeded);
-    return seeded;
+    return [];
   }
 
   Future<Map<String, dynamic>> addAlbum({required String title}) async {
@@ -145,32 +143,4 @@ class PhotoBackendService {
     };
   }
 
-  List<Map<String, dynamic>> _seedAlbums() {
-    return [
-      {
-        'id': 'album-1',
-        'title': 'Familienausflug',
-        'date': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-        'count': 12,
-      },
-      {
-        'id': 'album-2',
-        'title': 'Geburtstag Leon',
-        'date': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
-        'count': 24,
-      },
-      {
-        'id': 'album-3',
-        'title': 'Urlaub 2025',
-        'date': DateTime.now().subtract(const Duration(days: 45)).toIso8601String(),
-        'count': 87,
-      },
-      {
-        'id': 'album-4',
-        'title': 'Erster Schultag',
-        'date': DateTime.now().subtract(const Duration(days: 120)).toIso8601String(),
-        'count': 15,
-      },
-    ];
-  }
 }

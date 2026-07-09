@@ -1,4 +1,5 @@
 import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/logic/backend_api_client.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/models/meetup_chat.dart';
@@ -13,6 +14,14 @@ class MeetupChatService {
   final BackendApiClient? _apiClient;
 
   bool get isBackendEnabled => _apiClient != null;
+
+  BackendApiClient _requireApiClient() {
+    final apiClient = _apiClient;
+    if (apiClient == null) {
+      throw StateError('Chat-Backend ist nicht konfiguriert.');
+    }
+    return apiClient;
+  }
 
   void _storeMessages(String eventId, List<MeetupChatMessage> items) {
     _chatMessages[eventId] = List<MeetupChatMessage>.from(items);
@@ -39,23 +48,22 @@ class MeetupChatService {
   }
 
   Future<List<MeetupChatMessage>> getMessages(String eventId) async {
-    if (_apiClient != null) {
-      try {
-        final payload = await _apiClient!.getJson('/events/$eventId/chat/messages');
-        if (payload is Map<String, dynamic> && payload['items'] is List) {
-          final items = (payload['items'] as List)
-              .whereType<Map>()
-              .map((item) => MeetupChatMessage.fromJson(Map<String, dynamic>.from(item)))
-              .toList();
-          _storeMessages(eventId, items);
-          return items;
-        }
-      } catch (_) {
-        // fallback below
+    final apiClient = _requireApiClient();
+    try {
+      final payload = await apiClient.getJson('/events/$eventId/chat/messages');
+      if (payload is Map<String, dynamic> && payload['items'] is List) {
+        final items = (payload['items'] as List)
+            .whereType<Map>()
+            .map((item) => MeetupChatMessage.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+        _storeMessages(eventId, items);
+        return items;
       }
+    } catch (e) {
+      debugPrint('MeetupChatService.getMessages(): backend request failed: $e');
+      rethrow;
     }
 
-    await Future.delayed(const Duration(milliseconds: 300));
     return _chatMessages[eventId] ?? [];
   }
 
@@ -67,67 +75,47 @@ class MeetupChatService {
     required String content,
     bool isHost = false,
   }) async {
-    if (_apiClient != null) {
-      try {
-        final payload = await _apiClient!.postJsonAny(
-          '/events/$eventId/chat/messages',
-          {
-            'userId': userId,
-            'userName': userName,
-            'userAvatarUrl': userAvatarUrl,
-            'content': content,
-            'isHost': isHost,
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-        final raw = payload is Map<String, dynamic>
-            ? (payload['item'] is Map<String, dynamic>
-                ? Map<String, dynamic>.from(payload['item'] as Map)
-                : payload)
-            : <String, dynamic>{};
-        if (raw.isNotEmpty) {
-          final message = MeetupChatMessage.fromJson(raw);
-          _upsertMessage(eventId, message);
-          return message;
-        }
-      } catch (_) {
-        // fallback below
+    final apiClient = _requireApiClient();
+    try {
+      final payload = await apiClient.postJsonAny(
+        '/events/$eventId/chat/messages',
+        {
+          'userId': userId,
+          'userName': userName,
+          'userAvatarUrl': userAvatarUrl,
+          'content': content,
+          'isHost': isHost,
+          'schemaVersion': APIConfig.getBackendApiVersion(),
+        },
+      );
+      final raw = payload is Map<String, dynamic>
+          ? (payload['item'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(payload['item'] as Map)
+              : payload)
+          : <String, dynamic>{};
+      if (raw.isNotEmpty) {
+        final message = MeetupChatMessage.fromJson(raw);
+        _upsertMessage(eventId, message);
+        return message;
       }
+    } catch (e) {
+      debugPrint('MeetupChatService.sendMessage(): backend request failed: $e');
+      rethrow;
     }
 
-    await Future.delayed(const Duration(milliseconds: 400));
-    final message = MeetupChatMessage(
-      id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-      eventId: eventId,
-      userId: userId,
-      userName: userName,
-      userAvatarUrl: userAvatarUrl,
-      content: content,
-      timestamp: DateTime.now(),
-      isHost: isHost,
-    );
-    _upsertMessage(eventId, message);
-    return message;
+    throw StateError('Nachricht konnte nicht erstellt werden.');
   }
 
   Future<bool> deleteMessage(String eventId, String messageId) async {
-    if (_apiClient != null) {
-      try {
-        await _apiClient!.delete('/events/$eventId/chat/messages/$messageId');
-        _chatMessages[eventId]?.removeWhere((m) => m.id == messageId);
-        return true;
-      } catch (_) {
-        // fallback below
-      }
+    final apiClient = _requireApiClient();
+    try {
+      await apiClient.delete('/events/$eventId/chat/messages/$messageId');
+      _chatMessages[eventId]?.removeWhere((m) => m.id == messageId);
+      return true;
+    } catch (e) {
+      debugPrint('MeetupChatService.deleteMessage(): backend request failed: $e');
+      rethrow;
     }
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (_chatMessages.containsKey(eventId)) {
-      final originalLength = _chatMessages[eventId]!.length;
-      _chatMessages[eventId]!.removeWhere((m) => m.id == messageId);
-      return _chatMessages[eventId]!.length < originalLength;
-    }
-    return false;
   }
 
   Future<MeetupChatReport> reportMessage({
@@ -137,76 +125,71 @@ class MeetupChatService {
     required String reason,
     String? description,
   }) async {
-    if (_apiClient != null) {
-      try {
-        final payload = await _apiClient!.postJsonAny(
-          '/events/$eventId/chat/reports',
-          {
-            'reportedMessageId': reportedMessageId,
-            'reporterId': reporterId,
-            'reason': reason,
-            'description': description,
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-        final raw = payload is Map<String, dynamic>
-            ? (payload['item'] is Map<String, dynamic>
-                ? Map<String, dynamic>.from(payload['item'] as Map)
-                : payload)
-            : <String, dynamic>{};
-        if (raw.isNotEmpty) {
-          final report = MeetupChatReport.fromJson(raw);
-          _upsertReport(report);
-          return report;
-        }
-      } catch (_) {
-        // fallback below
+    final apiClient = _requireApiClient();
+    try {
+      final payload = await apiClient.postJsonAny(
+        '/events/$eventId/chat/reports',
+        {
+          'reportedMessageId': reportedMessageId,
+          'reporterId': reporterId,
+          'reason': reason,
+          'description': description,
+          'schemaVersion': APIConfig.getBackendApiVersion(),
+        },
+      );
+      final raw = payload is Map<String, dynamic>
+          ? (payload['item'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(payload['item'] as Map)
+              : payload)
+          : <String, dynamic>{};
+      if (raw.isNotEmpty) {
+        final report = MeetupChatReport.fromJson(raw);
+        _upsertReport(report);
+        return report;
       }
+    } catch (e) {
+      debugPrint('MeetupChatService.reportMessage(): backend request failed: $e');
+      rethrow;
     }
 
-    await Future.delayed(const Duration(milliseconds: 500));
-    final report = MeetupChatReport(
-      id: 'report_${DateTime.now().millisecondsSinceEpoch}',
-      reportedMessageId: reportedMessageId,
-      reporterId: reporterId,
-      reason: reason,
-      description: description,
-      reportedAt: DateTime.now(),
-    );
-    _upsertReport(report);
-    return report;
+    throw StateError('Meldung konnte nicht erstellt werden.');
   }
 
   Future<List<MeetupChatReport>> getAllReports() async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    final apiClient = _requireApiClient();
+    final payload = await apiClient.getJson('/events/chat/reports');
+    if (payload is Map<String, dynamic> && payload['items'] is List) {
+      final items = (payload['items'] as List)
+          .whereType<Map>()
+          .map((item) => MeetupChatReport.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+      _reports
+        ..clear()
+        ..addAll(items);
+    }
     return List.from(_reports);
   }
 
   Future<List<MeetupChatReport>> getReportsForEvent(String eventId) async {
-    if (_apiClient != null) {
-      try {
-        final payload = await _apiClient!.getJson('/events/$eventId/chat/reports');
-        if (payload is Map<String, dynamic> && payload['items'] is List) {
-          final items = (payload['items'] as List)
-              .whereType<Map>()
-              .map((item) => MeetupChatReport.fromJson(Map<String, dynamic>.from(item)))
-              .toList();
-          for (final report in items) {
-            _upsertReport(report);
-          }
-          return items;
+    final apiClient = _requireApiClient();
+    try {
+      final payload = await apiClient.getJson('/events/$eventId/chat/reports');
+      if (payload is Map<String, dynamic> && payload['items'] is List) {
+        final items = (payload['items'] as List)
+            .whereType<Map>()
+            .map((item) => MeetupChatReport.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+        for (final report in items) {
+          _upsertReport(report);
         }
-      } catch (_) {
-        // fallback below
+        return items;
       }
+    } catch (e) {
+      debugPrint('MeetupChatService.getReportsForEvent(): backend request failed: $e');
+      rethrow;
     }
 
-    await Future.delayed(const Duration(milliseconds: 300));
-    final eventMessages = _chatMessages[eventId] ?? [];
-    final eventMessageIds = eventMessages.map((m) => m.id).toSet();
-    return _reports
-        .where((report) => eventMessageIds.contains(report.reportedMessageId))
-        .toList();
+    return const <MeetupChatReport>[];
   }
 
   Future<bool> hasAccessToChat({
@@ -214,19 +197,19 @@ class MeetupChatService {
     required String userId,
     required String? hosterId,
   }) async {
-    if (_apiClient != null) {
-      try {
-        final payload = await _apiClient!.getJson(
-          '/events/$eventId/chat/access?userId=$userId&hosterId=${hosterId ?? ''}',
-        );
-        if (payload is Map<String, dynamic>) {
-          return payload['hasAccess'] as bool? ?? false;
-        }
-      } catch (_) {
-        // fallback below
+    final apiClient = _requireApiClient();
+    try {
+      final payload = await apiClient.getJson(
+        '/events/$eventId/chat/access?userId=$userId&hosterId=${hosterId ?? ''}',
+      );
+      if (payload is Map<String, dynamic>) {
+        return payload['hasAccess'] as bool? ?? false;
       }
+    } catch (e) {
+      debugPrint('MeetupChatService.hasAccessToChat(): backend request failed: $e');
+      rethrow;
     }
 
-    return userId == hosterId;
+    return false;
   }
 }

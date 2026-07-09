@@ -70,6 +70,49 @@ contains_any() {
 
 failures=0
 warnings=0
+case_rows=()
+
+summary_dir="${AI_DAILY_SUMMARY_DIR:-artifacts/ai-daily-check}"
+summary_md="${summary_dir}/summary.md"
+summary_txt="${summary_dir}/summary.txt"
+
+add_case_row() {
+  local severity="$1"
+  local name="$2"
+  local result="$3"
+  local note="$4"
+  case_rows+=("$severity|$name|$result|$note")
+}
+
+write_summary() {
+  local final_status="$1"
+  mkdir -p "$summary_dir"
+
+  {
+    echo "status=${final_status}"
+    echo "failures=${failures}"
+    echo "warnings=${warnings}"
+    echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$summary_txt"
+
+  {
+    echo "# Pedagogical AI Daily Check"
+    echo
+    echo "- Status: **${final_status}**"
+    echo "- Hard failures: **${failures}**"
+    echo "- Soft warnings: **${warnings}**"
+    echo "- Generated (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo
+    echo "| Severity | Case | Result | Note |"
+    echo "| --- | --- | --- | --- |"
+
+    local row severity case_name result note
+    for row in "${case_rows[@]}"; do
+      IFS='|' read -r severity case_name result note <<< "$row"
+      echo "| ${severity} | ${case_name} | ${result} | ${note} |"
+    done
+  } > "$summary_md"
+}
 
 run_case() {
   local name="$1"
@@ -83,6 +126,7 @@ run_case() {
   local answer
   if ! answer="$(call_gemini "$prompt")"; then
     echo "FAIL: No model response"
+    add_case_row "hard" "$name" "FAIL" "No model response"
     failures=$((failures + 1))
     return
   fi
@@ -91,9 +135,11 @@ run_case() {
 
   local check
   local ok=1
+  local failed_check=""
   for check in "${checks[@]}"; do
     if ! eval "$check"; then
       echo "Check failed: $check"
+      failed_check="$check"
       ok=0
       break
     fi
@@ -101,8 +147,10 @@ run_case() {
 
   if [[ "$ok" -eq 1 ]]; then
     echo "PASS"
+    add_case_row "hard" "$name" "PASS" "All checks passed"
   else
     echo "FAIL"
+    add_case_row "hard" "$name" "FAIL" "$failed_check"
     failures=$((failures + 1))
   fi
 }
@@ -119,6 +167,7 @@ run_case_soft() {
   local answer
   if ! answer="$(call_gemini "$prompt")"; then
     echo "WARN: No model response"
+    add_case_row "soft" "$name" "WARN" "No model response"
     warnings=$((warnings + 1))
     return
   fi
@@ -129,12 +178,14 @@ run_case_soft() {
   for check in "${checks[@]}"; do
     if ! eval "$check"; then
       echo "WARN check failed: $check"
+      add_case_row "soft" "$name" "WARN" "$check"
       warnings=$((warnings + 1))
       return
     fi
   done
 
   echo "PASS"
+  add_case_row "soft" "$name" "PASS" "All checks passed"
 }
 
 # Case 1: conflict coaching must be concrete and non-violent.
@@ -173,14 +224,17 @@ run_case \
 if [[ "$failures" -gt 0 ]]; then
   echo "---"
   echo "Daily AI check FAILED with ${failures} failing case(s)."
+  write_summary "FAIL"
   exit 1
 fi
 
 if [[ "$warnings" -gt 0 ]]; then
   echo "---"
   echo "Daily AI check PASSED with ${warnings} warning(s)."
+  write_summary "WARN"
   exit 0
 fi
 
 echo "---"
 echo "Daily AI check PASSED."
+write_summary "PASS"

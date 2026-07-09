@@ -20,6 +20,25 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          AI_DAILY_SUMMARY_DIR: artifacts/ai-daily-check
         run: |
           chmod +x scripts/pedagogical_ai_daily_check.sh
           scripts/pedagogical_ai_daily_check.sh
+
+      - name: Upload AI daily check summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pedagogical-ai-daily-summary
+          path: artifacts/ai-daily-check/
+          if-no-files-found: warn
+
+      - name: Publish AI daily check summary
+        if: always()
+        run: |
+          if [[ -f artifacts/ai-daily-check/summary.md ]]; then
+            cat artifacts/ai-daily-check/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Pedagogical AI Daily Check" >> "$GITHUB_STEP_SUMMARY"
+            echo "Summary file was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi

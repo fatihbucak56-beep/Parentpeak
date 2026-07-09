@@ -358,6 +358,27 @@ class AuthService {
     _currentUser = null;
   }
 
+  @visibleForTesting
+  Future<void> debugSeedSessionForTesting() async {
+    if (kReleaseMode) {
+      return;
+    }
+
+    final seededUser = ParentUser(
+      uid: 'debug_demo_user',
+      email: 'demo@parentpeak.app',
+      displayName: 'Demo Eltern',
+      registeredAt: DateTime.now().subtract(const Duration(days: 1)),
+      isPremium: false,
+      serverHasFullAccess: true,
+      serverTrialDaysRemaining: 13,
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await _persistSession(prefs, seededUser);
+    _currentUser = seededUser;
+  }
+
   // ── Abo aktivieren (Stub für In-App Purchase) ──────────────────────────────
 
   Future<bool> activatePremium() async {

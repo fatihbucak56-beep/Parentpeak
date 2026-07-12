@@ -11,7 +11,7 @@ import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 import 'package:trusted_circle_demo/ui/parent_matching_screen.dart';
 import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/finance_budget_screen.dart';
-import 'package:trusted_circle_demo/ui/kettenbrecher_dashboard.dart';
+import 'package:trusted_circle_demo/ui/simple_meal_planner.dart';
 import 'package:trusted_circle_demo/ui/treasure_handover_screen.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 
@@ -291,11 +291,11 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const OrganizationScreen(),
       ),
       _FeatureAction(
-        label: 'Essensplaner X',
-        description: 'Guerilla-Kochen, Hub-Rotation und SOS',
+        label: 'Essensplaner',
+        description: 'Wochenplan, Rezepte & Einkaufsliste',
         icon: Icons.restaurant_menu_rounded,
         color: const Color(0xFFF59E0B),
-        builder: (_) => const KettenbrecherDashboard(),
+        builder: (_) => const SimpleMealPlanner(),
       ),
       _FeatureAction(
         label: 'Finanzen & Budget',

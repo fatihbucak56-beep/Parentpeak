@@ -15,6 +15,7 @@ import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/logic/error_reporting_service.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/home_screen.dart';
+import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/profile_safety_screen.dart';
 import 'package:trusted_circle_demo/ui/treasure_handover_screen.dart';
 import 'package:trusted_circle_demo/ui/treasure_upload_screen.dart';
@@ -38,6 +39,8 @@ final GlobalKey<DemoAppState> demoAppKey = GlobalKey<DemoAppState>();
 // Development shortcut: skips auth gate and opens the app shell directly.
 const bool _debugBypassAuthGate =
     bool.fromEnvironment('PP_DEBUG_SKIP_LOGIN', defaultValue: false);
+const String _debugScreenDefine =
+  String.fromEnvironment('PP_DEBUG_SCREEN', defaultValue: '');
 const String _debugStartTab =
     String.fromEnvironment('PP_DEBUG_START_TAB', defaultValue: 'home');
 
@@ -115,6 +118,12 @@ Future<void> _startApp() async {
   }
   if (!kReleaseMode && hasDotEnv && releaseConfigIssues.isNotEmpty) {
     debugPrint('Konfigurationshinweis: ${releaseConfigIssues.join('; ')}');
+  }
+
+  if (!kReleaseMode) {
+    debugPrint(
+      'Gemini runtime config: hasDotEnv=$hasDotEnv, keyConfigured=${APIConfig.isGeminiApiKeyConfigured()}, model=${APIConfig.getGeminiModelName()}',
+    );
   }
 
   await ErrorReportingService.instance.initialize();
@@ -492,6 +501,9 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   String? get _debugScreen {
+    if (_debugBypassAuthGate && _debugScreenDefine.trim().isNotEmpty) {
+      return _debugScreenDefine.trim().toLowerCase();
+    }
     if (!_allowWebQueryBypass) return null;
     final value =
         Uri.base.queryParameters['pp_debug_screen']?.trim().toLowerCase();
@@ -512,6 +524,8 @@ class _AuthGateState extends State<AuthGate> {
       final debugScreen = _debugScreen;
       if (debugScreen != null) {
         switch (debugScreen) {
+          case 'chat':
+            return const ChatScreen();
           case 'treasure_handover':
             return const TreasureHandoverScreen();
           case 'treasure_upload':

@@ -12,6 +12,7 @@ import 'package:trusted_circle_demo/ui/parent_matching_screen.dart';
 import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/finance_budget_screen.dart';
 import 'package:trusted_circle_demo/ui/simple_meal_planner.dart';
+import 'package:trusted_circle_demo/ui/topf_und_herz_screen.dart';
 import 'package:trusted_circle_demo/ui/treasure_handover_screen.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 
@@ -289,6 +290,13 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.fact_check_rounded,
         color: const Color(0xFF16A34A),
         builder: (_) => const OrganizationScreen(),
+      ),
+      _FeatureAction(
+        label: 'Topf & Herz',
+        description: 'Essen teilen · Eltern-Solidarität in der Nachbarschaft',
+        icon: Icons.favorite_rounded,
+        color: const Color(0xFFE8543A),
+        builder: (_) => const TopfUndHerzScreen(),
       ),
       _FeatureAction(
         label: 'Essensplaner',

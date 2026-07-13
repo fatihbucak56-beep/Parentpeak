@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:trusted_circle_demo/models/food_share_post.dart';
+import 'package:trusted_circle_demo/models/shared_recipe.dart';
 
 // ============================================================
 // GEMEINSAM SATT — Eltern-Essenssolidarität
@@ -25,12 +26,14 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   final TextEditingController _commentController = TextEditingController();
 
   late List<FoodSharePost> _posts;
+  late List<SharedRecipe> _recipes;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _posts = _buildDemoPosts();
+    _recipes = _buildDemoRecipes();
   }
 
   @override
@@ -91,6 +94,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: const [
             Tab(text: 'In meiner Nähe'),
+            Tab(text: 'Rezepte'),
             Tab(text: 'Meine Angebote'),
           ],
         ),
@@ -99,18 +103,29 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         controller: _tabController,
         children: [
           _buildNearbyFeed(),
+          _buildRecipesFeed(),
           _buildMyOffers(),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _brand,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_circle_outline_rounded),
-        label: const Text(
-          'Ich habe extra gekocht!',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        onPressed: () => _openCreatePost(context),
+      floatingActionButton: AnimatedBuilder(
+        animation: _tabController,
+        builder: (context, _) {
+          final isRecipeTab = _tabController.index == 1;
+          return FloatingActionButton.extended(
+            backgroundColor: _brand,
+            foregroundColor: Colors.white,
+            icon: Icon(isRecipeTab
+                ? Icons.menu_book_rounded
+                : Icons.add_circle_outline_rounded),
+            label: Text(
+              isRecipeTab ? 'Rezept teilen' : 'Ich habe extra gekocht!',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            onPressed: () => isRecipeTab
+                ? _openCreateRecipe(context)
+                : _openCreatePost(context),
+          );
+        },
       ),
     );
   }
@@ -137,6 +152,81 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         onLike: () => _toggleLike(available[i].id),
         onAbholen: () => _reservePost(available[i].id),
         onComment: () => _showComments(available[i]),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------
+  // RECIPES FEED
+  // -------------------------------------------------------
+
+  Widget _buildRecipesFeed() {
+    if (_recipes.isEmpty) {
+      return _buildEmptyState(
+        emoji: '📖',
+        title: 'Noch keine Rezepte geteilt',
+        subtitle: 'Teile dein Lieblingsrezept mit anderen Eltern!',
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      itemCount: _recipes.length,
+      itemBuilder: (context, i) => _RecipeCard(
+        recipe: _recipes[i],
+        myUserId: _myUserId,
+        onLike: () => _toggleRecipeLike(_recipes[i].id),
+        onSave: () => _toggleSave(_recipes[i].id),
+        onTap: () => _showRecipeDetail(_recipes[i]),
+      ),
+    );
+  }
+
+  void _toggleRecipeLike(String recipeId) {
+    setState(() {
+      final idx = _recipes.indexWhere((r) => r.id == recipeId);
+      if (idx == -1) return;
+      final recipe = _recipes[idx];
+      final liked = recipe.likedByUserIds.contains(_myUserId);
+      final updated = liked
+          ? (List<String>.from(recipe.likedByUserIds)..remove(_myUserId))
+          : (List<String>.from(recipe.likedByUserIds)..add(_myUserId));
+      _recipes[idx] = recipe.copyWith(likedByUserIds: updated);
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _toggleSave(String recipeId) {
+    setState(() {
+      final idx = _recipes.indexWhere((r) => r.id == recipeId);
+      if (idx == -1) return;
+      _recipes[idx] = _recipes[idx].copyWith(
+        isSavedByMe: !_recipes[idx].isSavedByMe,
+      );
+    });
+    final saved = _recipes.firstWhere((r) => r.id == recipeId).isSavedByMe;
+    _showSnack(saved ? 'Rezept gespeichert ✅' : 'Rezept entfernt');
+  }
+
+  void _showRecipeDetail(SharedRecipe recipe) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RecipeDetailSheet(recipe: recipe),
+    );
+  }
+
+  void _openCreateRecipe(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CreateRecipeSheet(
+        onSubmit: (recipe) {
+          setState(() => _recipes.insert(0, recipe));
+          _showSnack('Dein Rezept ist jetzt für alle sichtbar! 🎉');
+        },
+        myUserId: _myUserId,
       ),
     );
   }
@@ -393,6 +483,104 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         likedByUserIds: ['kaya'],
         comments: [],
         imageEmoji: '🍱',
+      ),
+    ];
+  }
+
+  List<SharedRecipe> _buildDemoRecipes() {
+    return [
+      SharedRecipe(
+        id: 'rec-1',
+        authorId: 'mueller',
+        authorName: 'Familie Müller',
+        authorInitials: 'FM',
+        authorColor: const Color(0xFF2563EB),
+        title: 'Schnelle Linsensuppe für die ganze Familie',
+        description: 'Super einfach, nahrhaft und die Kinder lieben sie! In 20 Minuten fertig.',
+        imageEmoji: '🍲',
+        durationMinutes: 20,
+        difficulty: RecipeDifficulty.einfach,
+        tags: ['vegan', 'schnell', 'baby-geeignet'],
+        likedByUserIds: ['mama_fatih', 'kaya', 'nguyen'],
+        ingredients: [
+          '200g rote Linsen',
+          '1 Zwiebel, gewürfelt',
+          '2 Karotten, gewürfelt',
+          '1 TL Kurkuma',
+          '800ml Gemüsebrühe',
+          'Etwas Olivenöl, Salz, Pfeffer',
+        ],
+        steps: [
+          'Zwiebeln in Olivenöl glasig anbraten.',
+          'Karotten hinzufügen, 2 Min mitbraten.',
+          'Linsen und Kurkuma einrühren.',
+          'Mit Brühe aufgießen, 15 Min köcheln lassen.',
+          'Mit Stabmixer halb pürieren für cremige Konsistenz.',
+          'Mit Salz und Pfeffer abschmecken – fertig!',
+        ],
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      SharedRecipe(
+        id: 'rec-2',
+        authorId: 'kaya',
+        authorName: 'Familie Kaya',
+        authorInitials: 'FK',
+        authorColor: const Color(0xFF16A34A),
+        title: 'Türkische Menemen – Eier in Tomatensauce',
+        description: 'Unser Familienfrühstück! Kinder lippen ab, super schnell und sättigend.',
+        imageEmoji: '🍳',
+        durationMinutes: 15,
+        difficulty: RecipeDifficulty.einfach,
+        tags: ['vegetarisch', 'frühstück', 'kinderfreundlich'],
+        likedByUserIds: ['mueller'],
+        ingredients: [
+          '4 Eier',
+          '2 reife Tomaten, gewürfelt',
+          '1 grüne Paprika, gewürfelt',
+          '1 Zwiebel',
+          'Olivenöl, Salz, Pfeffer, Paprikapulver',
+          'Fladenbrot zum Servieren',
+        ],
+        steps: [
+          'Zwiebel und Paprika in Öl anbraten.',
+          'Tomaten hinzufügen, 5 Min einkochen lassen.',
+          'Eier direkt in die Pfanne aufschlagen.',
+          'Vorsichtig mit Gemüse verrühren.',
+          'Würzen und bei niedriger Hitze stocken lassen.',
+          'Mit Fladenbrot warm servieren.',
+        ],
+        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+      ),
+      SharedRecipe(
+        id: 'rec-3',
+        authorId: 'nguyen',
+        authorName: 'Familie Nguyen',
+        authorInitials: 'FN',
+        authorColor: const Color(0xFF8B5CF6),
+        title: 'Gebratener Reis mit Gemüse (One-Pan)',
+        description: 'Perfekt um Reisereste zu verwerten! Kinder können beim Kochen helfen.',
+        imageEmoji: '🍱',
+        durationMinutes: 25,
+        difficulty: RecipeDifficulty.mittel,
+        tags: ['vegan', 'one-pan', 'resteverwertung'],
+        likedByUserIds: ['mama_fatih'],
+        ingredients: [
+          '400g vorgekochter Reis (vom Vortag)',
+          '2 Eier',
+          '1 Tasse gefrorene Erbsen',
+          '2 Frühlingszwiebeln',
+          '2 EL Sojasoße',
+          '1 TL Sesamöl',
+        ],
+        steps: [
+          'Pfanne mit Öl stark erhitzen.',
+          'Erbsen und Frühlingszwiebeln kurz anbraten.',
+          'Reis hinzufügen, aufbrechen und braten.',
+          'Eine Mulde machen, Eier hineinschlagen und rühren.',
+          'Alles vermischen, mit Sojasoße würzen.',
+          'Mit Sesamöl abschmecken und servieren.',
+        ],
+        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
       ),
     ];
   }
@@ -1343,3 +1531,609 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
     );
   }
 }
+
+// ============================================================
+// RECIPE CARD
+// ============================================================
+
+class _RecipeCard extends StatefulWidget {
+  final SharedRecipe recipe;
+  final String myUserId;
+  final VoidCallback onLike;
+  final VoidCallback onSave;
+  final VoidCallback onTap;
+
+  const _RecipeCard({
+    required this.recipe,
+    required this.myUserId,
+    required this.onLike,
+    required this.onSave,
+    required this.onTap,
+  });
+
+  @override
+  State<_RecipeCard> createState() => _RecipeCardState();
+}
+
+class _RecipeCardState extends State<_RecipeCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _likeCtrl;
+  late final Animation<double> _likeScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _likeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 200));
+    _likeScale = Tween<double>(begin: 1, end: 1.4).animate(
+        CurvedAnimation(parent: _likeCtrl, curve: Curves.elasticOut));
+  }
+
+  @override
+  void dispose() {
+    _likeCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recipe = widget.recipe;
+    final isLiked = recipe.likedByUserIds.contains(widget.myUserId);
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: _cardBg,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // IMAGE AREA
+            Container(
+              height: 130,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                gradient: LinearGradient(
+                  colors: [
+                    recipe.authorColor.withValues(alpha: 0.12),
+                    recipe.authorColor.withValues(alpha: 0.04),
+                  ],
+                ),
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Text(recipe.imageEmoji, style: const TextStyle(fontSize: 60)),
+                  ),
+                  // Difficulty badge
+                  Positioned(
+                    top: 12, left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: recipe.difficultyColor.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        recipe.difficultyLabel,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  // Time badge
+                  Positioned(
+                    top: 12, right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF516072)),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${recipe.durationMinutes} min',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF516072)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Author
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: recipe.authorColor.withValues(alpha: 0.15),
+                        child: Text(recipe.authorInitials,
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: recipe.authorColor)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(recipe.authorName,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF516072))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Title
+                  Text(recipe.title,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF1A2A3A))),
+                  const SizedBox(height: 4),
+                  Text(recipe.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF516072), height: 1.4)),
+
+                  if (recipe.tags.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      children: recipe.tags.map((tag) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _brandLight,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('#$tag',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _brand)),
+                      )).toList(),
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: Color(0xFFF0F4F8)),
+                  const SizedBox(height: 10),
+
+                  Row(
+                    children: [
+                      // Like
+                      GestureDetector(
+                        onTap: () {
+                          _likeCtrl.forward().then((_) => _likeCtrl.reverse());
+                          widget.onLike();
+                        },
+                        child: ScaleTransition(
+                          scale: _likeScale,
+                          child: Row(
+                            children: [
+                              Icon(
+                                isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                color: isLiked ? _brand : const Color(0xFF8A9AB0),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 4),
+                              Text('${recipe.likedByUserIds.length}',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isLiked ? _brand : const Color(0xFF8A9AB0))),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      // Save button
+                      GestureDetector(
+                        onTap: widget.onSave,
+                        child: Icon(
+                          recipe.isSavedByMe ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                          color: recipe.isSavedByMe ? _brand : const Color(0xFF8A9AB0),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // View Recipe button
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _brandLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'Rezept ansehen →',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _brand),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// RECIPE DETAIL SHEET
+// ============================================================
+
+class _RecipeDetailSheet extends StatelessWidget {
+  final SharedRecipe recipe;
+
+  const _RecipeDetailSheet({required this.recipe});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              gradient: LinearGradient(
+                colors: [
+                  recipe.authorColor.withValues(alpha: 0.15),
+                  recipe.authorColor.withValues(alpha: 0.05),
+                ],
+              ),
+            ),
+            child: Stack(
+              children: [
+                Center(child: Text(recipe.imageEmoji, style: const TextStyle(fontSize: 56))),
+                Positioned(
+                  top: 12, right: 12,
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(recipe.title,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1A2A3A))),
+                  const SizedBox(height: 4),
+                  Text('von ${recipe.authorName}',
+                      style: const TextStyle(color: Color(0xFF8A9AB0), fontSize: 13)),
+                  const SizedBox(height: 12),
+
+                  // Stats row
+                  Row(
+                    children: [
+                      _statChip(Icons.schedule_rounded, '${recipe.durationMinutes} min'),
+                      const SizedBox(width: 8),
+                      _statChip(Icons.bar_chart_rounded, recipe.difficultyLabel),
+                      const SizedBox(width: 8),
+                      _statChip(Icons.favorite_rounded, '${recipe.likedByUserIds.length} Likes'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text(recipe.description,
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF516072), height: 1.5)),
+                  const SizedBox(height: 20),
+
+                  // Ingredients
+                  const Text('🛒 Zutaten',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1A2A3A))),
+                  const SizedBox(height: 10),
+                  ...recipe.ingredients.asMap().entries.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 24, height: 24,
+                          decoration: BoxDecoration(
+                            color: _brandLight,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text('${e.key + 1}',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _brand)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(e.value,
+                              style: const TextStyle(fontSize: 14, color: Color(0xFF1A2A3A))),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+
+                  const SizedBox(height: 20),
+
+                  // Steps
+                  const Text('👨‍🍳 Zubereitung',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1A2A3A))),
+                  const SizedBox(height: 10),
+                  ...recipe.steps.asMap().entries.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 28, height: 28,
+                          decoration: BoxDecoration(
+                            color: _brand,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text('${e.key + 1}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(e.value,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF516072), height: 1.5)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: _brandLight,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: _brand),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _brand)),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// CREATE RECIPE SHEET
+// ============================================================
+
+class _CreateRecipeSheet extends StatefulWidget {
+  final Function(SharedRecipe) onSubmit;
+  final String myUserId;
+
+  const _CreateRecipeSheet({required this.onSubmit, required this.myUserId});
+
+  @override
+  State<_CreateRecipeSheet> createState() => _CreateRecipeSheetState();
+}
+
+class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _ingredientsCtrl = TextEditingController();
+  final _stepsCtrl = TextEditingController();
+  int _duration = 30;
+  RecipeDifficulty _difficulty = RecipeDifficulty.einfach;
+  String _emoji = '🍲';
+
+  final List<String> _emojis = ['🍲', '🍝', '🥗', '🍱', '🥘', '🍜', '🥙', '🫕', '🍛', '🥞'];
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _ingredientsCtrl.dispose();
+    _stepsCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: const Color(0xFFE0E3E8), borderRadius: BorderRadius.circular(4))),
+            ),
+            const SizedBox(height: 16),
+            const Center(child: Text('📖 Rezept teilen',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A2A3A)))),
+            const SizedBox(height: 4),
+            const Center(child: Text('Teile dein Lieblingsrezept mit anderen Eltern',
+                style: TextStyle(color: Color(0xFF8A9AB0), fontSize: 13))),
+            const SizedBox(height: 20),
+
+            // Emoji picker
+            const Text('Emoji wählen', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: _emojis.map((e) => GestureDetector(
+                onTap: () => setState(() => _emoji = e),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _emoji == e ? _brandLight : const Color(0xFFF0F4F8),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _emoji == e ? _brand : Colors.transparent, width: 1.5),
+                  ),
+                  child: Text(e, style: const TextStyle(fontSize: 22)),
+                ),
+              )).toList(),
+            ),
+            const SizedBox(height: 14),
+
+            const Text('Rezeptname', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+            const SizedBox(height: 6),
+            TextField(controller: _titleCtrl, decoration: _inputDeco('z. B. Mamas Linsensuppe 🍲')),
+            const SizedBox(height: 12),
+
+            const Text('Kurze Beschreibung', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+            const SizedBox(height: 6),
+            TextField(controller: _descCtrl, maxLines: 2, decoration: _inputDeco('Was macht dieses Rezept besonders?')),
+            const SizedBox(height: 12),
+
+            const Text('Zutaten (eine pro Zeile)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+            const SizedBox(height: 6),
+            TextField(controller: _ingredientsCtrl, maxLines: 4,
+                decoration: _inputDeco('z. B.\n200g rote Linsen\n1 Zwiebel\n2 Karotten')),
+            const SizedBox(height: 12),
+
+            const Text('Zubereitung (Schritt für Schritt, eine Zeile pro Schritt)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+            const SizedBox(height: 6),
+            TextField(controller: _stepsCtrl, maxLines: 5,
+                decoration: _inputDeco('z. B.\nZwiebeln anbraten\nLinsen hinzufügen...')),
+            const SizedBox(height: 12),
+
+            // Duration + Difficulty
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Zeit (min)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          IconButton.outlined(
+                            onPressed: () { if (_duration > 5) setState(() => _duration -= 5); },
+                            icon: const Icon(Icons.remove_rounded, size: 18),
+                            padding: const EdgeInsets.all(4),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text('$_duration', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                          ),
+                          IconButton.filled(
+                            style: IconButton.styleFrom(backgroundColor: _brand, padding: const EdgeInsets.all(4)),
+                            onPressed: () => setState(() => _duration += 5),
+                            icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Schwierigkeit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+                      const SizedBox(height: 6),
+                      DropdownButton<RecipeDifficulty>(
+                        value: _difficulty,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: RecipeDifficulty.values.map((d) {
+                          final labels = ['Einfach', 'Mittel', 'Fortgeschritten'];
+                          return DropdownMenuItem(value: d, child: Text(labels[d.index]));
+                        }).toList(),
+                        onChanged: (v) { if (v != null) setState(() => _difficulty = v); },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _brand,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () {
+                  final title = _titleCtrl.text.trim();
+                  if (title.isEmpty) return;
+                  final ingredients = _ingredientsCtrl.text
+                      .split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                  final steps = _stepsCtrl.text
+                      .split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                  final recipe = SharedRecipe(
+                    id: 'r-${DateTime.now().millisecondsSinceEpoch}',
+                    authorId: widget.myUserId,
+                    authorName: 'Ich (Familie Fatih)',
+                    authorInitials: 'FF',
+                    authorColor: _brand,
+                    title: title,
+                    description: _descCtrl.text.trim(),
+                    imageEmoji: _emoji,
+                    durationMinutes: _duration,
+                    difficulty: _difficulty,
+                    ingredients: ingredients.isEmpty ? ['Zutaten werden noch ergänzt'] : ingredients,
+                    steps: steps.isEmpty ? ['Zubereitung wird noch ergänzt'] : steps,
+                    createdAt: DateTime.now(),
+                  );
+                  Navigator.pop(context);
+                  widget.onSubmit(recipe);
+                },
+                child: const Text('Rezept teilen 📖',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDeco(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFFB0BBC8), fontSize: 13),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFD),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _brand, width: 1.5)),
+    );
+  }
+}
+

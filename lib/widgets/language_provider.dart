@@ -19,7 +19,8 @@ class LanguageProvider extends InheritedWidget {
 
   @override
   bool updateShouldNotify(LanguageProvider oldWidget) {
-    print('🔔 LanguageProvider.updateShouldNotify() - old: ${oldWidget.currentLanguage}, new: $currentLanguage');
+    debugPrint(
+        '🔔 LanguageProvider.updateShouldNotify() - old: ${oldWidget.currentLanguage}, new: $currentLanguage');
     return oldWidget.currentLanguage != currentLanguage;
   }
 }
@@ -44,7 +45,8 @@ class _LanguageProviderWrapperState extends State<LanguageProviderWrapper> {
   void initState() {
     super.initState();
     _currentLanguage = languageService.currentLanguage;
-    print('✅ LanguageProviderWrapper.initState() - currentLanguage: $_currentLanguage');
+    debugPrint(
+        '✅ LanguageProviderWrapper.initState() - currentLanguage: $_currentLanguage');
     languageService.addListener(_onLanguageChanged);
   }
 
@@ -55,8 +57,8 @@ class _LanguageProviderWrapperState extends State<LanguageProviderWrapper> {
   }
 
   void _onLanguageChanged() {
-    print('🔄 LanguageProviderWrapper._onLanguageChanged() triggered');
-    print('   Old: $_currentLanguage, New: ${languageService.currentLanguage}');
+    debugPrint('🔄 LanguageProviderWrapper._onLanguageChanged() triggered');
+    debugPrint('   Old: $_currentLanguage, New: ${languageService.currentLanguage}');
     setState(() {
       _currentLanguage = languageService.currentLanguage;
     });
@@ -64,7 +66,7 @@ class _LanguageProviderWrapperState extends State<LanguageProviderWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    print('🏗️  LanguageProviderWrapper.build() - language: $_currentLanguage');
+    debugPrint('🏗️  LanguageProviderWrapper.build() - language: $_currentLanguage');
     return LanguageProvider(
       currentLanguage: _currentLanguage,
       child: widget.child,

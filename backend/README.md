@@ -27,6 +27,9 @@ Für produktionsnahe Nutzung setze folgende Umgebungsvariablen vor dem Start:
 - `CORS_ALLOWED_ORIGINS`: Kommagetrennte Origin-Allowlist
 - `WRITE_RATE_LIMIT_WINDOW_MS`: Zeitfenster für Write-Rate-Limit (ms)
 - `WRITE_RATE_LIMIT_MAX`: Max. Schreibanfragen pro Fenster und Client
+- `STRIPE_WEBHOOK_SECRET`: Stripe Endpoint Signing Secret (`whsec_...`)
+- `STRIPE_WEBHOOK_TOLERANCE_SEC`: erlaubte Zeitabweichung fuer Stripe Signaturen
+- `ALLOW_CLIENT_PROVIDER_EVENTS=0`: deaktiviert clientseitige Provider-Statusupdates
 
 Beispiel:
 
@@ -34,7 +37,64 @@ Beispiel:
 export BACKEND_API_TOKEN="..."
 export REQUIRE_AUTH_FOR_WRITES=1
 export CORS_ALLOWED_ORIGINS="https://parentpeak.de,https://www.parentpeak.de"
+export STRIPE_WEBHOOK_SECRET="whsec_..."
+export STRIPE_WEBHOOK_TOLERANCE_SEC=300
+export ALLOW_CLIENT_PROVIDER_EVENTS=0
 node server.js
+```
+
+## Stripe Webhook (Produktion)
+
+Sichere Stripe-Integration laeuft ueber:
+
+```bash
+POST /payments/stripe/webhook
+```
+
+Wichtig:
+- Dieser Endpoint erwartet `application/json` Raw Body und den Header `Stripe-Signature`.
+- Die Signatur wird serverseitig gegen `STRIPE_WEBHOOK_SECRET` geprueft.
+- `completed` und `refunded` werden nur aus verifizierten Provider-Events akzeptiert.
+- Der Legacy-Dev-Pfad `POST /payments/provider-events` sollte in Produktion deaktiviert sein (`ALLOW_CLIENT_PROVIDER_EVENTS=0`).
+
+Empfohlene Stripe Event-Abos fuer den Endpoint:
+- `payment_intent.succeeded`
+- `payment_intent.payment_failed`
+- `charge.refunded`
+
+## Post-Deploy Smoke Checks
+
+1. Health pruefen:
+
+```bash
+curl -i https://api.example.com/health
+```
+
+2. Client-Provider-Events muessen in Produktion geblockt sein:
+
+```bash
+curl -i -X POST https://api.example.com/payments/provider-events \
+   -H "Content-Type: application/json" \
+   -d '{"provider":"stripe","providerTransactionRef":"pi_test","status":"completed","verified":true}'
+```
+
+Erwartung: `403`.
+
+Automatisiert (empfohlen):
+
+```bash
+BACKEND_BASE_URL=https://api.example.com \
+STRIPE_WEBHOOK_SECRET=whsec_... \
+bash scripts/stripe_webhook_smoke_test.sh
+```
+
+Kombiniert (Security + Stripe in einem Lauf):
+
+```bash
+BACKEND_BASE_URL=https://api.example.com \
+BACKEND_API_TOKEN=... \
+STRIPE_WEBHOOK_SECRET=whsec_... \
+bash scripts/release_smoke_suite.sh
 ```
 
 Schneller Smoke-Test gegen eine laufende Instanz:

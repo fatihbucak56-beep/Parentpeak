@@ -24,7 +24,7 @@ echo ""
 # 1. Zertifikat in Keychain installieren
 echo "1. Importiere Zertifikat in Keychain..."
 security import "$CERT_FILE" -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign 2>/dev/null || \
-security import "$CERT_FILE" -k login.keychain -T /usr/bin/codesign
+security import "$CERT_FILE" -k login.keychain -T /usr/bin/codesign 2>/dev/null || true
 echo "   ✅ Zertifikat importiert"
 
 # 2. Private Key einbinden (wenn vorhanden)

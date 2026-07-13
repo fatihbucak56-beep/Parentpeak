@@ -22,6 +22,8 @@ class ProfileSafetyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final user = AuthService.instance.currentUser;
+    const primary = Color(0xFF2563EB);
+    const accent = Color(0xFF7DD3FC);
     final displayName = (user?.displayName.trim().isNotEmpty ?? false)
         ? user!.displayName.trim()
         : 'Familie';
@@ -46,13 +48,13 @@ class ProfileSafetyScreen extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               gradient: const LinearGradient(
-                colors: [Color(0xFF0F766E), Color(0xFF1D4ED8)],
+                colors: [Color(0xFF0F172A), primary, accent],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F766E).withValues(alpha: 0.22),
+                  color: primary.withValues(alpha: 0.22),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
@@ -92,6 +94,13 @@ class ProfileSafetyScreen extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Hier startet alles, was Eltern schnell brauchen: Familienprofil, Schutzwissen, Kontakte und vertrauensvolle Geraete.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.82),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -99,12 +108,49 @@ class ProfileSafetyScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.verified_user_outlined, color: primary),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Heute wichtig: Familienprofil, Schutzwissen und Wiederherstellung sind hier gebuendelt, damit Eltern nicht durch doppelte Wege navigieren muessen.',
+                    style: TextStyle(color: Color(0xFF334155), height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const _StatusStrip(
+            items: [
+              _StatusStripItem(label: 'Profil', value: 'Zentral'),
+              _StatusStripItem(label: 'Schutz', value: 'Sichtbar'),
+              _StatusStripItem(label: 'Kontakte', value: 'Schnell'),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const _SectionIntro(
+            title: 'Familie im Blick',
+            subtitle:
+                'Alles, was euer Familienprofil, Rollen und vertrauensvolle Struktur im Alltag zusammenhaelt.',
+          ),
+          const SizedBox(height: 10),
           _ActionCard(
             icon: Icons.family_restroom_rounded,
-            color: const Color(0xFF2563EB),
+            color: primary,
             title: 'Familienprofil',
             subtitle:
                 'Mitglieder, Sprache, Interessen und Kontodetails pflegen',
+            badge: 'Zentrale',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -116,12 +162,19 @@ class ProfileSafetyScreen extends StatelessWidget {
               );
             },
           ),
+          const SizedBox(height: 16),
+          const _SectionIntro(
+            title: 'Schutz & Sicherheit',
+            subtitle:
+                'Wissen, Kontakte und Geraetezugriffe, die Eltern im richtigen Moment schnell erreichen sollen.',
+          ),
           const SizedBox(height: 10),
           _ActionCard(
             icon: Icons.shield_rounded,
             color: const Color(0xFF0EA5A4),
             title: 'Sicherheitsleitfaden',
             subtitle: 'Praevention, Notfallwissen und Schutz im Alltag',
+            badge: 'Leitfaden',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SafetyGuideScreen()),
@@ -134,6 +187,7 @@ class ProfileSafetyScreen extends StatelessWidget {
             color: const Color(0xFFF59E0B),
             title: 'Notfallkontakte',
             subtitle: 'Wichtige Kontakte sofort erreichbar halten',
+            badge: 'Direkt',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ContactsScreen()),
@@ -146,6 +200,7 @@ class ProfileSafetyScreen extends StatelessWidget {
             color: const Color(0xFF7C3AED),
             title: 'Vertrauensgeraete',
             subtitle: 'Aktive Geraete einsehen und Berechtigungen steuern',
+            badge: '${devices.length} aktiv',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -157,8 +212,61 @@ class ProfileSafetyScreen extends StatelessWidget {
               );
             },
           ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.tips_and_updates_outlined, color: Color(0xFF1D4ED8)),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Elternfreundlich gedacht: Der Profilbereich fuehrt jetzt nicht mehr durch doppelte Wege, sondern konzentriert Familie, Schutz und Wiederherstellung an wenigen klaren Stellen.',
+                    style: TextStyle(color: Color(0xFF334155), height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _SectionIntro extends StatelessWidget {
+  const _SectionIntro({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF475569),
+                height: 1.35,
+              ),
+        ),
+      ],
     );
   }
 }
@@ -169,6 +277,7 @@ class _ActionCard extends StatelessWidget {
     required this.color,
     required this.title,
     required this.subtitle,
+    required this.badge,
     required this.onTap,
   });
 
@@ -176,6 +285,7 @@ class _ActionCard extends StatelessWidget {
   final Color color;
   final String title;
   final String subtitle;
+  final String badge;
   final VoidCallback onTap;
 
   @override
@@ -232,11 +342,90 @@ class _ActionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _StatusStrip extends StatelessWidget {
+  const _StatusStrip({required this.items});
+
+  final List<_StatusStripItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: items
+          .map(
+            (item) => Expanded(
+              child: Container(
+                margin: EdgeInsets.only(
+                  right: item == items.last ? 0 : 10,
+                ),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      item.value,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _StatusStripItem {
+  const _StatusStripItem({required this.label, required this.value});
+
+  final String label;
+  final String value;
 }

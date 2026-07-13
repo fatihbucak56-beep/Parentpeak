@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 
@@ -681,8 +682,8 @@ class MarketplaceService {
               .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
               .toList();
         }
-      } catch (_) {
-        // fallback below
+      } catch (e) {
+        debugPrint('MarketplaceService.getAllProviders fallback: $e');
       }
     }
 
@@ -709,8 +710,8 @@ class MarketplaceService {
               .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
               .toList();
         }
-      } catch (_) {
-        // fallback below
+      } catch (e) {
+        debugPrint('MarketplaceService.getProvidersByCategory fallback: $e');
       }
     }
 
@@ -753,8 +754,8 @@ class MarketplaceService {
               .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
               .toList();
         }
-      } catch (_) {
-        // fallback below
+      } catch (e) {
+        debugPrint('MarketplaceService.search fallback: $e');
       }
     }
 
@@ -786,8 +787,8 @@ class MarketplaceService {
           },
         );
         return;
-      } catch (_) {
-        // fallback below
+      } catch (e) {
+        debugPrint('MarketplaceService.addReview fallback: $e');
       }
     }
 
@@ -821,8 +822,8 @@ class MarketplaceService {
           }
           return remote;
         }
-      } catch (_) {
-        // fallback below
+      } catch (e) {
+        debugPrint('MarketplaceService.filterProviders fallback: $e');
       }
     }
 

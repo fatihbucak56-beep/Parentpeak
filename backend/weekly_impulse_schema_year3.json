@@ -1,0 +1,20 @@
+{
+  "id": "years_3",
+  "min_age_months": 36,
+  "max_age_months": 47,
+  "title": "3. Lebensjahr: Magisches Denken & Große Gefühle",
+  "pedagogical_focus": "GfK im Alltag, Inklusion durch Stärkenblick, Liebevolle Elterliche Führung",
+  "developmental_areas": {
+    "sozial_emotional": "Entwicklung von Empathie, 'Magisches Denken' (Fantasie und Realität verschmelzen, z.B. Angst vor Monstern).",
+    "sprache": "Sätze werden komplexer (Haupt- und Nebensätze). Die berühmt-berüchtigte 'Warum-Phase' beginnt.",
+    "kognition": "Versteht Konzepte wie 'Gleich' und 'Anders'. Sortiert Gegenstände nach Merkmalen.",
+    "motorik": "Sicherer Einbeinstand für wenige Sekunden. Laufrad- oder Dreiradfahren gelingt meist problemlos."
+  },
+  "parent_tips": [
+    "Nutze die Giraffensprache (GfK): Benenne deine eigenen Gefühle und Bedürfnisse klar, statt zu schimpfen.",
+    "Beantworte die 'Warum'-Fragen kurz und simpel – dein Kind sucht Logik, keine wissenschaftlichen Vorträge.",
+    "Setze Grenzen liebevoll durch persönliche Präsenz ('Ich möchte nicht, dass du haust'), statt durch Strafen."
+  ],
+  "parent_lens": "Dein Kind stellt dir 100-mal am Tag die Frage 'Warum?'. Das tut es nicht, um dich zu nerven, sondern weil sein Gehirn Verbindungen knüpft. Es will die Welt begreifen.",
+  "reassurance": "Jedes Kind hat sein eigenes Tempo. Während manche Dreijährige schon fehlerfreie Sätze sprechen, sind andere motorisch kaum zu bremsen. Das ist völlig normal und gesund."
+}

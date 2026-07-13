@@ -34,7 +34,7 @@ awk -v team="$TEAM_ID" '
   in_runner_cfg && /DEVELOPMENT_TEAM = [A-Z0-9]{10};/ {
     next
   }
-  in_runner_cfg && /PRODUCT_BUNDLE_IDENTIFIER = com.parentpeak.trustedCircleDemo;/ {
+  in_runner_cfg && /PRODUCT_BUNDLE_IDENTIFIER = com.parentpeak.app;/ {
     print $0
     print "\t\t\t\tDEVELOPMENT_TEAM = " team ";"
     inserted=1

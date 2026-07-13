@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
 
 class SimpleLanguageTest extends StatefulWidget {
   const SimpleLanguageTest({super.key});

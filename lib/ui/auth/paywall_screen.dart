@@ -156,7 +156,17 @@ class PaywallScreen extends StatelessWidget {
 
   Future<void> _activatePremium(BuildContext context) async {
     // Stub: In Produktion hier In-App Purchase Flow starten
-    await AuthService.instance.activatePremium();
+    final success = await AuthService.instance.activatePremium();
+    if (!success) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Premium-Aktivierung fehlgeschlagen. Bitte erneut versuchen.'),
+          ),
+        );
+      }
+      return;
+    }
     onSubscribed?.call();
     if (context.mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();

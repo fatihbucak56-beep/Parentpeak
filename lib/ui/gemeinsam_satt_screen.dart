@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:trusted_circle_demo/models/food_share_post.dart';
 
 // ============================================================
-// TOPF & HERZ — Eltern-Essenssolidarität
+// GEMEINSAM SATT — Eltern-Essenssolidarität
 // ============================================================
 
 const Color _brand = Color(0xFFE8543A);
@@ -11,14 +11,14 @@ const Color _brandLight = Color(0xFFFFF1EE);
 const Color _surface = Color(0xFFF8FAFD);
 const Color _cardBg = Colors.white;
 
-class TopfUndHerzScreen extends StatefulWidget {
-  const TopfUndHerzScreen({super.key});
+class GemeinsamSattScreen extends StatefulWidget {
+  const GemeinsamSattScreen({super.key});
 
   @override
-  State<TopfUndHerzScreen> createState() => _TopfUndHerzScreenState();
+  State<GemeinsamSattScreen> createState() => _GemeinsamSattScreenState();
 }
 
-class _TopfUndHerzScreenState extends State<TopfUndHerzScreen>
+class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     with SingleTickerProviderStateMixin {
   static const String _myUserId = 'mama_fatih';
   late final TabController _tabController;
@@ -56,14 +56,14 @@ class _TopfUndHerzScreenState extends State<TopfUndHerzScreen>
                 color: _brandLight,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('🍲', style: TextStyle(fontSize: 18)),
+              child: const Text('🤝', style: TextStyle(fontSize: 18)),
             ),
             const SizedBox(width: 10),
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Topf & Herz',
+                  'GemeinsamSatt',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
@@ -71,7 +71,8 @@ class _TopfUndHerzScreenState extends State<TopfUndHerzScreen>
                   ),
                 ),
                 Text(
-                  'Essen teilen · Füreinander da sein',
+                  'Essen teilen · Zusammen satt werden',
+
                   style: TextStyle(
                     fontSize: 11,
                     color: Color(0xFF8A9AB0),

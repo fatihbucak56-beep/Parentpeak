@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:trusted_circle_demo/models/cooking_hub.dart';
 import 'package:trusted_circle_demo/models/guerilla_recipe.dart';
@@ -133,7 +134,8 @@ class KettenbrecherService {
         hideVegetables: true,
         aiTarnMapping: mapping,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('KettenbrecherService._parseGeminiRecipeJson(): failed: $e');
       return null;
     }
   }

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: parentpeak-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REQUIRE_AUTH_FOR_WRITES
+        value: "1"
+      - key: ALLOW_CLIENT_PROVIDER_EVENTS
+        value: "0"
+      - key: STRIPE_WEBHOOK_TOLERANCE_SEC
+        value: "300"
+      - key: WRITE_RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: WRITE_RATE_LIMIT_MAX
+        value: "120"
+      - key: BACKEND_API_TOKEN
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

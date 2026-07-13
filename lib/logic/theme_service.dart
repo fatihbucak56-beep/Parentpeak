@@ -19,14 +19,14 @@ class ThemeService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isDarkMode = prefs.getBool(_darkModeKey) ?? false;
-      print(
+      debugPrint(
           '✅ ThemeService.initialize(): isDarkMode=$_isDarkMode (from prefs: ${prefs.getBool(_darkModeKey)})');
     } catch (e) {
-      print('❌ Error initializing theme: $e');
+      debugPrint('❌ Error initializing theme: $e');
       _isDarkMode = false;
     }
     notifyListeners();
-    print('✅ ThemeService.initialize(): notifyListeners() called');
+    debugPrint('✅ ThemeService.initialize(): notifyListeners() called');
   }
 
   Future<void> resetTheme() async {
@@ -34,9 +34,9 @@ class ThemeService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_darkModeKey);
-      print('✅ ThemeService.resetTheme(): Reset to light mode');
+      debugPrint('✅ ThemeService.resetTheme(): Reset to light mode');
     } catch (e) {
-      print('❌ Error resetting theme: $e');
+      debugPrint('❌ Error resetting theme: $e');
     }
     notifyListeners();
   }
@@ -44,16 +44,16 @@ class ThemeService extends ChangeNotifier {
   Future<void> setDarkMode(bool isDark) async {
     if (_isDarkMode == isDark) return; // Avoid redundant updates
     _isDarkMode = isDark;
-    print('✅ ThemeService: Dark mode set to $isDark');
+    debugPrint('✅ ThemeService: Dark mode set to $isDark');
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_darkModeKey, isDark);
-      print('✅ ThemeService: Saved to SharedPreferences');
+      debugPrint('✅ ThemeService: Saved to SharedPreferences');
     } catch (e) {
-      print('❌ Error saving theme preference: $e');
+      debugPrint('❌ Error saving theme preference: $e');
     }
     notifyListeners();
-    print('✅ ThemeService: notifyListeners() called');
+    debugPrint('✅ ThemeService: notifyListeners() called');
   }
 
   ThemeData getLightTheme() {

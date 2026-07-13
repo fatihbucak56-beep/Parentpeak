@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'dart:io' show Platform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -8,27 +10,49 @@ class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
+  static void _logIgnoredError(String context, Object error) {
+    debugPrint('$context: $error');
+  }
+
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  bool get _isRunningOnIOSSimulator {
+    if (!Platform.isIOS) return false;
+    final version = Platform.operatingSystemVersion.toLowerCase();
+    return version.contains('simulator') ||
+      Platform.environment.containsKey('SIMULATOR_DEVICE_NAME') ||
+      Platform.environment.containsKey('SIMULATOR_UDID');
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
     tz.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Europe/Berlin'));
 
+    if (kDebugMode && Platform.isIOS) {
+      _initialized = true;
+      return;
+    }
+
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
+    final iosInit = DarwinInitializationSettings(
+      requestAlertPermission: !_isRunningOnIOSSimulator,
+      requestBadgePermission: !_isRunningOnIOSSimulator,
+      requestSoundPermission: !_isRunningOnIOSSimulator,
     );
-    const settings = InitializationSettings(
+    final settings = InitializationSettings(
       android: androidInit,
       iOS: iosInit,
       macOS: iosInit,
     );
     await _plugin.initialize(settings: settings);
+
+    if (_isRunningOnIOSSimulator) {
+      _initialized = true;
+      return;
+    }
 
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -46,6 +70,14 @@ class NotificationService {
   /// Wire up FCM: request permission, get token, register with backend,
   /// and handle foreground messages as local notifications.
   Future<void> initFcm({BackendApiClient? apiClient, String? userId}) async {
+    if (kDebugMode && Platform.isIOS) {
+      return;
+    }
+
+    if (_isRunningOnIOSSimulator) {
+      return;
+    }
+
     final messaging = FirebaseMessaging.instance;
 
     final settings = await messaging.requestPermission(
@@ -63,7 +95,11 @@ class NotificationService {
             userId: userId,
             token: token,
           );
-        } catch (_) {
+        } catch (e) {
+          _logIgnoredError(
+            'NotificationService.initFcm(): initial token registration skipped',
+            e,
+          );
           // Non-fatal: local notifications still work.
         }
       }
@@ -76,7 +112,12 @@ class NotificationService {
               userId: userId,
               token: newToken,
             );
-          } catch (_) {}
+          } catch (e) {
+            _logIgnoredError(
+              'NotificationService.initFcm(): token refresh registration skipped',
+              e,
+            );
+          }
         }
       });
 

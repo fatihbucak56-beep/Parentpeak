@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class BackendApiClient {
@@ -165,7 +166,8 @@ class BackendApiClient {
     }
     try {
       return jsonDecode(rawBody);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('BackendApiClient._decodeResponse(): non-JSON response fallback: $e');
       return <String, dynamic>{'raw': rawBody};
     }
   }

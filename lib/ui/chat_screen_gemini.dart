@@ -14,7 +14,6 @@ class _ChatScreenGeminiState extends State<ChatScreenGemini> {
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isLoading = false;
   bool _isStreaming = false;
 
   @override

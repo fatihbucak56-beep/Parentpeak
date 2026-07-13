@@ -13,7 +13,7 @@ void main() {
           onPressed: () => showDialog<bool>(context: context, builder: (_) => const RevokeConfirmationDialog(deviceName: 'MyDevice')),
         );
       }),
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -24,7 +24,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Gerätename eingeben'), findsOneWidget);
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
 
     // Confirm button should be disabled initially
     final confirmButton = find.byKey(const Key('confirm-revoke'));

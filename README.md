@@ -20,6 +20,17 @@ Wichtige .env Variablen:
 - `BACKEND_API_VERSION`: Version des Request-Schemas (Standard: `v1`)
 - `BACKEND_TODOS_PATH`, `BACKEND_SHOPPING_PATH`, `BACKEND_CALENDAR_EVENTS_PATH`, `BACKEND_HEALTH_PATH`: optionale Endpoint-Overrides
 
+Backend Deploy (Anfaenger)
+--------------------------
+
+Wenn du noch keine echte Backend-URL hast, starte hier:
+
+1. `docs/BACKEND_DEPLOY_BEGINNER_GUIDE.md`
+
+Repo enthaelt bereits Starter-Configs:
+- `render.yaml` (Render Blueprint)
+- `railway.json` (Railway Build/Start)
+
 Backend-Hardening (Produktion):
 - `REQUIRE_AUTH_FOR_WRITES=1`: Schuetzt Schreibzugriffe (POST/PUT/PATCH/DELETE) per Bearer-Token.
 - `CORS_ALLOWED_ORIGINS`: Kommagetrennte Origin-Allowlist, z. B. `https://parentpeak.de,https://www.parentpeak.de`.
@@ -89,6 +100,24 @@ Zusaetzlich prueft CI das Backend-Sicherheits-Baseline-Profil:
 Weitere Details und Migrationskriterien stehen in:
 - `docs/SPM_PLUGIN_STATUS.md`
 
+Crash Reporting (Firebase Crashlytics)
+-------------------------------------
+
+Crash-Monitoring ist im App-Startpfad zentral verdrahtet und nutzt Firebase Crashlytics,
+wenn Firebase auf der Plattform verfuegbar ist.
+
+- Release-Builds: Crashlytics ist aktiv.
+- Debug-Builds: Crashlytics ist standardmaessig aus.
+- Optional fuer Debug-Tests: mit `--dart-define=PP_ENABLE_CRASHLYTICS_DEBUG=true` aktivierbar.
+
+Der Hook deckt Flutter-Framework-Fehler, Platform-Dispatcher-Fehler und Zone-Fehler ab.
+
+SPM-Plugin-Warnungen: Ticketpaket
+---------------------------------
+
+Das priorisierte Massnahmenpaket fuer die aktuellen Apple-SPM-Plugin-Warnungen ist hier gepflegt:
+- `docs/SPM_PLUGIN_STATUS.md` (Abschnitt: Work package)
+
 Security Smoke Test (gegen laufendes Backend)
 ---------------------------------------------
 
@@ -99,6 +128,30 @@ Optional:
 - `BACKEND_API_TOKEN=...` fuer authentifizierten Write-Test
 - `EXPECT_WRITE_AUTH=0` falls Write-Auth in der Zielumgebung bewusst deaktiviert ist
 - `SMOKE_ORIGIN=https://parentpeak.de` um CORS mit echter Origin zu testen
+
+Stripe Webhook Smoke Test (Produktion)
+--------------------------------------
+
+Zur Verifikation von Stripe-Signaturpruefung und Provider-Event-Haertung:
+
+1. `BACKEND_BASE_URL=https://api.example.com STRIPE_WEBHOOK_SECRET=whsec_... bash scripts/stripe_webhook_smoke_test.sh`
+
+Optional:
+- `STRIPE_TEST_PAYMENT_INTENT_REF=pi_...` um eine konkrete Referenz zu testen
+- `EXPECT_CLIENT_PROVIDER_EVENTS_BLOCKED=0` wenn Client-Provider-Events bewusst offen sind
+
+Release Smoke Suite (Ein Befehl)
+--------------------------------
+
+Führt Security + Stripe Webhook Smoke Tests hintereinander aus:
+
+1. `BACKEND_BASE_URL=https://api.example.com BACKEND_API_TOKEN=... STRIPE_WEBHOOK_SECRET=whsec_... bash scripts/release_smoke_suite.sh`
+
+Optionale Schalter:
+- `RUN_BACKEND_SECURITY_SMOKE=0` nur Stripe Test
+- `RUN_STRIPE_WEBHOOK_SMOKE=0` nur Security Test
+- `EXPECT_WRITE_AUTH=0` falls Write-Auth bewusst deaktiviert ist
+- `EXPECT_CLIENT_PROVIDER_EVENTS_BLOCKED=0` falls Provider-Events bewusst offen sind
 
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------

@@ -43,7 +43,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
         _weeklyImpulse = impulse;
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EntwicklungImpulseScreen._loadImpulse(): failed: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
@@ -63,7 +64,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
     try {
       final languageCode = Localizations.localeOf(context).languageCode;
       await _tts.setLanguage(_resolveTtsLocale(languageCode));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EntwicklungImpulseScreen._playAudio(): locale setup failed: $e');
       await _tts.setLanguage('de-DE');
     }
     await _tts.setPitch(1.0);

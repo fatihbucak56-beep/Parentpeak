@@ -244,7 +244,8 @@ class _DevelopmentSchemaCardState extends State<DevelopmentSchemaCard> {
         base: baseFont,
         bold: boldFont,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('DevelopmentSchemaFeature._shareCurrentOverview(): PDF font fallback: $e');
       pdfTheme = null;
     }
 

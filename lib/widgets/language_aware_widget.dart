@@ -29,12 +29,12 @@ class _LanguageAwareWidgetState extends State<LanguageAwareWidget> {
 
   void _onLanguageChanged() {
     if (mounted) {
-      print('🔄 LanguageAwareWidget._onLanguageChanged() triggered!');
-      print('   Current language: ${languageService.currentLanguage}');
+      debugPrint('🔄 LanguageAwareWidget._onLanguageChanged() triggered!');
+      debugPrint('   Current language: ${languageService.currentLanguage}');
       setState(() {
         // Erzwinge Rebuild
       });
-      print('   setState() called, rebuilding child widget');
+      debugPrint('   setState() called, rebuilding child widget');
     }
   }
 

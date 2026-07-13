@@ -10,9 +10,9 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.2
   http: ^1.1.0
-  firebase_core: ^4.10.0
-  firebase_crashlytics: ^5.0.0
-  firebase_auth: ^6.0.0
+  firebase_core: ^4.11.0
+  firebase_crashlytics: ^5.2.4
+  firebase_auth: ^6.5.4
   firebase_messaging: ^16.3.0
   shared_preferences: ^2.0.15
   intl: ^0.20.2
@@ -32,11 +32,10 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   qr_flutter: ^4.1.0
-  mobile_scanner: ^6.0.2
   pdf: ^3.11.3
   printing: ^5.14.3
   crypto: ^3.0.7
-  flutter_stripe: ^11.2.0
+  flutter_stripe: ^13.0.0
 
 dev_dependencies:
   flutter_test:

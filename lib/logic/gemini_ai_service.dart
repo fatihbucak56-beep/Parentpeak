@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 
@@ -29,8 +30,8 @@ class GeminiAIService {
   /// Sende eine Nachricht an Gemini und erhalte einen Stream der Antwort
   Stream<String> chatWithStreaming(String userMessage) async* {
     try {
-      print('DEBUG: Sende Nachricht mit Modell: $_modelName');
-      print('DEBUG: API-Key Länge: ${_apiKey?.length}');
+      debugPrint('DEBUG: Sende Nachricht mit Modell: $_modelName');
+      debugPrint('DEBUG: API-Key Länge: ${_apiKey?.length}');
 
       final content = [
         Content.text(userMessage),
@@ -44,7 +45,7 @@ class GeminiAIService {
         }
       }
     } catch (e) {
-      print('ERROR: $_modelName -> $e');
+      debugPrint('ERROR: $_modelName -> $e');
       yield 'Fehler: $e';
     }
   }

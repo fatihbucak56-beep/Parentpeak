@@ -17,7 +17,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: DeviceManagementScreen(devices: [device], onRevoke: fakeRevoke),
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

@@ -40,11 +40,11 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
   Widget build(BuildContext context) {
     final errorText = _errorText;
     return AlertDialog(
-      title: Text(AppLocalizations.of(context)!.removeDeviceDialogTitle),
+      title: Text(AppLocalizations.of(context).removeDeviceDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(AppLocalizations.of(context)!.removeDeviceDialogMessage(widget.deviceName)),
+          Text(AppLocalizations.of(context).removeDeviceDialogMessage(widget.deviceName)),
           const SizedBox(height: 12),
           TextField(
             controller: _controller,
@@ -53,8 +53,8 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
             onChanged: _checkInput,
             onSubmitted: _onSubmitted,
             decoration: InputDecoration(
-              labelText: AppLocalizations.of(context)!.deviceNameLabel,
-              helperText: AppLocalizations.of(context)!.deviceNameHelper,
+              labelText: AppLocalizations.of(context).deviceNameLabel,
+              helperText: AppLocalizations.of(context).deviceNameHelper,
               errorText: errorText,
               border: const OutlineInputBorder(),
             ),
@@ -62,12 +62,12 @@ class _RevokeConfirmationDialogState extends State<RevokeConfirmationDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(AppLocalizations.of(context)!.cancel)),
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(AppLocalizations.of(context).cancel)),
         ElevatedButton(
           key: const Key('confirm-revoke'),
           onPressed: _isConfirmed ? _confirm : null,
           style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-          child: Text(AppLocalizations.of(context)!.removeDevice),
+          child: Text(AppLocalizations.of(context).removeDevice),
         ),
       ],
     );

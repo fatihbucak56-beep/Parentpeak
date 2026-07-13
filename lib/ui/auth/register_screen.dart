@@ -69,7 +69,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               'Registrierung fehlgeschlagen. Bitte erneut versuchen.',
         );
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('RegisterScreen._submit(): unexpected register error: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -504,9 +505,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               padding: const EdgeInsets.only(top: 4),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded,
+                  const Icon(Icons.check_circle_outline_rounded,
                       size: 16,
-                      color: const Color(0xFF5E6F6B)),
+                      color: Color(0xFF5E6F6B)),
                   const SizedBox(width: 8),
                   Text(hint, style: theme.textTheme.bodySmall),
                 ],

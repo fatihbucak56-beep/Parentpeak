@@ -168,6 +168,10 @@ Fuer die finale Veroeffentlichung und den Betrieb nach Launch:
 	- `docs/APP_GO_NO_GO_DECISION_PAGE.md`
 5. Druckbare 1-Seiten Uebersicht fuer Management/Partner:
 	- `docs/RELEASE_EXEC_SUMMARY.md`
+6. Ultrakurzer Investor-Brief (DE):
+	- `docs/RELEASE_INVESTOR_BRIEF_DE.md`
+7. Ultra-short investor brief (EN):
+	- `docs/RELEASE_INVESTOR_BRIEF_EN.md`
 
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------

@@ -174,6 +174,8 @@ Fuer die finale Veroeffentlichung und den Betrieb nach Launch:
 	- `docs/RELEASE_INVESTOR_BRIEF_EN.md`
 8. 30-Sekunden Pitch (DE + EN):
 	- `docs/RELEASE_30S_PITCH.md`
+9. Konkretes Solo-Release-Entscheidungsprotokoll (GO mit Auflagen):
+	- `docs/RELEASE_DECISION_PROTOCOL_2026-07-14.md`
 
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------

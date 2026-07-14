@@ -166,6 +166,8 @@ Fuer die finale Veroeffentlichung und den Betrieb nach Launch:
 	- `docs/POST_LAUNCH_7_DAY_MONITORING_PLAN.md`
 4. Kompakte Meeting-Seite fuer Go/No-Go:
 	- `docs/APP_GO_NO_GO_DECISION_PAGE.md`
+5. Druckbare 1-Seiten Uebersicht fuer Management/Partner:
+	- `docs/RELEASE_EXEC_SUMMARY.md`
 
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------

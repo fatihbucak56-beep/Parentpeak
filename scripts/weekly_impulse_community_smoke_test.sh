@@ -7,6 +7,7 @@ INTERNAL_REVIEWER_EMAIL="${INTERNAL_REVIEWER_EMAIL:-lead@parentpeak.de}"
 INTERNAL_REVIEWER_NAME="${INTERNAL_REVIEWER_NAME:-Lead Review}"
 EXPECT_INTERNAL_MODERATION_LOCK="${EXPECT_INTERNAL_MODERATION_LOCK:-1}"
 SMOKE_ORIGIN="${SMOKE_ORIGIN:-https://parentpeak.de}"
+AUTH_TOKEN="${BACKEND_API_TOKEN:-}"
 
 if [[ -z "$BASE_URL" ]]; then
   echo "[weekly_impulse_community_smoke_test] ERROR: BACKEND_BASE_URL is required"
@@ -42,6 +43,10 @@ request_json() {
     -H "Origin: $SMOKE_ORIGIN"
     -H "Accept: application/json"
   )
+
+  if [[ -n "$AUTH_TOKEN" ]]; then
+    curl_args+=( -H "Authorization: Bearer $AUTH_TOKEN" )
+  fi
 
   if [[ "$method" != "GET" ]]; then
     curl_args+=( -H "Content-Type: application/json" )

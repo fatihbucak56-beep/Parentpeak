@@ -153,6 +153,20 @@ Optionale Schalter:
 - `EXPECT_WRITE_AUTH=0` falls Write-Auth bewusst deaktiviert ist
 - `EXPECT_CLIENT_PROVIDER_EVENTS_BLOCKED=0` falls Provider-Events bewusst offen sind
 
+Release Hub (Empfohlen)
+-----------------------
+
+Fuer die finale Veroeffentlichung und den Betrieb nach Launch:
+
+1. Priorisierung vor/nach Release:
+	- `docs/APP_RELEASE_PRIORITY_BOARD.md`
+2. Operative Go-Live Checkliste mit Ownern:
+	- `docs/APP_GO_LIVE_OPERATIONS_CHECKLIST.md`
+3. 7-Tage Monitoring und Eskalation nach Launch:
+	- `docs/POST_LAUNCH_7_DAY_MONITORING_PLAN.md`
+4. Kompakte Meeting-Seite fuer Go/No-Go:
+	- `docs/APP_GO_NO_GO_DECISION_PAGE.md`
+
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------
 

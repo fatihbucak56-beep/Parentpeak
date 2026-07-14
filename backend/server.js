@@ -665,7 +665,19 @@ function getWeeklyImpulseSchema() {
     'Weekly-Impulse-Schema konnte nicht geladen werden. Gepruefte Pfade:',
     weeklyImpulseSchemaPathCandidates,
   );
-  return null;
+  return {
+    id: 'years_3',
+    parent_lens:
+      'Kinder in der Warum-Phase suchen vor allem Verbindung und Orientierung, nicht perfekte Erklaerungen.',
+    pedagogical_focus: 'Gefuehle sehen, klar begrenzen, ruhig beantworten',
+    parent_tips: [
+      'Spiegele zuerst das Gefuehl deines Kindes, bevor du auf die Frage eingehst.',
+      'Antworte kurz in einem Satz und vermeide lange Erklaerketten.',
+      'Wiederhole Grenzen freundlich und konsistent statt in Diskussionen zu gehen.',
+    ],
+    reassurance:
+      'Du musst nicht jede Frage perfekt loesen. Verlaessliche Praesenz ist fuer dein Kind wichtiger als die perfekte Antwort.',
+  };
 }
 
 // In-memory stores for app endpoints

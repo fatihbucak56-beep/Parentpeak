@@ -172,6 +172,8 @@ Fuer die finale Veroeffentlichung und den Betrieb nach Launch:
 	- `docs/RELEASE_INVESTOR_BRIEF_DE.md`
 7. Ultra-short investor brief (EN):
 	- `docs/RELEASE_INVESTOR_BRIEF_EN.md`
+8. 30-Sekunden Pitch (DE + EN):
+	- `docs/RELEASE_30S_PITCH.md`
 
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------

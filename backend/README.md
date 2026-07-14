@@ -27,6 +27,9 @@ Für produktionsnahe Nutzung setze folgende Umgebungsvariablen vor dem Start:
 - `CORS_ALLOWED_ORIGINS`: Kommagetrennte Origin-Allowlist
 - `WRITE_RATE_LIMIT_WINDOW_MS`: Zeitfenster für Write-Rate-Limit (ms)
 - `WRITE_RATE_LIMIT_MAX`: Max. Schreibanfragen pro Fenster und Client
+- `INTERNAL_MODERATOR_EMAILS`: explizite interne Moderations-/Review-Accounts (kommagetrennt)
+- `INTERNAL_MODERATOR_DOMAINS`: erlaubte interne Domains für Moderation und Fachverifizierung
+- `WEEKLY_IMPULSE_SCHEMA_PATH`: optionaler absoluter Pfad zur `weekly_impulse_schema_year3.json` (nur noetig bei abweichendem Deploy-Arbeitsverzeichnis)
 - `STRIPE_WEBHOOK_SECRET`: Stripe Endpoint Signing Secret (`whsec_...`)
 - `STRIPE_WEBHOOK_TOLERANCE_SEC`: erlaubte Zeitabweichung fuer Stripe Signaturen
 - `ALLOW_CLIENT_PROVIDER_EVENTS=0`: deaktiviert clientseitige Provider-Statusupdates
@@ -37,11 +40,48 @@ Beispiel:
 export BACKEND_API_TOKEN="..."
 export REQUIRE_AUTH_FOR_WRITES=1
 export CORS_ALLOWED_ORIGINS="https://parentpeak.de,https://www.parentpeak.de"
+export INTERNAL_MODERATOR_EMAILS="lead@parentpeak.de,ops@parentpeak.de"
+export INTERNAL_MODERATOR_DOMAINS="parentpeak.de,parentpeak.com"
+export WEEKLY_IMPULSE_SCHEMA_PATH="/opt/render/project/src/backend/weekly_impulse_schema_year3.json"
 export STRIPE_WEBHOOK_SECRET="whsec_..."
 export STRIPE_WEBHOOK_TOLERANCE_SEC=300
 export ALLOW_CLIENT_PROVIDER_EVENTS=0
 node server.js
 ```
+
+## Wochenimpuls Community, Moderation und Fachverifizierung
+
+Der Wochenimpuls-Bereich besitzt jetzt drei produktionsrelevante Ebenen:
+
+- Community-Posts, Likes und Kommentare
+- Moderations-Reports mit globalem Ausblenden/Wiederfreigeben
+- Fachverifizierung für paedagogische Stimmen
+
+Wichtige Endpunkte:
+
+- `GET /api/weekly-impulse`
+- `POST /api/weekly-impulse/community/posts`
+- `POST /api/weekly-impulse/community/posts/:postId/report`
+- `GET /api/weekly-impulse/community/reports`
+- `POST /api/weekly-impulse/community/reports/:reportId/resolve`
+- `POST /api/weekly-impulse/community/posts/:postId/moderation-visibility`
+- `GET /api/weekly-impulse/community/verification-status`
+- `POST /api/weekly-impulse/community/verification-requests`
+- `GET /api/weekly-impulse/community/verification-requests`
+- `POST /api/weekly-impulse/community/verification-requests/:requestId/approve`
+
+Sicherheitsmodell:
+
+- Normale Community-Aktionen bleiben fuer App-Nutzer:innen offen.
+- Moderations- und Verifizierungs-Review-Endpunkte verlangen jetzt serverseitig eine interne E-Mail (`INTERNAL_MODERATOR_EMAILS` oder `INTERNAL_MODERATOR_DOMAINS`).
+- UI-Sichtbarkeit allein reicht also nicht mehr aus, um diese Endpunkte zu nutzen.
+
+Empfohlener Go-Live-Check:
+
+1. Setze `INTERNAL_MODERATOR_EMAILS` und/oder `INTERNAL_MODERATOR_DOMAINS` im Hosting.
+2. Pruefe mit einem internen Account, dass das Moderationspanel Reports laden kann.
+3. Pruefe mit einem normalen Account, dass Moderations- oder Freigabe-Endpunkte `403` liefern.
+4. Erzeuge testweise eine Fachverifizierungsanfrage und gib sie mit internem Account frei.
 
 ## Stripe Webhook (Produktion)
 
@@ -94,6 +134,26 @@ Kombiniert (Security + Stripe in einem Lauf):
 BACKEND_BASE_URL=https://api.example.com \
 BACKEND_API_TOKEN=... \
 STRIPE_WEBHOOK_SECRET=whsec_... \
+bash scripts/release_smoke_suite.sh
+```
+
+Wochenimpuls-Community und Fachverifizierung gezielt pruefen:
+
+```bash
+BACKEND_BASE_URL=https://api.example.com \
+INTERNAL_REVIEWER_EMAIL=lead@parentpeak.de \
+INTERNAL_REVIEWER_NAME="Lead Review" \
+bash scripts/weekly_impulse_community_smoke_test.sh
+```
+
+Oder im Gesamtlauf aktivieren:
+
+```bash
+BACKEND_BASE_URL=https://api.example.com \
+RUN_BACKEND_SECURITY_SMOKE=1 \
+RUN_STRIPE_WEBHOOK_SMOKE=0 \
+RUN_WEEKLY_IMPULSE_COMMUNITY_SMOKE=1 \
+INTERNAL_REVIEWER_EMAIL=lead@parentpeak.de \
 bash scripts/release_smoke_suite.sh
 ```
 

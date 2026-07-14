@@ -6,6 +6,7 @@ BASE_URL="${BACKEND_BASE_URL:-}"
 RUN_BACKEND_SECURITY_SMOKE="${RUN_BACKEND_SECURITY_SMOKE:-1}"
 RUN_STRIPE_WEBHOOK_SMOKE="${RUN_STRIPE_WEBHOOK_SMOKE:-1}"
 RUN_PARENT_MATCHING_SMOKE="${RUN_PARENT_MATCHING_SMOKE:-0}"
+RUN_WEEKLY_IMPULSE_COMMUNITY_SMOKE="${RUN_WEEKLY_IMPULSE_COMMUNITY_SMOKE:-0}"
 
 if [[ -z "$BASE_URL" ]]; then
   echo "[release_smoke_suite] ERROR: BACKEND_BASE_URL is required"
@@ -17,6 +18,7 @@ echo "[release_smoke_suite] Base URL: $BASE_URL"
 echo "[release_smoke_suite] RUN_BACKEND_SECURITY_SMOKE=$RUN_BACKEND_SECURITY_SMOKE"
 echo "[release_smoke_suite] RUN_STRIPE_WEBHOOK_SMOKE=$RUN_STRIPE_WEBHOOK_SMOKE"
 echo "[release_smoke_suite] RUN_PARENT_MATCHING_SMOKE=$RUN_PARENT_MATCHING_SMOKE"
+echo "[release_smoke_suite] RUN_WEEKLY_IMPULSE_COMMUNITY_SMOKE=$RUN_WEEKLY_IMPULSE_COMMUNITY_SMOKE"
 
 if [[ "$RUN_BACKEND_SECURITY_SMOKE" == "1" ]]; then
   echo "[release_smoke_suite] Running backend security smoke test..."
@@ -60,6 +62,18 @@ if [[ "$RUN_PARENT_MATCHING_SMOKE" == "1" ]]; then
   bash scripts/parent_matching_smoke_test.sh
 else
   echo "[release_smoke_suite] Skipping parent matching smoke test"
+fi
+
+if [[ "$RUN_WEEKLY_IMPULSE_COMMUNITY_SMOKE" == "1" ]]; then
+  echo "[release_smoke_suite] Running weekly impulse community smoke test..."
+  BACKEND_BASE_URL="$BASE_URL" \
+  INTERNAL_REVIEWER_EMAIL="${INTERNAL_REVIEWER_EMAIL:-lead@parentpeak.de}" \
+  INTERNAL_REVIEWER_NAME="${INTERNAL_REVIEWER_NAME:-Lead Review}" \
+  EXPECT_INTERNAL_MODERATION_LOCK="${EXPECT_INTERNAL_MODERATION_LOCK:-1}" \
+  SMOKE_ORIGIN="${SMOKE_ORIGIN:-https://parentpeak.de}" \
+  bash scripts/weekly_impulse_community_smoke_test.sh
+else
+  echo "[release_smoke_suite] Skipping weekly impulse community smoke test"
 fi
 
 echo "[release_smoke_suite] Completed"

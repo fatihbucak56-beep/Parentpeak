@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const Stripe = require('stripe');
+require('dotenv').config(); // Load environment variables
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
@@ -66,7 +67,7 @@ const prismaPool = new Pool({
 });
 const prismaAdapter = new PrismaPg(prismaPool);
 const app = express();
-const prisma = new PrismaClient({ adapter: prismaAdapter });
+const prisma = new PrismaClient({ adapter: prismaAdapter, log: ['error'] });
 const PORT = Number.parseInt(process.env.PORT || '3000', 10);
 const backendApiToken = (process.env.BACKEND_API_TOKEN || '').trim();
 const requireAuthForWrites =
@@ -94,6 +95,14 @@ if (stripeSecretKey) {
 const allowClientProviderEvents =
   (process.env.ALLOW_CLIENT_PROVIDER_EVENTS ||
     (process.env.NODE_ENV === 'production' ? '0' : '1')) === '1';
+const internalModeratorEmails = (process.env.INTERNAL_MODERATOR_EMAILS || '')
+  .split(',')
+  .map(item => item.trim().toLowerCase())
+  .filter(Boolean);
+const internalModeratorDomains = (process.env.INTERNAL_MODERATOR_DOMAINS || 'parentpeak.de,parentpeak.com')
+  .split(',')
+  .map(item => item.trim().toLowerCase())
+  .filter(Boolean);
 
 const writeRateWindowMs = Number.parseInt(
   process.env.WRITE_RATE_LIMIT_WINDOW_MS || `${15 * 60 * 1000}`,
@@ -106,6 +115,9 @@ const writeRateMax = Number.parseInt(
 const writeRateBuckets = new Map();
 const DEMO_USER_ID = 'host_demo_001';
 const DEMO_FAMILY_ID = 'demo-family-001';
+const weeklyImpulseCommunityState = new Map();
+const weeklyImpulseVerificationRequests = [];
+const weeklyImpulseVerifiedExperts = new Map();
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -119,6 +131,230 @@ function getClientIp(req) {
     return xff.split(',')[0].trim();
   }
   return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function getWeeklyImpulseCommunityEntry(impulseId) {
+  if (!weeklyImpulseCommunityState.has(impulseId)) {
+    weeklyImpulseCommunityState.set(impulseId, {
+      customPosts: [],
+      likedByPostId: {},
+      commentsByPostId: {},
+      reportsByPostId: {},
+      hiddenPostIds: {},
+    });
+  }
+
+  return weeklyImpulseCommunityState.get(impulseId);
+}
+
+function getVerifiedExpertRecord({ userId, email }) {
+  const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+  if (normalizedUserId && weeklyImpulseVerifiedExperts.has(`user:${normalizedUserId}`)) {
+    return weeklyImpulseVerifiedExperts.get(`user:${normalizedUserId}`);
+  }
+  if (normalizedEmail && weeklyImpulseVerifiedExperts.has(`email:${normalizedEmail}`)) {
+    return weeklyImpulseVerifiedExperts.get(`email:${normalizedEmail}`);
+  }
+  return null;
+}
+
+function isInternalModeratorEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+  if (internalModeratorEmails.includes(normalized)) return true;
+  return internalModeratorDomains.some(domain => normalized.endsWith(`@${domain}`));
+}
+
+function ensureInternalModeratorAccess({ email, displayName }) {
+  if (isInternalModeratorEmail(email)) {
+    return {
+      allowed: true,
+      normalizedEmail: String(email || '').trim().toLowerCase(),
+      normalizedDisplayName: String(displayName || '').trim(),
+    };
+  }
+
+  return {
+    allowed: false,
+    normalizedEmail: String(email || '').trim().toLowerCase(),
+    normalizedDisplayName: String(displayName || '').trim(),
+  };
+}
+
+function storeVerifiedExpertRecord(record) {
+  if (record.userId) {
+    weeklyImpulseVerifiedExperts.set(`user:${record.userId}`, record);
+  }
+  if (record.email) {
+    weeklyImpulseVerifiedExperts.set(`email:${record.email.toLowerCase()}`, record);
+  }
+}
+
+function buildWeeklyImpulseSeedPosts(schema, impulseId) {
+  return [
+    {
+      id: `${impulseId}_parent_seed`,
+      author_name: 'Miriam, Mama von 2 Kindern',
+      role: 'Elternteil',
+      verified_expert: false,
+      verification_label: '',
+      title: 'Kurze Antworten haben uns entlastet',
+      body:
+        'Seit wir nicht mehr alles komplett erklaeren, sondern erst das Gefuehl sehen und dann kurz antworten, sind unsere Nachmittage deutlich entspannter.',
+      seed_like_count: 18,
+      seed_comments: [
+        'Das probieren wir heute direkt aus.',
+        'Kurz und freundlich klappt bei uns auch besser als lange Diskussionen.',
+      ],
+    },
+    {
+      id: `${impulseId}_educator_seed`,
+      author_name: 'Seda, Erzieherin',
+      role: 'Paedagog:in',
+      verified_expert: true,
+      verification_label: 'Verifizierte Fachstimme',
+      title: 'Praxis aus der Gruppe',
+      body:
+        'Ein ruhiger Blickkontakt und ein Satz wie Ich hoere dich, ich antworte dir kurz hilft vielen Kindern schneller als eine lange Erklaerung.',
+      seed_like_count: 24,
+      seed_comments: ['Sehr nah am Alltag, danke.'],
+    },
+  ];
+}
+
+function buildWeeklyImpulseResponse({ schema, viewerUserId }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const impulseId = `imp_${schema.id}_gfk_w1`;
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  const seedPosts = buildWeeklyImpulseSeedPosts(schema, impulseId);
+  const mergedPosts = [...seedPosts, ...state.customPosts]
+    .filter(post => !state.hiddenPostIds?.[post.id]?.hidden)
+    .map(post => {
+    const likedBy = state.likedByPostId[post.id] || [];
+    const extraComments = state.commentsByPostId[post.id] || [];
+    const seedComments = Array.isArray(post.seed_comments) ? post.seed_comments : [];
+    const seedLikeCount = Number.isFinite(post.seed_like_count) ? post.seed_like_count : 0;
+    return {
+      ...post,
+      seed_like_count: seedLikeCount + likedBy.length,
+      seed_comments: [...seedComments, ...extraComments.map(item => item.text)],
+      viewer_has_liked: viewerUserId ? likedBy.includes(viewerUserId) : false,
+    };
+  });
+
+  return {
+    id: impulseId,
+    title: 'Warum-Fragen gelassen begleiten',
+    hero_headline: 'Euer Themenraum fuer ruhige Warum-Momente',
+    hero_description:
+      'Diese Woche bekommt ihr nicht nur einen Text, sondern mehrere kurze Impulse, alltagsnahe Praxisideen und erste Erfahrungen aus Elternhaus und Paedagogik.',
+    content_body:
+      `${schema.parent_lens}\n\n` +
+      `Fokus diese Woche: ${schema.pedagogical_focus}.\n\n` +
+      `Drei alltagsnahe Impulse:\n` +
+      `- ${schema.parent_tips[0]}\n` +
+      `- ${schema.parent_tips[1]}\n` +
+      `- ${schema.parent_tips[2]}\n\n` +
+      `${schema.reassurance}`,
+    practical_tip:
+      'Heute bei der naechsten Warum-Frage: erst Gefuehl spiegeln, dann in einem Satz antworten und die Grenze freundlich benennen.',
+    audio_script:
+      `Hallo und schoen, dass du da bist. ${schema.parent_lens} ` +
+      'Bleib bei kurzen Antworten, klaren Grenzen und liebevoller Praesenz. ' +
+      'Du gibst deinem Kind damit Sicherheit und Orientierung. Du machst das gut.',
+    category: 'gfk',
+    publish_date: today,
+    companion_impulses: [
+      {
+        id: `imp_${schema.id}_quick`,
+        title: 'Heute in 2 Minuten',
+        summary:
+          'Waehle heute nur eine ruhige Antwort auf eine Warum-Frage und bleibe danach bewusst kurz.',
+        duration_label: '2 Min',
+        format_label: 'Sofort-Impuls',
+      },
+      {
+        id: `imp_${schema.id}_understand`,
+        title: 'Kurz verstanden',
+        summary: schema.parent_lens,
+        duration_label: '3 Min',
+        format_label: 'Verstehen',
+      },
+      {
+        id: `imp_${schema.id}_practice`,
+        title: 'Praxis fuer Zuhause und Kita',
+        summary: schema.parent_tips[0],
+        duration_label: '4 Min',
+        format_label: 'Praxis',
+      },
+      {
+        id: `imp_${schema.id}_reflect`,
+        title: 'Abend-Reflexion',
+        summary:
+          'Wann hat dein Kind heute besonders viele Verbindungen gesucht und wie konntest du ruhig Orientierung geben?',
+        duration_label: '2 Min',
+        format_label: 'Reflexion',
+      },
+      {
+        id: `imp_${schema.id}_deepdive`,
+        title: 'Tieferer Blick',
+        summary: schema.reassurance,
+        duration_label: '5 Min',
+        format_label: 'Artikel',
+      },
+    ],
+    discussion_prompt: {
+      id: `imp_${schema.id}_discussion`,
+      title: 'Frage der Woche',
+      body:
+        'Welche kurze, ruhige Formulierung hilft euch, wenn euer Kind zum zehnten Mal nach dem Warum fragt?',
+    },
+    community_posts: mergedPosts,
+  };
+}
+
+function findWeeklyImpulseCommunityPost({ schema, impulseId, postId }) {
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  const seedPosts = buildWeeklyImpulseSeedPosts(schema, impulseId);
+  return [...seedPosts, ...state.customPosts].find(post => post.id === postId) || null;
+}
+
+function buildWeeklyImpulseReportItems({ schema, impulseId }) {
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  const seedPosts = buildWeeklyImpulseSeedPosts(schema, impulseId);
+  const allPosts = [...seedPosts, ...state.customPosts];
+  const items = [];
+
+  for (const [postId, reports] of Object.entries(state.reportsByPostId || {})) {
+    const post = allPosts.find(entry => entry.id === postId);
+    for (const report of reports || []) {
+      items.push({
+        id: report.id,
+        postId,
+        postTitle: post?.title || 'Unbekannter Beitrag',
+        postAuthorName: post?.author_name || 'Unbekannt',
+        postRole: post?.role || 'Community',
+        reason: report.reason,
+        reporterName: report.reporterName,
+        reporterUserId: report.reporterUserId,
+        createdAt: report.createdAt,
+        resolvedAt: report.resolvedAt || null,
+        resolvedBy: report.resolvedBy || '',
+        moderatorNote: report.moderatorNote || '',
+        lastAction: report.lastAction || '',
+        lastActionAt: report.lastActionAt || null,
+        hiddenByModeration: state.hiddenPostIds?.[postId]?.hidden === true,
+        hiddenAt: state.hiddenPostIds?.[postId]?.hiddenAt || null,
+        hiddenBy: state.hiddenPostIds?.[postId]?.hiddenBy || '',
+      });
+    }
+  }
+
+  items.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  return items;
 }
 
 function parseStripeSignatureHeader(headerValue) {
@@ -381,10 +617,13 @@ app.use((req, res, next) => {
 
 // Providers-Daten aus JSON laden
 const providersPath = path.join(__dirname, 'providers.json');
-const weeklyImpulseSchemaPath = path.join(
-  __dirname,
-  'weekly_impulse_schema_year3.json',
-);
+const weeklyImpulseSchemaOverridePath = (process.env.WEEKLY_IMPULSE_SCHEMA_PATH || '').trim();
+const weeklyImpulseSchemaPathCandidates = [
+  weeklyImpulseSchemaOverridePath,
+  path.join(__dirname, 'weekly_impulse_schema_year3.json'),
+  path.join(process.cwd(), 'backend', 'weekly_impulse_schema_year3.json'),
+  path.join(process.cwd(), 'weekly_impulse_schema_year3.json'),
+].filter(Boolean);
 
 function getProviders() {
   try {
@@ -407,13 +646,26 @@ function saveProviders(providers) {
 }
 
 function getWeeklyImpulseSchema() {
-  try {
-    const data = fs.readFileSync(weeklyImpulseSchemaPath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Fehler beim Lesen des Weekly-Impulse-Schemas:', error);
-    return null;
+  for (const schemaPath of weeklyImpulseSchemaPathCandidates) {
+    try {
+      if (!fs.existsSync(schemaPath)) {
+        continue;
+      }
+      const data = fs.readFileSync(schemaPath, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      console.error(
+        `Fehler beim Lesen des Weekly-Impulse-Schemas (${schemaPath}):`,
+        error,
+      );
+    }
   }
+
+  console.error(
+    'Weekly-Impulse-Schema konnte nicht geladen werden. Gepruefte Pfade:',
+    weeklyImpulseSchemaPathCandidates,
+  );
+  return null;
 }
 
 // In-memory stores for app endpoints
@@ -1673,30 +1925,447 @@ app.get('/api/weekly-impulse', (req, res) => {
     return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const viewerUserId =
+    typeof req.query.viewerUserId === 'string' && req.query.viewerUserId.trim()
+      ? req.query.viewerUserId.trim()
+      : '';
 
-  const impulse = {
-    id: `imp_${schema.id}_gfk_w1`,
-    title: 'Warum-Fragen gelassen begleiten',
-    content_body:
-      `${schema.parent_lens}\n\n` +
-      `Fokus diese Woche: ${schema.pedagogical_focus}.\n\n` +
-      `Drei alltagsnahe Impulse:\n` +
-      `- ${schema.parent_tips[0]}\n` +
-      `- ${schema.parent_tips[1]}\n` +
-      `- ${schema.parent_tips[2]}\n\n` +
-      `${schema.reassurance}`,
-    practical_tip:
-      'Heute bei der naechsten Warum-Frage: erst Gefuehl spiegeln, dann in einem Satz antworten und die Grenze freundlich benennen.',
-    audio_script:
-      `Hallo und schoen, dass du da bist. ${schema.parent_lens} ` +
-      'Bleib bei kurzen Antworten, klaren Grenzen und liebevoller Praesenz. ' +
-      'Du gibst deinem Kind damit Sicherheit und Orientierung. Du machst das gut.',
-    category: 'gfk',
-    publish_date: today,
+  res.json(buildWeeklyImpulseResponse({ schema, viewerUserId }));
+});
+
+app.post('/api/weekly-impulse/community/posts', (req, res) => {
+  const schema = getWeeklyImpulseSchema();
+  if (!schema) {
+    return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
+  }
+
+  const impulseId = typeof req.body?.impulseId === 'string' ? req.body.impulseId.trim() : '';
+  const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+  const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
+  const authorName =
+    typeof req.body?.authorName === 'string' ? req.body.authorName.trim() : '';
+  const role = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
+  const authorUserId =
+    typeof req.body?.authorUserId === 'string' ? req.body.authorUserId.trim() : '';
+  const authorEmail =
+    typeof req.body?.authorEmail === 'string' ? req.body.authorEmail.trim() : '';
+
+  if (!impulseId || !title || !body || !authorName || !role) {
+    return res.status(400).json({ error: 'impulseId, title, body, authorName und role sind erforderlich' });
+  }
+
+  const expectedImpulseId = `imp_${schema.id}_gfk_w1`;
+  if (impulseId !== expectedImpulseId) {
+    return res.status(404).json({ error: 'Weekly Impulse nicht gefunden' });
+  }
+
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  const verifiedRecord = role === 'Paedagog:in'
+    ? getVerifiedExpertRecord({ userId: authorUserId, email: authorEmail })
+    : null;
+  const item = {
+    id: `${impulseId}_community_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    author_name: authorName,
+    role,
+    verified_expert: !!verifiedRecord,
+    verification_label: verifiedRecord?.verificationLabel || '',
+    title,
+    body,
+    seed_like_count: 0,
+    seed_comments: [],
   };
 
-  res.json(impulse);
+  state.customPosts.unshift(item);
+  return res.status(201).json({ item });
+});
+
+app.get('/api/weekly-impulse/community/verification-status', (req, res) => {
+  const userId =
+    typeof req.query.userId === 'string' ? req.query.userId.trim() : '';
+  const email =
+    typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
+
+  const verifiedRecord = getVerifiedExpertRecord({ userId, email });
+  const latestRequest = weeklyImpulseVerificationRequests
+    .filter(item =>
+      (userId && item.userId === userId) || (email && item.email.toLowerCase() === email),
+    )
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+
+  return res.json({
+    verified: !!verifiedRecord,
+    verificationLabel: verifiedRecord?.verificationLabel || '',
+    verifiedAt: verifiedRecord?.verifiedAt || null,
+    pendingRequest: latestRequest?.status === 'pending',
+    verifiedProfile: verifiedRecord
+      ? {
+          displayName: verifiedRecord.displayName || '',
+          roleTitle: verifiedRecord.roleTitle || '',
+          organization: verifiedRecord.organization || '',
+          verificationLabel: verifiedRecord.verificationLabel || '',
+          verifiedAt: verifiedRecord.verifiedAt || null,
+          reviewedBy: verifiedRecord.reviewedBy || '',
+          reviewNote: verifiedRecord.reviewNote || '',
+        }
+      : null,
+    latestRequest,
+  });
+});
+
+app.post('/api/weekly-impulse/community/verification-requests', (req, res) => {
+  const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+  const roleTitle = typeof req.body?.roleTitle === 'string' ? req.body.roleTitle.trim() : '';
+  const organization = typeof req.body?.organization === 'string' ? req.body.organization.trim() : '';
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+
+  if (!userId || !email || !displayName || !roleTitle) {
+    return res.status(400).json({
+      error: 'userId, email, displayName und roleTitle sind erforderlich',
+    });
+  }
+
+  const existingPending = weeklyImpulseVerificationRequests.find(item =>
+    item.status === 'pending' && (item.userId === userId || item.email.toLowerCase() === email),
+  );
+  if (existingPending) {
+    return res.status(409).json({ error: 'Es gibt bereits eine offene Verifizierungsanfrage' });
+  }
+
+  const item = {
+    id: `verif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    userId,
+    email,
+    displayName,
+    roleTitle,
+    organization,
+    note,
+    status: 'pending',
+    verificationLabel: 'Verifizierte Fachstimme',
+    createdAt: new Date().toISOString(),
+    reviewedAt: null,
+    reviewedBy: '',
+    reviewNote: '',
+  };
+  weeklyImpulseVerificationRequests.unshift(item);
+  return res.status(201).json({ item });
+});
+
+app.get('/api/weekly-impulse/community/verification-requests', (req, res) => {
+  const reviewerEmail =
+    typeof req.query.reviewerEmail === 'string' ? req.query.reviewerEmail.trim() : '';
+  const access = ensureInternalModeratorAccess({ email: reviewerEmail, displayName: '' });
+  if (!access.allowed) {
+    return res.status(403).json({ error: 'Verifizierungszugriff nicht erlaubt' });
+  }
+
+  const status =
+    typeof req.query.status === 'string' ? req.query.status.trim().toLowerCase() : '';
+  const items = weeklyImpulseVerificationRequests.filter(item =>
+    status ? item.status === status : true,
+  );
+  return res.json({ items });
+});
+
+app.post('/api/weekly-impulse/community/verification-requests/:requestId/approve', (req, res) => {
+  const { requestId } = req.params;
+  const reviewerName =
+    typeof req.body?.reviewerName === 'string' ? req.body.reviewerName.trim() : '';
+  const reviewerEmail =
+    typeof req.body?.reviewerEmail === 'string' ? req.body.reviewerEmail.trim() : '';
+  const reviewNote =
+    typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim() : '';
+  const verificationLabel =
+    typeof req.body?.verificationLabel === 'string' && req.body.verificationLabel.trim()
+      ? req.body.verificationLabel.trim()
+      : 'Verifizierte Fachstimme';
+
+  const access = ensureInternalModeratorAccess({
+    email: reviewerEmail,
+    displayName: reviewerName,
+  });
+  if (!access.allowed) {
+    return res.status(403).json({ error: 'Verifizierungszugriff nicht erlaubt' });
+  }
+
+  if (!reviewerName) {
+    return res.status(400).json({ error: 'reviewerName ist erforderlich' });
+  }
+
+  const request = weeklyImpulseVerificationRequests.find(item => item.id === requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Verifizierungsanfrage nicht gefunden' });
+  }
+
+  request.status = 'approved';
+  request.reviewedAt = new Date().toISOString();
+  request.reviewedBy = reviewerName;
+  request.reviewNote = reviewNote;
+  request.verificationLabel = verificationLabel;
+
+  storeVerifiedExpertRecord({
+    userId: request.userId,
+    email: request.email,
+    displayName: request.displayName,
+    roleTitle: request.roleTitle,
+    organization: request.organization,
+    verificationLabel,
+    verifiedAt: request.reviewedAt,
+    reviewedBy: reviewerName,
+    reviewNote,
+  });
+
+  return res.json({ item: request });
+});
+
+app.post('/api/weekly-impulse/community/posts/:postId/like', (req, res) => {
+  const schema = getWeeklyImpulseSchema();
+  if (!schema) {
+    return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
+  }
+
+  const { postId } = req.params;
+  const impulseId = typeof req.body?.impulseId === 'string' ? req.body.impulseId.trim() : '';
+  const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+  const isLiked = req.body?.isLiked === true;
+
+  if (!impulseId || !postId || !userId) {
+    return res.status(400).json({ error: 'impulseId, postId und userId sind erforderlich' });
+  }
+
+  const post = findWeeklyImpulseCommunityPost({ schema, impulseId, postId });
+  if (!post) {
+    return res.status(404).json({ error: 'Community-Post nicht gefunden' });
+  }
+
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  const likedBy = new Set(state.likedByPostId[postId] || []);
+  if (isLiked) {
+    likedBy.add(userId);
+  } else {
+    likedBy.delete(userId);
+  }
+  state.likedByPostId[postId] = [...likedBy];
+
+  const baseLikeCount = Number.isFinite(post.seed_like_count) ? post.seed_like_count : 0;
+  return res.json({
+    liked: isLiked,
+    likeCount: baseLikeCount + state.likedByPostId[postId].length,
+  });
+});
+
+app.post('/api/weekly-impulse/community/posts/:postId/comments', (req, res) => {
+  const schema = getWeeklyImpulseSchema();
+  if (!schema) {
+    return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
+  }
+
+  const { postId } = req.params;
+  const impulseId = typeof req.body?.impulseId === 'string' ? req.body.impulseId.trim() : '';
+  const authorName =
+    typeof req.body?.authorName === 'string' ? req.body.authorName.trim() : '';
+  const role = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
+  const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
+
+  if (!impulseId || !postId || !authorName || !role || !comment) {
+    return res.status(400).json({ error: 'impulseId, postId, authorName, role und comment sind erforderlich' });
+  }
+
+  const post = findWeeklyImpulseCommunityPost({ schema, impulseId, postId });
+  if (!post) {
+    return res.status(404).json({ error: 'Community-Post nicht gefunden' });
+  }
+
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  const comments = state.commentsByPostId[postId] || [];
+  const item = {
+    id: `${postId}_comment_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    authorName,
+    role,
+    text: comment,
+  };
+  comments.push(item);
+  state.commentsByPostId[postId] = comments;
+
+  const baseCommentCount = Array.isArray(post.seed_comments) ? post.seed_comments.length : 0;
+  return res.status(201).json({
+    item,
+    commentCount: baseCommentCount + comments.length,
+  });
+});
+
+app.post('/api/weekly-impulse/community/posts/:postId/report', (req, res) => {
+  const schema = getWeeklyImpulseSchema();
+  if (!schema) {
+    return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
+  }
+
+  const { postId } = req.params;
+  const impulseId = typeof req.body?.impulseId === 'string' ? req.body.impulseId.trim() : '';
+  const reporterUserId =
+    typeof req.body?.reporterUserId === 'string' ? req.body.reporterUserId.trim() : '';
+  const reporterName =
+    typeof req.body?.reporterName === 'string' ? req.body.reporterName.trim() : '';
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+
+  if (!impulseId || !postId || !reporterUserId || !reporterName || !reason) {
+    return res.status(400).json({
+      error: 'impulseId, postId, reporterUserId, reporterName und reason sind erforderlich',
+    });
+  }
+
+  const post = findWeeklyImpulseCommunityPost({ schema, impulseId, postId });
+  if (!post) {
+    return res.status(404).json({ error: 'Community-Post nicht gefunden' });
+  }
+
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  const reports = state.reportsByPostId[postId] || [];
+  const item = {
+    id: `${postId}_report_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    reporterUserId,
+    reporterName,
+    reason,
+    createdAt: new Date().toISOString(),
+  };
+  reports.push(item);
+  state.reportsByPostId[postId] = reports;
+
+  return res.status(201).json({ item, reportCount: reports.length });
+});
+
+app.get('/api/weekly-impulse/community/reports', (req, res) => {
+  const schema = getWeeklyImpulseSchema();
+  if (!schema) {
+    return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
+  }
+
+  const moderatorEmail =
+    typeof req.query.moderatorEmail === 'string' ? req.query.moderatorEmail.trim() : '';
+  const access = ensureInternalModeratorAccess({ email: moderatorEmail, displayName: '' });
+  if (!access.allowed) {
+    return res.status(403).json({ error: 'Moderationszugriff nicht erlaubt' });
+  }
+
+  const impulseId =
+    typeof req.query.impulseId === 'string' && req.query.impulseId.trim()
+      ? req.query.impulseId.trim()
+      : `imp_${schema.id}_gfk_w1`;
+  const includeResolved = req.query.includeResolved === '1';
+
+  const items = buildWeeklyImpulseReportItems({ schema, impulseId }).filter(item =>
+    includeResolved ? true : !item.resolvedAt,
+  );
+  return res.json({ items });
+});
+
+app.post('/api/weekly-impulse/community/reports/:reportId/resolve', (req, res) => {
+  const schema = getWeeklyImpulseSchema();
+  if (!schema) {
+    return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
+  }
+
+  const { reportId } = req.params;
+  const impulseId = typeof req.body?.impulseId === 'string' ? req.body.impulseId.trim() : '';
+  const moderatorName =
+    typeof req.body?.moderatorName === 'string' ? req.body.moderatorName.trim() : '';
+  const moderatorEmail =
+    typeof req.body?.moderatorEmail === 'string' ? req.body.moderatorEmail.trim() : '';
+  const moderatorNote =
+    typeof req.body?.moderatorNote === 'string' ? req.body.moderatorNote.trim() : '';
+
+  const access = ensureInternalModeratorAccess({
+    email: moderatorEmail,
+    displayName: moderatorName,
+  });
+  if (!access.allowed) {
+    return res.status(403).json({ error: 'Moderationszugriff nicht erlaubt' });
+  }
+
+  if (!impulseId || !reportId || !moderatorName) {
+    return res.status(400).json({ error: 'impulseId, reportId und moderatorName sind erforderlich' });
+  }
+
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  for (const reports of Object.values(state.reportsByPostId || {})) {
+    const match = (reports || []).find(item => item.id === reportId);
+    if (match) {
+      match.resolvedAt = new Date().toISOString();
+      match.resolvedBy = moderatorName;
+      match.moderatorNote = moderatorNote;
+      match.lastAction = 'resolved';
+      match.lastActionAt = match.resolvedAt;
+      return res.json({ item: match });
+    }
+  }
+
+  return res.status(404).json({ error: 'Report nicht gefunden' });
+});
+
+app.post('/api/weekly-impulse/community/posts/:postId/moderation-visibility', (req, res) => {
+  const schema = getWeeklyImpulseSchema();
+  if (!schema) {
+    return res.status(500).json({ error: 'Weekly Impulse Schema fehlt' });
+  }
+
+  const { postId } = req.params;
+  const impulseId = typeof req.body?.impulseId === 'string' ? req.body.impulseId.trim() : '';
+  const moderatorName =
+    typeof req.body?.moderatorName === 'string' ? req.body.moderatorName.trim() : '';
+  const moderatorEmail =
+    typeof req.body?.moderatorEmail === 'string' ? req.body.moderatorEmail.trim() : '';
+  const moderatorNote =
+    typeof req.body?.moderatorNote === 'string' ? req.body.moderatorNote.trim() : '';
+  const reportId = typeof req.body?.reportId === 'string' ? req.body.reportId.trim() : '';
+  const hidden = req.body?.hidden === true;
+
+  const access = ensureInternalModeratorAccess({
+    email: moderatorEmail,
+    displayName: moderatorName,
+  });
+  if (!access.allowed) {
+    return res.status(403).json({ error: 'Moderationszugriff nicht erlaubt' });
+  }
+
+  if (!impulseId || !postId || !moderatorName) {
+    return res.status(400).json({ error: 'impulseId, postId und moderatorName sind erforderlich' });
+  }
+
+  const post = findWeeklyImpulseCommunityPost({ schema, impulseId, postId });
+  if (!post) {
+    return res.status(404).json({ error: 'Community-Post nicht gefunden' });
+  }
+
+  const state = getWeeklyImpulseCommunityEntry(impulseId);
+  if (hidden) {
+    state.hiddenPostIds[postId] = {
+      hidden: true,
+      hiddenAt: new Date().toISOString(),
+      hiddenBy: moderatorName,
+    };
+  } else {
+    delete state.hiddenPostIds[postId];
+  }
+
+  if (reportId) {
+    for (const reports of Object.values(state.reportsByPostId || {})) {
+      const match = (reports || []).find(item => item.id === reportId);
+      if (match) {
+        match.moderatorNote = moderatorNote;
+        match.lastAction = hidden ? 'hidden' : 'restored';
+        match.lastActionAt = new Date().toISOString();
+        break;
+      }
+    }
+  }
+
+  return res.json({
+    postId,
+    hidden,
+    hiddenAt: state.hiddenPostIds[postId]?.hiddenAt || null,
+    hiddenBy: state.hiddenPostIds[postId]?.hiddenBy || '',
+  });
 });
 
 // 1. Alle Anbieter abrufen
@@ -3981,6 +4650,244 @@ app.post('/uploads/image', (req, res) => {
   });
 });
 
+// ============================================================================
+// MEAL PLANNER / ESSENSPLANER ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/meal-plans/:familyId?date=YYYY-MM-DD
+ * Hole Essensplan für einen bestimmten Tag einer Familie
+ */
+app.get('/api/meal-plans/:familyId', async (req, res) => {
+  const { familyId } = req.params;
+  const { date } = req.query;
+
+  try {
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required' });
+    }
+
+    const targetDate = new Date(date);
+    targetDate.setUTCHours(0, 0, 0, 0);
+
+    const mealPlan = await prisma.MealPlan.findUnique({
+      where: {
+        familyId_date: {
+          familyId,
+          date: targetDate,
+        },
+      },
+      include: {
+        meals: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    res.json(mealPlan || { familyId, date: targetDate, meals: [] });
+  } catch (err) {
+    console.error('❌ Fehler beim Abrufen des Essensplans:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/meal-plans/:familyId/week?startDate=YYYY-MM-DD
+ * Hole komplette Woche (7 Tage) für eine Familie
+ */
+app.get('/api/meal-plans/:familyId/week', async (req, res) => {
+  const { familyId } = req.params;
+  const { startDate } = req.query;
+
+  try {
+    if (!startDate) {
+      return res.status(400).json({ error: 'startDate query parameter required' });
+    }
+
+    const start = new Date(startDate);
+    start.setUTCHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+
+    const mealPlans = await prisma.mealPlan.findMany({
+      where: {
+        familyId,
+        date: {
+          gte: start,
+          lt: end,
+        },
+      },
+      include: {
+        meals: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    res.json(mealPlans);
+  } catch (err) {
+    console.error('❌ Fehler beim Abrufen der Woche:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/meal-plans/:familyId
+ * Erstelle oder aktualisiere Essensplan für einen Tag
+ */
+app.post('/api/meal-plans/:familyId', async (req, res) => {
+  const { familyId } = req.params;
+  const { date, meals } = req.body;
+
+  if (requireAuthForWrites && !req.headers.authorization) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+
+  try {
+    const targetDate = new Date(date);
+    targetDate.setUTCHours(0, 0, 0, 0);
+
+    // Lösche existierende Meals für diesen Tag
+    await prisma.Meal.deleteMany({
+      where: {
+        mealPlan: {
+          familyId,
+          date: targetDate,
+        },
+      },
+    });
+
+    // Erstelle oder update MealPlan
+    const mealPlan = await prisma.MealPlan.upsert({
+      where: {
+        familyId_date: {
+          familyId,
+          date: targetDate,
+        },
+      },
+      update: { updatedAt: new Date() },
+      create: {
+        familyId,
+        date: targetDate,
+      },
+    });
+
+    // Erstelle neue Meals
+    if (meals && meals.length > 0) {
+      for (const meal of meals) {
+        await prisma.Meal.create({
+          data: {
+            mealPlanId: mealPlan.id,
+            title: meal.title,
+            type: meal.type,
+            description: meal.description || null,
+            ingredients: JSON.stringify(meal.ingredients || []),
+          },
+        });
+      }
+    }
+
+    const updated = await prisma.MealPlan.findUnique({
+      where: { id: mealPlan.id },
+      include: {
+        meals: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    res.status(201).json(updated);
+  } catch (err) {
+    console.error('❌ Fehler beim Erstellen des Essensplans:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/meals/:mealPlanId
+ * Füge einzelne Mahlzeit zum Essensplan hinzu
+ */
+app.post('/api/meals/:mealPlanId', async (req, res) => {
+  const { mealPlanId } = req.params;
+  const { title, type, description, ingredients } = req.body;
+
+  if (requireAuthForWrites && !req.headers.authorization) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+
+  try {
+    const meal = await prisma.Meal.create({
+      data: {
+        mealPlanId,
+        title,
+        type,
+        description: description || null,
+        ingredients: JSON.stringify(ingredients || []),
+      },
+    });
+
+    res.status(201).json(meal);
+  } catch (err) {
+    console.error('❌ Fehler beim Erstellen der Mahlzeit:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/meals/:mealId
+ * Aktualisiere eine Mahlzeit
+ */
+app.put('/api/meals/:mealId', async (req, res) => {
+  const { mealId } = req.params;
+  const { title, type, description, ingredients } = req.body;
+
+  if (requireAuthForWrites && !req.headers.authorization) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+
+  try {
+    const meal = await prisma.Meal.update({
+      where: { id: mealId },
+      data: {
+        title,
+        type,
+        description: description || null,
+        ingredients: JSON.stringify(ingredients || []),
+        updatedAt: new Date(),
+      },
+    });
+
+    res.json(meal);
+  } catch (err) {
+    console.error('❌ Fehler beim Aktualisieren der Mahlzeit:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/meals/:mealId
+ * Lösche eine Mahlzeit
+ */
+app.delete('/api/meals/:mealId', async (req, res) => {
+  const { mealId } = req.params;
+
+  if (requireAuthForWrites && !req.headers.authorization) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+
+  try {
+    await prisma.Meal.delete({
+      where: { id: mealId },
+    });
+
+    res.json({ success: true, message: 'Mahlzeit gelöscht' });
+  } catch (err) {
+    console.error('❌ Fehler beim Löschen der Mahlzeit:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Server starten
 app.listen(PORT, '0.0.0.0', () => {

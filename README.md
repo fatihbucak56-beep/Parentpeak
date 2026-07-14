@@ -176,6 +176,10 @@ Fuer die finale Veroeffentlichung und den Betrieb nach Launch:
 	- `docs/RELEASE_30S_PITCH.md`
 9. Konkretes Solo-Release-Entscheidungsprotokoll (GO mit Auflagen):
 	- `docs/RELEASE_DECISION_PROTOCOL_2026-07-14.md`
+10. T+24h Entscheidungs-Card fuer Rollout-Stufe 10% -> 25%:
+	- `docs/T_PLUS_24H_ROLLOUT_DECISION_CARD.md`
+11. Automatisches GO/HOLD/STOP Script:
+	- `scripts/t_plus_24h_rollout_gate.sh`
 
 Finale Backend Verkabelung (Android + iOS)
 ------------------------------------------

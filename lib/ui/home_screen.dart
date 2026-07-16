@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/main.dart';
@@ -22,6 +24,7 @@ class _FeatureAction {
   final IconData icon;
   final Color color;
   final WidgetBuilder builder;
+  final String? statusHint;
 
   const _FeatureAction({
     required this.label,
@@ -29,11 +32,12 @@ class _FeatureAction {
     required this.icon,
     required this.color,
     required this.builder,
+    this.statusHint,
   });
 }
 
 const String _debugOpenFeature =
-  String.fromEnvironment('PP_DEBUG_OPEN_FEATURE', defaultValue: '');
+    String.fromEnvironment('PP_DEBUG_OPEN_FEATURE', defaultValue: '');
 
 class HomeScreen extends StatefulWidget {
   final String? initialInviteInput;
@@ -47,12 +51,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const String _recentTilesStorageKey = 'home.recent_tiles.v1';
   static const String _tileOrderStorageKey = 'home.tile_order.v1';
+  static const String _parentMatchStorageKey = 'parent_matching.v1';
   static const int _recentTilesLimit = 3;
 
   bool _initialInviteHandled = false;
   bool _debugFeatureHandled = false;
   List<String> _recentTileLabels = const [];
   List<String> _customTileOrderLabels = const [];
+  int _newParentMatchesCount = 0;
 
   @override
   void initState() {
@@ -60,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     languageService.addListener(_onLanguageChanged);
     _restoreRecentTiles();
     _restoreTileOrder();
+    _restoreParentMatchStatusHint();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openInitialInviteIfNeeded();
       _openDebugFeatureIfNeeded();
@@ -223,12 +230,49 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openFeature(_FeatureAction action) async {
     await _storeRecentTileTap(action.label);
     if (!mounted) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: action.builder),
     );
+    if (!mounted) return;
+    if (action.label == 'Eltern Match') {
+      await _restoreParentMatchStatusHint();
+    }
   }
 
+  Future<void> _restoreParentMatchStatusHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_parentMatchStorageKey);
+    if (raw == null || raw.isEmpty) {
+      if (!mounted) return;
+      setState(() => _newParentMatchesCount = 0);
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        if (!mounted) return;
+        setState(() => _newParentMatchesCount = 0);
+        return;
+      }
+
+      final matchedIds =
+          (decoded['matchedIds'] as List?)?.map((e) => e.toString()).toSet() ??
+              <String>{};
+      final seenIds = (decoded['seenMatchedProfileIds'] as List?)
+              ?.map((e) => e.toString())
+              .toSet() ??
+          matchedIds;
+      final unseenCount = matchedIds.difference(seenIds).length;
+
+      if (!mounted) return;
+      setState(() => _newParentMatchesCount = unseenCount);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _newParentMatchesCount = 0);
+    }
+  }
 
   void _onLanguageChanged() {
     if (mounted) {
@@ -244,21 +288,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context);
     final viewportWidth = MediaQuery.sizeOf(context).width;
     final contentMaxWidth = viewportWidth >= 1400
-      ? 1260.0
-      : viewportWidth >= 1024
-        ? 1120.0
-        : double.infinity;
+        ? 1260.0
+        : viewportWidth >= 1024
+            ? 1120.0
+            : double.infinity;
     final horizontalPadding = viewportWidth >= 1024 ? 24.0 : 20.0;
     final gridCrossAxisCount = viewportWidth >= 1220
-      ? 4
-      : viewportWidth >= 860
-        ? 3
-        : 2;
+        ? 4
+        : viewportWidth >= 860
+            ? 3
+            : 2;
     final gridAspectRatio = viewportWidth >= 1220
-      ? 1.42
-      : viewportWidth >= 860
-        ? 1.36
-        : 1.38;
+        ? 1.42
+        : viewportWidth >= 860
+            ? 1.36
+            : 1.38;
 
     final featureActions = <_FeatureAction>[
       _FeatureAction(
@@ -291,8 +335,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       _FeatureAction(
         label: l10n.t('treasureTileTitle', fallback: 'Verschenkmarkt'),
-        description:
-            l10n.t('treasureTileSubtitle', fallback: 'Verschenken, austauschen, Eltern verbinden'),
+        description: l10n.t('treasureTileSubtitle',
+            fallback: 'Verschenken, austauschen, Eltern verbinden'),
         icon: Icons.inventory_2_rounded,
         color: const Color(0xFF1E5CD7),
         builder: (_) => const TreasureHandoverScreen(),
@@ -303,6 +347,11 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.diversity_3_rounded,
         color: const Color(0xFF0EA5A4),
         builder: (_) => const ParentMatchingScreen(),
+        statusHint: _newParentMatchesCount > 0
+            ? (_newParentMatchesCount == 1
+                ? '1 neu bestaetigt'
+                : '$_newParentMatchesCount neu bestaetigt')
+            : null,
       ),
       _FeatureAction(
         label: 'KI Elternberatung',
@@ -346,7 +395,8 @@ class _HomeScreenState extends State<HomeScreen> {
         .whereType<_FeatureAction>()
         .toList();
 
-    final displayName = AuthService.instance.currentUser?.displayName.trim() ?? '';
+    final displayName =
+        AuthService.instance.currentUser?.displayName.trim() ?? '';
     final familyGreeting = displayName.isEmpty
         ? 'Hallo Familie 👋'
         : 'Hallo Familie $displayName 👋';
@@ -361,7 +411,8 @@ class _HomeScreenState extends State<HomeScreen> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(horizontalPadding, 10, horizontalPadding, 8),
+                    padding: EdgeInsets.fromLTRB(
+                        horizontalPadding, 10, horizontalPadding, 8),
                     child: _buildHeroCard(
                       theme,
                       familyGreeting,
@@ -372,7 +423,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
+                    padding: EdgeInsets.fromLTRB(
+                        horizontalPadding, 0, horizontalPadding, 8),
                     child: _buildTodayFlowCard(
                       theme,
                       developmentAction: developmentAction,
@@ -383,7 +435,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: horizontalPadding),
                     child: Container(
                       height: 1,
                       decoration: BoxDecoration(
@@ -400,7 +453,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(horizontalPadding, 2, horizontalPadding, 10),
+                    padding: EdgeInsets.fromLTRB(
+                        horizontalPadding, 2, horizontalPadding, 10),
                     child: Text(
                       'Alle Bereiche',
                       style: theme.textTheme.titleSmall?.copyWith(
@@ -410,7 +464,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 SliverPadding(
-                  padding: EdgeInsets.fromLTRB(horizontalPadding, 14, horizontalPadding, 24),
+                  padding: EdgeInsets.fromLTRB(
+                      horizontalPadding, 14, horizontalPadding, 24),
                   sliver: recentActions.isEmpty
                       ? const SliverToBoxAdapter(child: SizedBox.shrink())
                       : SliverToBoxAdapter(
@@ -422,7 +477,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 for (final action in recentActions)
                                   ActionChip(
-                                    avatar: Icon(action.icon, size: 16, color: action.color),
+                                    avatar: Icon(action.icon,
+                                        size: 16, color: action.color),
                                     label: Text(action.label),
                                     onPressed: () => _openFeature(action),
                                   ),
@@ -432,7 +488,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                 ),
                 SliverPadding(
-                  padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 24),
+                  padding: EdgeInsets.fromLTRB(
+                      horizontalPadding, 0, horizontalPadding, 24),
                   sliver: SliverGrid(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -441,6 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           context,
                           title: action.label,
                           subtitle: action.description,
+                          statusHint: action.statusHint,
                           icon: action.icon,
                           color: action.color,
                           compact: true,
@@ -512,7 +570,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   tooltip: 'Kachel-Sortierung zuruecksetzen',
                   onPressed: onResetTileOrder,
-                  icon: const Icon(Icons.restart_alt_rounded, color: Colors.white),
+                  icon: const Icon(Icons.restart_alt_rounded,
+                      color: Colors.white),
                 ),
             ],
           ),
@@ -595,7 +654,8 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         color: theme.colorScheme.surface,
-        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+        border:
+            Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -609,7 +669,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: const Color(0xFF0EA5A4).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.flag_rounded, color: Color(0xFF0F766E), size: 18),
+                child: const Icon(Icons.flag_rounded,
+                    color: Color(0xFF0F766E), size: 18),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -639,7 +700,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: developmentAction == null
                     ? null
                     : () async {
-                        await ProductMetricsService.instance.recordHomeQuickCheckCtaTap(
+                        await ProductMetricsService.instance
+                            .recordHomeQuickCheckCtaTap(
                           userId: AuthService.instance.currentUser?.uid,
                         );
                         await _openFeature(developmentAction);
@@ -648,19 +710,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: const Text('Jetzt Kurzcheck'),
               ),
               OutlinedButton.icon(
-                onPressed: chatAction == null ? null : () => _openFeature(chatAction),
+                onPressed:
+                    chatAction == null ? null : () => _openFeature(chatAction),
                 icon: const Icon(Icons.tips_and_updates_rounded),
                 label: const Text('Frage die KI'),
               ),
               OutlinedButton.icon(
                 onPressed: () async {
-                  await ProductMetricsService.instance.recordHomeDevelopmentDirectCtaTap(
+                  await ProductMetricsService.instance
+                      .recordHomeDevelopmentDirectCtaTap(
                     userId: AuthService.instance.currentUser?.uid,
                   );
                   if (!mounted) return;
                   await Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+                      builder: (_) =>
+                          const EntwicklungImpulseScreen(initialTabIndex: 1),
                     ),
                   );
                 },
@@ -668,7 +733,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: const Text('Direkt Entwicklung'),
               ),
               OutlinedButton.icon(
-                onPressed: calendarAction == null ? null : () => _openFeature(calendarAction),
+                onPressed: calendarAction == null
+                    ? null
+                    : () => _openFeature(calendarAction),
                 icon: const Icon(Icons.calendar_month_rounded),
                 label: const Text('Zum Kalender'),
               ),
@@ -686,9 +753,11 @@ class _HomeScreenState extends State<HomeScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+              border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.2)),
             ),
             child: Wrap(
               spacing: 8,
@@ -698,7 +767,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: chatAction == null
                       ? null
                       : () async {
-                          await ProductMetricsService.instance.recordHomeFallbackRouteTap(
+                          await ProductMetricsService.instance
+                              .recordHomeFallbackRouteTap(
                             from: 'calendar',
                             to: 'chat',
                             userId: AuthService.instance.currentUser?.uid,
@@ -711,7 +781,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 OutlinedButton.icon(
                   onPressed: () async {
-                    await ProductMetricsService.instance.recordHomeFallbackRouteTap(
+                    await ProductMetricsService.instance
+                        .recordHomeFallbackRouteTap(
                       from: 'chat',
                       to: 'development',
                       userId: AuthService.instance.currentUser?.uid,
@@ -719,7 +790,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (!mounted) return;
                     await Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+                        builder: (_) =>
+                            const EntwicklungImpulseScreen(initialTabIndex: 1),
                       ),
                     );
                   },
@@ -746,6 +818,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context, {
     required String title,
     required String subtitle,
+    String? statusHint,
     required Color color,
     required IconData icon,
     bool compact = false,
@@ -760,8 +833,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onLongPress: onLongPress,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final compactTile =
-                compact || constraints.maxWidth < 150 || constraints.maxHeight < 210;
+            final compactTile = compact ||
+                constraints.maxWidth < 150 ||
+                constraints.maxHeight < 210;
 
             return Container(
               padding: EdgeInsets.all(compactTile ? 9 : 14),
@@ -783,9 +857,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: compactTile ? 28 : 42,
                     decoration: BoxDecoration(
                       color: color,
-                      borderRadius: BorderRadius.circular(compactTile ? 10 : 14),
+                      borderRadius:
+                          BorderRadius.circular(compactTile ? 10 : 14),
                     ),
-                    child: Icon(icon, color: Colors.white, size: compactTile ? 15 : 22),
+                    child: Icon(icon,
+                        color: Colors.white, size: compactTile ? 15 : 22),
                   ),
                   SizedBox(height: compactTile ? 4 : 8),
                   Text(
@@ -814,6 +890,31 @@ class _HomeScreenState extends State<HomeScreen> {
                     maxLines: compactTile ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (statusHint != null && statusHint.trim().isNotEmpty) ...[
+                    SizedBox(height: compactTile ? 4 : 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0xFF86EFAC),
+                        ),
+                      ),
+                      child: Text(
+                        statusHint,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: const Color(0xFF166534),
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                   if (!compactTile) ...[
                     const Spacer(),
                     Align(

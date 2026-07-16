@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trusted_circle_demo/models/trusted_device.dart';
+import 'package:parentpeak/models/trusted_device.dart';
 
 void main() {
   test('import works', () {

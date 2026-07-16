@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
+import 'package:parentpeak/logic/auth_service.dart';
 
 class PaywallScreen extends StatelessWidget {
   final VoidCallback? onSubscribed;

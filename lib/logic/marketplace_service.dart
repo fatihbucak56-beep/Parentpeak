@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
 
 class Provider {
   final String id;

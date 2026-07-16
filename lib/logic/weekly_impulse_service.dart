@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models_and_widgets/weekly_impulse_feature.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models_and_widgets/weekly_impulse_feature.dart';
 
 import 'backend_api_client.dart';
 

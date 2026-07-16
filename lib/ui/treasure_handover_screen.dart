@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/treasure_listing_service.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
-import 'package:trusted_circle_demo/models/treasure_listing.dart';
-import 'package:trusted_circle_demo/ui/treasure_upload_screen.dart';
+import 'package:parentpeak/logic/treasure_listing_service.dart';
+import 'package:parentpeak/l10n/app_localizations.dart';
+import 'package:parentpeak/models/treasure_listing.dart';
+import 'package:parentpeak/ui/treasure_upload_screen.dart';
 
 enum TreasureHandoverMode { coffeeChat, flyingSwap }
 

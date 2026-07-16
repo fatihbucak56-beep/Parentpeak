@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/logic/meetup_chat_service.dart';
-import 'package:trusted_circle_demo/models/meetup_chat.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/logic/meetup_chat_service.dart';
+import 'package:parentpeak/models/meetup_chat.dart';
 
 class MeetupChatScreen extends StatefulWidget {
   final MeetupEvent event;

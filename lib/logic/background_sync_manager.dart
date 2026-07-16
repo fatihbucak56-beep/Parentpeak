@@ -1,15 +1,13 @@
 import 'dart:async';
 
-/// Mock BackgroundSyncManager for the demo. In production this would handle
-/// Firebase background messages and secure storage.
+/// Background sync hook for app startup. Platform-specific background message
+/// registration can be wired here when enabled by the app configuration.
 class BackgroundSyncManager {
   static Future<void> initialize() async {
-    // In demo we don't hook into Firebase; in production register onBackgroundMessage
-    return Future.value();
+    return Future<void>.value();
   }
 
   static Future<void> simulateKeyRotation(String packageUuid) async {
-    // Simulate background sync
     await Future.delayed(const Duration(milliseconds: 500));
   }
 }

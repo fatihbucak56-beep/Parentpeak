@@ -1,12 +1,12 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
-import 'package:trusted_circle_demo/models/cooking_hub.dart';
-import 'package:trusted_circle_demo/models/kitchen_sos.dart';
-import 'package:trusted_circle_demo/models/kitchen_sos_response.dart';
-import 'package:trusted_circle_demo/models/local_help_profile.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
+import 'package:parentpeak/models/cooking_hub.dart';
+import 'package:parentpeak/models/kitchen_sos.dart';
+import 'package:parentpeak/models/kitchen_sos_response.dart';
+import 'package:parentpeak/models/local_help_profile.dart';
 
 class KettenbrecherBackendService {
   KettenbrecherBackendService({this.apiClient});

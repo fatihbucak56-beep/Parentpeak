@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/models/recipe.dart';
 
 /// SimpleMealPlanner: Clean, focused meal planning for real parents.
 /// 

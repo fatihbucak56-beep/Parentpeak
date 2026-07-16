@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:parentpeak/config/api_config.dart';
 
 class LegalInfoScreen extends StatelessWidget {
   const LegalInfoScreen({super.key});

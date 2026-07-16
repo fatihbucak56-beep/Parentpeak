@@ -1,4 +1,4 @@
-import 'package:trusted_circle_demo/models/meetup_event.dart';
+import 'package:parentpeak/models/meetup_event.dart';
 
 class EventParticipation {
   final String id;

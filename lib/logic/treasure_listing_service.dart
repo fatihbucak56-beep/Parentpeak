@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:trusted_circle_demo/models/treasure_listing.dart';
+import 'package:parentpeak/models/treasure_listing.dart';
 
 class TreasureListingService {
   TreasureListingService._();

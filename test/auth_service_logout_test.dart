@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

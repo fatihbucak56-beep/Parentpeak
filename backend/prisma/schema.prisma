@@ -406,3 +406,113 @@ model Meal {
   @@index([mealPlanId])
   @@index([type])
 }
+
+// ============================================================================
+// SHARED RECIPES - Gemeinsam Satt (Modern & Secure)
+// ============================================================================
+
+model SharedRecipe {
+  id                    String   @id @default(cuid())
+  externalId            String?  @unique
+  
+  // Creator & Metadata
+  creatorUserId         String?
+  familyId              String?
+  title                 String
+  description           String?
+  category              String   // breakfast, lunch, dinner, snack, dessert, etc.
+  difficulty            String   @default("mittel") // leicht, mittel, schwer
+  prepTimeMinutes       Int?
+  servings              Int      @default(2)
+  
+  // Recipe Content
+  ingredients           String   // JSON array: [{name, quantity, unit}]
+  instructions          String   // JSON array: [step1, step2, ...]
+  
+  // Media & SEO
+  imageUrl              String?
+  tags                  String[] // JSON array
+  
+  // Community Features
+  rating                Decimal  @default(0) @db.Decimal(3, 2)
+  ratingCount           Int      @default(0)
+  isFavorited           Boolean  @default(false)
+  favoritedByCount      Int      @default(0)
+  viewCount             Int      @default(0)
+  
+  // Moderation
+  isPublished           Boolean  @default(true)
+  isFeatured            Boolean  @default(false)
+  reportedCount         Int      @default(0)
+  lastReportedAt        DateTime?
+  
+  // Audit
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  publishedAt           DateTime?
+  
+  // Relations
+  ratings               RecipeRating[]
+  favorites             RecipeFavorite[]
+  reports               RecipeReport[]
+  
+  @@index([familyId])
+  @@index([creatorUserId])
+  @@index([category])
+  @@index([difficulty])
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([rating])
+  @@index([createdAt])
+}
+
+model RecipeRating {
+  id                    String   @id @default(cuid())
+  
+  recipeId              String
+  recipe                SharedRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  
+  userId                String
+  rating                Int      // 1-5 stars
+  comment               String?
+  
+  createdAt             DateTime @default(now())
+  
+  @@unique([recipeId, userId])
+  @@index([recipeId])
+  @@index([userId])
+  @@index([rating])
+}
+
+model RecipeFavorite {
+  id                    String   @id @default(cuid())
+  
+  recipeId              String
+  recipe                SharedRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  
+  userId                String
+  createdAt             DateTime @default(now())
+  
+  @@unique([recipeId, userId])
+  @@index([recipeId])
+  @@index([userId])
+}
+
+model RecipeReport {
+  id                    String   @id @default(cuid())
+  
+  recipeId              String
+  recipe                SharedRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  
+  reportedById          String
+  reason                String   // spam, offensive, incorrect, allergen_concern, etc.
+  details               String?
+  status                String   @default("pending") // pending, reviewed, resolved, dismissed
+  
+  createdAt             DateTime @default(now())
+  resolvedAt            DateTime?
+  
+  @@index([recipeId])
+  @@index([reportedById])
+  @@index([status])
+}

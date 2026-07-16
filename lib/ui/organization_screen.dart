@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
-import 'package:trusted_circle_demo/logic/shopping_backend_service.dart';
-import 'package:trusted_circle_demo/logic/todo_backend_service.dart';
-import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
-import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/product_metrics_service.dart';
+import 'package:parentpeak/logic/shopping_backend_service.dart';
+import 'package:parentpeak/logic/todo_backend_service.dart';
+import 'package:parentpeak/ui/calendar_screen.dart';
+import 'package:parentpeak/ui/chat_screen.dart';
+import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
 
 enum _OrganizationMode { todos, shopping }
 

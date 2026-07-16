@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/models/cooking_hub.dart';
-import 'package:trusted_circle_demo/models/day_plan.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/models/cooking_hub.dart';
+import 'package:parentpeak/models/day_plan.dart';
+import 'package:parentpeak/models/recipe.dart';
 
 class CleanWeeklyPlannerView extends StatefulWidget {
   const CleanWeeklyPlannerView({

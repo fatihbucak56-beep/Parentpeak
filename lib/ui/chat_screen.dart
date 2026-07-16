@@ -2,13 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
-import 'package:trusted_circle_demo/logic/pedagogical_chat_backend.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
-import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/gemini_ai_service.dart';
+import 'package:parentpeak/logic/pedagogical_chat_backend.dart';
+import 'package:parentpeak/logic/product_metrics_service.dart';
+import 'package:parentpeak/ui/calendar_screen.dart';
+import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});

@@ -65,7 +65,7 @@ flutter run -d RFCY30GWBEB
 
 ### **Flow 7: Host-Dashboard**
 1. (Hier musst du manuell navigieren)
-2. Stelle den Demo-Host-ID sicher: `host_demo_001`
+2. Stelle eine gueltige Host-ID sicher: `host_test_001` oder eine reale Host-ID aus deiner Umgebung
 3. Dashboard zeigt:
    - 📊 Statistiken
    - 📬 Ausstehende Anfragen
@@ -101,7 +101,7 @@ flutter run -d RFCY30GWBEB
 ### **Problem: Button "Aktivitäten & Treffs" nicht sichtbar**
 → Überprüfe HomeScreen imports:
 ```dart
-import 'package:trusted_circle_demo/ui/meetup_screen.dart';
+import 'package:your_package/ui/meetup_screen.dart';
 ```
 
 ### **Problem: MeetupScreen zeigt keine Events**
@@ -125,12 +125,12 @@ flutter devices
 
 ---
 
-## 💡 Demo-Accounts
+## 💡 Test-Accounts
 
 | Role | ID | Bemerkung |
 |------|-----|-----------|
-| User | `user_demo_001` | Regular User |
-| Host | `host_demo_001` | Host/Admin |
+| User | `user_test_001` | Regular User |
+| Host | `host_test_001` | Host/Admin |
 
 ---
 

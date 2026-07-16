@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/event_service.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/ui/create_event_screen.dart';
-import 'package:trusted_circle_demo/ui/event_detail_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/event_service.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/ui/create_event_screen.dart';
+import 'package:parentpeak/ui/event_detail_screen.dart';
 
 class MeetupScreen extends StatefulWidget {
   const MeetupScreen({super.key});

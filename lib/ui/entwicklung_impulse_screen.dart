@@ -3,14 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
-import 'package:trusted_circle_demo/logic/weekly_impulse_service.dart';
-import 'package:trusted_circle_demo/models_and_widgets/weekly_impulse_feature.dart';
-import 'package:trusted_circle_demo/models_and_widgets/development_schema_feature.dart';
-import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/product_metrics_service.dart';
+import 'package:parentpeak/logic/weekly_impulse_service.dart';
+import 'package:parentpeak/models_and_widgets/weekly_impulse_feature.dart';
+import 'package:parentpeak/models_and_widgets/development_schema_feature.dart';
+import 'package:parentpeak/ui/calendar_screen.dart';
+import 'package:parentpeak/ui/chat_screen.dart';
 
 class EntwicklungImpulseScreen extends StatefulWidget {
   final int initialTabIndex;

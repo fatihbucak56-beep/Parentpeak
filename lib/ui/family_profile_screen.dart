@@ -6,16 +6,16 @@ import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/ui/backup_qr_scan_screen.dart';
-import 'package:trusted_circle_demo/main.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
-import 'package:trusted_circle_demo/logic/account_data_cleanup_service.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/models/trusted_device.dart';
-import 'package:trusted_circle_demo/ui/auth/login_screen.dart';
-import 'package:trusted_circle_demo/ui/legal_info_screen.dart';
-import 'package:trusted_circle_demo/ui/privacy_settings_screen.dart';
-import 'package:trusted_circle_demo/widgets/ala_rengin_flag_painter.dart';
+import 'package:parentpeak/ui/backup_qr_scan_screen.dart';
+import 'package:parentpeak/main.dart';
+import 'package:parentpeak/l10n/app_localizations_all.dart';
+import 'package:parentpeak/logic/account_data_cleanup_service.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/models/trusted_device.dart';
+import 'package:parentpeak/ui/auth/login_screen.dart';
+import 'package:parentpeak/ui/legal_info_screen.dart';
+import 'package:parentpeak/ui/privacy_settings_screen.dart';
+import 'package:parentpeak/widgets/ala_rengin_flag_painter.dart';
 
 class FamilyProfileScreen extends StatefulWidget {
   final List<TrustedDevice> devices;

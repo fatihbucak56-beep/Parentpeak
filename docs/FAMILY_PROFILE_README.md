@@ -31,7 +31,7 @@
 
 ### 1. **Widget verwenden**
 ```dart
-import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
+import 'package:parentpeak/ui/family_profile_screen.dart';
 
 Navigator.push(
   context,
@@ -41,7 +41,7 @@ Navigator.push(
 
 ### 2. **Strings übersetzen**
 ```dart
-import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+import 'package:parentpeak/l10n/app_localizations_all.dart';
 
 String title = AppStringsManager.getString('de', 'family_profile_title');
 // Returns: "Parentpeak Familie"

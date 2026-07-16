@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/calendar_backend_service.dart';
-import 'package:trusted_circle_demo/logic/notification_service.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
-import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
-import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/calendar_backend_service.dart';
+import 'package:parentpeak/logic/notification_service.dart';
+import 'package:parentpeak/logic/product_metrics_service.dart';
+import 'package:parentpeak/ui/chat_screen.dart';
+import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
+import 'package:parentpeak/widgets/language_change_mixin.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});

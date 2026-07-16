@@ -9,7 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
+import 'package:parentpeak/logic/product_metrics_service.dart';
 
 import 'development_schema_data.dart';
 

@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
-import 'package:trusted_circle_demo/logic/family_circle_service.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
+import 'package:parentpeak/logic/family_circle_service.dart';
 
 BackendApiClient _clientWith(http.Client httpClient) {
   return BackendApiClient(

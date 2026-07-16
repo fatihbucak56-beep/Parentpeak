@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models/event_invitation.dart';
-import 'package:trusted_circle_demo/models/event_participation.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models/event_invitation.dart';
+import 'package:parentpeak/models/event_participation.dart';
+import 'package:parentpeak/models/meetup_event.dart';
 
 import 'backend_api_client.dart';
 import 'backend_service_factory.dart';

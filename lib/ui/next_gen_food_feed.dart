@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/next_gen_food_feed_backend_service.dart';
-import 'package:trusted_circle_demo/logic/next_gen_food_feed_service.dart';
-import 'package:trusted_circle_demo/models/audio_hack.dart';
-import 'package:trusted_circle_demo/models/community_snack.dart';
-import 'package:trusted_circle_demo/models/ingredient_share.dart';
-import 'package:trusted_circle_demo/models/kitchen_sos.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/next_gen_food_feed_backend_service.dart';
+import 'package:parentpeak/logic/next_gen_food_feed_service.dart';
+import 'package:parentpeak/models/audio_hack.dart';
+import 'package:parentpeak/models/community_snack.dart';
+import 'package:parentpeak/models/ingredient_share.dart';
+import 'package:parentpeak/models/kitchen_sos.dart';
+import 'package:parentpeak/models/recipe.dart';
 import 'package:video_player/video_player.dart';
 
 class NextGenFoodFeedScreen extends StatefulWidget {

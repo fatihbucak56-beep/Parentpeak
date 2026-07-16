@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models/food_share_post.dart';
-import 'package:trusted_circle_demo/models/shared_recipe.dart';
-import 'package:trusted_circle_demo/models/meal_plan.dart';
-import 'package:trusted_circle_demo/services/meal_planner_service.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models/food_share_post.dart';
+import 'package:parentpeak/models/shared_recipe.dart';
+import 'package:parentpeak/models/meal_plan.dart';
+import 'package:parentpeak/services/meal_planner_service.dart';
 
 // ============================================================
 // GEMEINSAM SATT — Eltern-Essenssolidarität

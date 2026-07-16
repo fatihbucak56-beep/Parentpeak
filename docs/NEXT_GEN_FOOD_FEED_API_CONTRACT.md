@@ -56,7 +56,7 @@ Request:
     "latitude": 52.5211,
     "longitude": 13.4061
   },
-  "familyId": "demo-family-001",
+  "familyId": "example-family-001",
   "schemaVersion": "v1"
 }
 ```
@@ -130,7 +130,7 @@ Request:
   "durationSeconds": 14,
   "upvotes": 0,
   "transcript": "Nimm doppelt Frischkaese, dann wird es cremiger.",
-  "familyId": "demo-family-001",
+  "familyId": "example-family-001",
   "schemaVersion": "v1"
 }
 ```
@@ -185,7 +185,7 @@ Request:
     "longitude": 13.4060
   },
   "note": "Fast neu, nur 2 EL genutzt.",
-  "familyId": "demo-family-001",
+  "familyId": "example-family-001",
   "schemaVersion": "v1"
 }
 ```

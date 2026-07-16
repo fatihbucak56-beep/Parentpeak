@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
+import 'package:parentpeak/l10n/app_localizations.dart';
 import '../models/trusted_device.dart';
 import 'revoke_confirmation_dialog.dart';
 

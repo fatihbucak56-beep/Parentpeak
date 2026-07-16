@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:parentpeak/config/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/logic/advanced_balance_provider.dart';
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
-import 'package:trusted_circle_demo/models/care_activity.dart';
-import 'package:trusted_circle_demo/models/expense.dart';
+import 'package:parentpeak/logic/advanced_balance_provider.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
+import 'package:parentpeak/models/care_activity.dart';
+import 'package:parentpeak/models/expense.dart';
 
 class FinanceStorageSnapshot {
   const FinanceStorageSnapshot({

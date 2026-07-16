@@ -2,8 +2,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:http/http.dart' as http;
-import 'package:trusted_circle_demo/logic/revocation_service_impl.dart';
-import 'package:trusted_circle_demo/logic/secure_storage.dart';
+import 'package:parentpeak/logic/revocation_service_impl.dart';
+import 'package:parentpeak/logic/secure_storage.dart';
 
 class FakeStorage implements SecureStorage {
   final Map<String, String> _data = {};

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/ui/payment_screen.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/ui/payment_screen.dart';
 
 MeetupEvent _buildEvent() {
   return MeetupEvent(

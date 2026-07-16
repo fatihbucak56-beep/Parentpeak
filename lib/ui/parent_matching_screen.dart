@@ -3,10 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/parent_matching_backend_service.dart';
-import 'package:trusted_circle_demo/ui/match_conversation_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/parent_matching_backend_service.dart';
+import 'package:parentpeak/ui/match_conversation_screen.dart';
 
 class ParentMatchingScreen extends StatefulWidget {
   const ParentMatchingScreen({

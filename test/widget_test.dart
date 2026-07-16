@@ -4,17 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/family_circle_service.dart';
-import 'package:trusted_circle_demo/main.dart';
-import 'package:trusted_circle_demo/models/trusted_device.dart';
-import 'package:trusted_circle_demo/ui/auth/login_screen.dart';
-import 'package:trusted_circle_demo/ui/auth/paywall_screen.dart';
-import 'package:trusted_circle_demo/ui/create_event_screen.dart';
-import 'package:trusted_circle_demo/ui/events_activities_screen.dart';
-import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
-import 'package:trusted_circle_demo/ui/home_screen.dart';
+import 'package:parentpeak/l10n/app_localizations.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/family_circle_service.dart';
+import 'package:parentpeak/main.dart';
+import 'package:parentpeak/models/trusted_device.dart';
+import 'package:parentpeak/ui/auth/login_screen.dart';
+import 'package:parentpeak/ui/auth/paywall_screen.dart';
+import 'package:parentpeak/ui/create_event_screen.dart';
+import 'package:parentpeak/ui/events_activities_screen.dart';
+import 'package:parentpeak/ui/family_circle_screen.dart';
+import 'package:parentpeak/ui/home_screen.dart';
 
 Widget _buildTestApp(Widget child) {
   return MaterialApp(

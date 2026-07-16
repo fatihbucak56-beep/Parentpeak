@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:parentpeak/config/api_config.dart';
 
 class GeminiAIService {
   final String _modelName;

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/models/trusted_device.dart';
-import 'package:trusted_circle_demo/ui/contacts_screen.dart';
-import 'package:trusted_circle_demo/ui/device_management_screen.dart';
-import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
-import 'package:trusted_circle_demo/ui/safety_guide_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/models/trusted_device.dart';
+import 'package:parentpeak/ui/contacts_screen.dart';
+import 'package:parentpeak/ui/device_management_screen.dart';
+import 'package:parentpeak/ui/family_profile_screen.dart';
+import 'package:parentpeak/ui/safety_guide_screen.dart';
 
 class ProfileSafetyScreen extends StatelessWidget {
   const ProfileSafetyScreen({

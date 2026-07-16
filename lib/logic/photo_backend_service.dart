@@ -1,4 +1,4 @@
-import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:parentpeak/config/api_config.dart';
 
 import 'backend_api_client.dart';
 

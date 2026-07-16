@@ -1,4 +1,4 @@
-import 'package:trusted_circle_demo/models/kitchen_sos.dart';
+import 'package:parentpeak/models/kitchen_sos.dart';
 
 class CommunitySnack {
   const CommunitySnack({

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/photo_backend_service.dart';
-import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/photo_backend_service.dart';
+import 'package:parentpeak/widgets/language_change_mixin.dart';
 
 class PhotosScreen extends StatefulWidget {
   const PhotosScreen({super.key});

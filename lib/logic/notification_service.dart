@@ -4,7 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
 
 class NotificationService {
   NotificationService._();

@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models/audio_hack.dart';
-import 'package:trusted_circle_demo/models/community_snack.dart';
-import 'package:trusted_circle_demo/models/ingredient_share.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models/audio_hack.dart';
+import 'package:parentpeak/models/community_snack.dart';
+import 'package:parentpeak/models/ingredient_share.dart';
 
 import 'backend_api_client.dart';
 

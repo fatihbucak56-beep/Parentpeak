@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/models/cooking_hub.dart';
+import 'package:parentpeak/models/cooking_hub.dart';
 
 enum KitaHarmonyStatus { harmonisch, ueberschneidung, unbekannt }
 

@@ -5,8 +5,8 @@
 // ignore_for_file: file_names
 
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+import 'package:parentpeak/ui/family_profile_screen.dart';
+import 'package:parentpeak/l10n/app_localizations_all.dart';
 
 Future<bool> _mockOnRevoke(String deviceUuid, String deviceName) async {
   return true;
@@ -22,8 +22,8 @@ Widget _buildFamilyProfileDemoScreen() {
 // ============================================================
 // 1. IMPORT IN MAIN.DART
 // ============================================================
-// import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
-// import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+// import 'package:parentpeak/ui/family_profile_screen.dart';
+// import 'package:parentpeak/l10n/app_localizations_all.dart';
 
 // ============================================================
 // 2. NAVIGATION ZUM FAMILY PROFILE SCREEN
@@ -300,7 +300,7 @@ class _RtlAwareLayoutState extends State<RtlAwareLayout> {
 
 1. BASIC IMPORT & NAVIGATION:
    
-   import 'package:trusted_circle_demo/ui/family_profile_screen.dart';
+   import 'package:parentpeak/ui/family_profile_screen.dart';
    
    Navigator.push(
      context,
@@ -309,7 +309,7 @@ class _RtlAwareLayoutState extends State<RtlAwareLayout> {
 
 2. MIT LOCALIZATION:
    
-   import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
+   import 'package:parentpeak/l10n/app_localizations_all.dart';
    
    String title = AppStringsManager.getString('de', 'family_profile_title');
 

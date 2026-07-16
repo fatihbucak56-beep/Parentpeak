@@ -2,13 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:trusted_circle_demo/logic/event_backend_service.dart';
-import 'package:trusted_circle_demo/logic/event_service.dart';
-import 'package:trusted_circle_demo/logic/family_circle_service.dart';
-import 'package:trusted_circle_demo/models/family_contact.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/ui/family_circle_screen.dart';
+import 'package:parentpeak/logic/event_backend_service.dart';
+import 'package:parentpeak/logic/event_service.dart';
+import 'package:parentpeak/logic/family_circle_service.dart';
+import 'package:parentpeak/models/family_contact.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/ui/family_circle_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
-import 'package:trusted_circle_demo/ui/revoke_confirmation_dialog.dart';
+import 'package:parentpeak/l10n/app_localizations.dart';
+import 'package:parentpeak/ui/revoke_confirmation_dialog.dart';
 
 void main() {
   testWidgets('Revoke dialog enables confirm only on exact name', (WidgetTester tester) async {

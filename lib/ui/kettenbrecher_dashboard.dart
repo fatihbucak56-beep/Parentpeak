@@ -1,22 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/kettenbrecher_ai_service.dart';
-import 'package:trusted_circle_demo/logic/kettenbrecher_backend_service.dart';
-import 'package:trusted_circle_demo/logic/kettenbrecher_service.dart';
-import 'package:trusted_circle_demo/logic/weekly_planner_storage_service.dart';
-import 'package:trusted_circle_demo/models/cooking_hub.dart';
-import 'package:trusted_circle_demo/models/day_plan.dart';
-import 'package:trusted_circle_demo/models/guerilla_recipe.dart';
-import 'package:trusted_circle_demo/models/kitchen_sos.dart';
-import 'package:trusted_circle_demo/models/kitchen_sos_response.dart';
-import 'package:trusted_circle_demo/models/local_help_profile.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
-import 'package:trusted_circle_demo/ui/next_gen_food_feed.dart';
-import 'package:trusted_circle_demo/ui/weekly_planner_screen.dart';
-import 'package:trusted_circle_demo/ui/widgets/clean_weekly_planner_view.dart';
-import 'package:trusted_circle_demo/ui/widgets/meal_planner_card.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/kettenbrecher_ai_service.dart';
+import 'package:parentpeak/logic/kettenbrecher_backend_service.dart';
+import 'package:parentpeak/logic/kettenbrecher_service.dart';
+import 'package:parentpeak/logic/weekly_planner_storage_service.dart';
+import 'package:parentpeak/models/cooking_hub.dart';
+import 'package:parentpeak/models/day_plan.dart';
+import 'package:parentpeak/models/guerilla_recipe.dart';
+import 'package:parentpeak/models/kitchen_sos.dart';
+import 'package:parentpeak/models/kitchen_sos_response.dart';
+import 'package:parentpeak/models/local_help_profile.dart';
+import 'package:parentpeak/models/recipe.dart';
+import 'package:parentpeak/ui/next_gen_food_feed.dart';
+import 'package:parentpeak/ui/weekly_planner_screen.dart';
+import 'package:parentpeak/ui/widgets/clean_weekly_planner_view.dart';
+import 'package:parentpeak/ui/widgets/meal_planner_card.dart';
 
 class KettenbrecherDashboard extends StatefulWidget {
   const KettenbrecherDashboard({super.key});

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/models/payment_transaction.dart';
-import 'package:trusted_circle_demo/logic/payment_service.dart';
-import 'package:trusted_circle_demo/logic/event_service.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/models/payment_transaction.dart';
+import 'package:parentpeak/logic/payment_service.dart';
+import 'package:parentpeak/logic/event_service.dart';
 
 class PaymentScreen extends StatefulWidget {
   final MeetupEvent event;

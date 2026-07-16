@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/main.dart';
+import 'package:parentpeak/main.dart';
 
 /// Ein Wrapper-Widget das jeden Widget-Baum mit Sprachänderungen verbindet
 /// Nutze dies um alle Screens automatisch zu aktualisieren wenn die Sprache wechselt

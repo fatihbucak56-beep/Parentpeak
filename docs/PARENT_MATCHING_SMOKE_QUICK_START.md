@@ -34,6 +34,6 @@ bash scripts/release_smoke_suite.sh
 
 - `RUN_PARENT_MATCHING_SMOKE=1` aktiviert den Parent-Matching-Teil
 - `PARENT_MATCHING_SMOKE_USER_ID` optional, Standard: `smoke-user-001`
-- `PARENT_MATCHING_SMOKE_FAMILY_ID` optional, Standard: `demo-family-001`
+- `PARENT_MATCHING_SMOKE_FAMILY_ID` optional, Standard: `smoke-family-001`
 - `BACKEND_API_TOKEN` erforderlich
 - `BACKEND_BASE_URL` erforderlich

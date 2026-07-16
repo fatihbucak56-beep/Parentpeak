@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 
-import 'package:trusted_circle_demo/logic/kettenbrecher_service.dart';
-import 'package:trusted_circle_demo/models/audio_hack.dart';
-import 'package:trusted_circle_demo/models/community_snack.dart';
-import 'package:trusted_circle_demo/models/ingredient_share.dart';
-import 'package:trusted_circle_demo/models/kitchen_sos.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/logic/kettenbrecher_service.dart';
+import 'package:parentpeak/models/audio_hack.dart';
+import 'package:parentpeak/models/community_snack.dart';
+import 'package:parentpeak/models/ingredient_share.dart';
+import 'package:parentpeak/models/kitchen_sos.dart';
+import 'package:parentpeak/models/recipe.dart';
 
 class NextGenFoodFeedService {
   const NextGenFoodFeedService({KettenbrecherService? kettenbrecherService})

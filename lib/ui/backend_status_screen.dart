@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
 
 class BackendStatusScreen extends StatefulWidget {
   const BackendStatusScreen({super.key});

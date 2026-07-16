@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/todo_backend_service.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/todo_backend_service.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});

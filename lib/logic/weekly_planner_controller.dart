@@ -1,8 +1,8 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/models/day_plan.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/models/day_plan.dart';
+import 'package:parentpeak/models/recipe.dart';
 
 enum ChildStage { baby, toddler, school }
 

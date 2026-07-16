@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models/meal_plan.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models/meal_plan.dart';
 
 class MealPlannerService {
   static Uri? _resolveUri(String relativePath) {

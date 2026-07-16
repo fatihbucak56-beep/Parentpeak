@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
+import 'package:parentpeak/widgets/language_change_mixin.dart';
 
 enum ContactCategory { emergency, family, medical, school, other }
 

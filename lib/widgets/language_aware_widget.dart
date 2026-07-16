@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/main.dart';
+import 'package:parentpeak/main.dart';
 
 /// Ein Wrapper, der jeden Widget zwingt, sich neu zu rendern wenn die Sprache wechselt
 class LanguageAwareWidget extends StatefulWidget {

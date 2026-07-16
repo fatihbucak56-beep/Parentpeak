@@ -1,4 +1,4 @@
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/models/recipe.dart';
 
 class AiTarnStep {
   final String hiddenIngredient;

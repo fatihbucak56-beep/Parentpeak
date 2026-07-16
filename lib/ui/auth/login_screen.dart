@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/ui/auth/register_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/ui/auth/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onLoginSuccess;

@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models/day_plan.dart';
-import 'package:trusted_circle_demo/models/meal_memory.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models/day_plan.dart';
+import 'package:parentpeak/models/meal_memory.dart';
 
 import 'backend_api_client.dart';
 

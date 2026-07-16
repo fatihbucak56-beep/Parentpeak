@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
+import 'package:parentpeak/l10n/app_localizations.dart';
 
 class RevokeConfirmationDialog extends StatefulWidget {
   final String deviceName;

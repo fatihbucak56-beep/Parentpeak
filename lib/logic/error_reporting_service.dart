@@ -2,7 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io' show Platform;
-import 'package:trusted_circle_demo/firebase_options.dart';
+import 'package:parentpeak/firebase_options.dart';
 
 class ErrorReportingService {
   ErrorReportingService._();

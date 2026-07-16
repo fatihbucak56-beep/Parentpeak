@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/main.dart';
+import 'package:parentpeak/main.dart';
 
 /// Mixin für alle Screens um auf Sprachänderungen zu reagieren
 mixin LanguageChangeMixin<T extends StatefulWidget> on State<T> {

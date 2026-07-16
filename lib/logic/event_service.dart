@@ -1,9 +1,9 @@
 import 'dart:math' as math;
-import 'package:trusted_circle_demo/logic/event_backend_service.dart';
-import 'package:trusted_circle_demo/logic/family_circle_service.dart';
-import 'package:trusted_circle_demo/models/event_invitation.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/models/event_participation.dart';
+import 'package:parentpeak/logic/event_backend_service.dart';
+import 'package:parentpeak/logic/family_circle_service.dart';
+import 'package:parentpeak/models/event_invitation.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/models/event_participation.dart';
 
 class EventService {
   final _familyCircleService = FamilyCircleService.instance;

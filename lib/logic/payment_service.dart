@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/models/payment_transaction.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/models/payment_transaction.dart';
 
 class PaymentService {
   PaymentService({BackendApiClient? apiClient})

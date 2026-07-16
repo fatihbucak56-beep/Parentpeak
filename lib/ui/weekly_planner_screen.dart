@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/weekly_planner_controller.dart';
-import 'package:trusted_circle_demo/logic/weekly_planner_storage_service.dart';
-import 'package:trusted_circle_demo/models/meal_memory.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
-import 'package:trusted_circle_demo/ui/weekly_planner_view.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/weekly_planner_controller.dart';
+import 'package:parentpeak/logic/weekly_planner_storage_service.dart';
+import 'package:parentpeak/models/meal_memory.dart';
+import 'package:parentpeak/models/recipe.dart';
+import 'package:parentpeak/ui/weekly_planner_view.dart';
 
 class WeeklyPlannerScreen extends StatefulWidget {
   const WeeklyPlannerScreen({super.key});

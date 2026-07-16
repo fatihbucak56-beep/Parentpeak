@@ -19,10 +19,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trusted_circle_demo/logic/notification_service.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/notification_service.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
 
 // ─── Result-Typen ────────────────────────────────────────────────────────────
 

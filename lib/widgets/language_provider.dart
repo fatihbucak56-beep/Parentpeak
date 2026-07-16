@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/main.dart';
+import 'package:parentpeak/main.dart';
 
 /// InheritedWidget um Sprache durch den Widget-Baum zu propagieren
 class LanguageProvider extends InheritedWidget {

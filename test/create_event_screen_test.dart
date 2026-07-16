@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trusted_circle_demo/ui/create_event_screen.dart';
+import 'package:parentpeak/ui/create_event_screen.dart';
 
 void main() {
   testWidgets('CreateEventScreen shows photo section controls',

@@ -3,11 +3,11 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/models/cooking_hub.dart';
-import 'package:trusted_circle_demo/models/guerilla_recipe.dart';
-import 'package:trusted_circle_demo/models/kitchen_sos.dart';
-import 'package:trusted_circle_demo/models/local_help_profile.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/models/cooking_hub.dart';
+import 'package:parentpeak/models/guerilla_recipe.dart';
+import 'package:parentpeak/models/kitchen_sos.dart';
+import 'package:parentpeak/models/local_help_profile.dart';
+import 'package:parentpeak/models/recipe.dart';
 
 class HubPlanningResult {
   const HubPlanningResult({

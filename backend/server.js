@@ -5657,6 +5657,486 @@ app.delete('/api/meals/:mealId', async (req, res) => {
   }
 });
 
+// ============================================================================
+// PARENT MATCHING - Modern Smart Matching Algorithm
+// ============================================================================
+
+/**
+ * Haversine formula for geographic distance
+ */
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Jaccard similarity for interest/hobby matching
+ */
+function jaccardSimilarity(arr1, arr2) {
+  if (!Array.isArray(arr1)) arr1 = [];
+  if (!Array.isArray(arr2)) arr2 = [];
+  const set1 = new Set(arr1.map(s => String(s).toLowerCase()));
+  const set2 = new Set(arr2.map(s => String(s).toLowerCase()));
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+  return union.size === 0 ? 0 : intersection.size / union.size;
+}
+
+/**
+ * POST /api/parent-matching/profiles
+ * Create or update user's matching profile
+ */
+app.post('/api/parent-matching/profiles', async (req, res) => {
+  const { userId, name, age, city, latitude, longitude, interests, languages, valuesFocus, childAges, familyForm, bio } = req.body;
+
+  if (!userId || !name || !city) {
+    return res.status(400).json({ error: 'userId, name, city erforderlich' });
+  }
+
+  if (age && (age < 18 || age > 120)) {
+    return res.status(400).json({ error: 'Alter muss zwischen 18 und 120 liegen' });
+  }
+
+  try {
+    const profile = await prisma.parentMatchingProfile.upsert({
+      where: { ownerUserId: userId },
+      update: {
+        name: String(name).slice(0, 100),
+        age: age ? parseInt(age, 10) : undefined,
+        city: String(city).slice(0, 50),
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        bio: bio ? String(bio).slice(0, 500) : null,
+        interests: Array.isArray(interests) ? interests.map(i => String(i).slice(0, 50)) : [],
+        languages: Array.isArray(languages) ? languages.map(l => String(l).slice(0, 30)) : [],
+        valuesFocus: Array.isArray(valuesFocus) ? valuesFocus.map(v => String(v).slice(0, 50)) : [],
+        childAges: Array.isArray(childAges) ? childAges.map(c => String(c).slice(0, 30)) : [],
+        familyForm: familyForm ? String(familyForm).slice(0, 50) : null,
+        updatedAt: new Date(),
+      },
+      create: {
+        ownerUserId: userId,
+        name: String(name).slice(0, 100),
+        age: age ? parseInt(age, 10) : null,
+        city: String(city).slice(0, 50),
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        bio: bio ? String(bio).slice(0, 500) : null,
+        interests: Array.isArray(interests) ? interests.map(i => String(i).slice(0, 50)) : [],
+        languages: Array.isArray(languages) ? languages.map(l => String(l).slice(0, 30)) : [],
+        valuesFocus: Array.isArray(valuesFocus) ? valuesFocus.map(v => String(v).slice(0, 50)) : [],
+        childAges: Array.isArray(childAges) ? childAges.map(c => String(c).slice(0, 30)) : [],
+        familyForm: familyForm ? String(familyForm).slice(0, 50) : null,
+      },
+    });
+
+    res.json({ profile });
+  } catch (err) {
+    console.error('❌ Fehler beim Speichern des Matching-Profils:', err);
+    res.status(500).json({ error: 'Profil konnte nicht gespeichert werden' });
+  }
+});
+
+/**
+ * GET /api/parent-matching/find
+ * Find matching parent profiles with smart algorithm
+ */
+app.get('/api/parent-matching/find', async (req, res) => {
+  const { userId, limit = '10', maxDistanceKm = '25' } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId erforderlich' });
+  }
+
+  try {
+    const userProfile = await prisma.parentMatchingProfile.findUnique({
+      where: { ownerUserId: userId },
+    });
+
+    if (!userProfile) {
+      return res.json({ matches: [], message: 'Benutzerprofil nicht gefunden' });
+    }
+
+    const allProfiles = await prisma.parentMatchingProfile.findMany({
+      where: {
+        isActive: true,
+        ownerUserId: { not: userId },
+      },
+      take: 100, // Get top candidates to score
+    });
+
+    const scored = allProfiles.map(candidate => {
+      let score = 0;
+      let breakdown = {};
+
+      // Geographic proximity (0-40 points)
+      if (userProfile.latitude && userProfile.longitude && candidate.latitude && candidate.longitude) {
+        const distance = haversineDistance(
+          userProfile.latitude,
+          userProfile.longitude,
+          candidate.latitude,
+          candidate.longitude,
+        );
+
+        breakdown.distanceKm = Math.round(distance);
+        if (distance <= parseFloat(maxDistanceKm)) {
+          breakdown.proximityScore = Math.max(0, 40 - distance);
+          score += breakdown.proximityScore;
+        }
+      }
+
+      // Interest overlap (0-30 points)
+      const interestSimilarity = jaccardSimilarity(userProfile.interests, candidate.interests);
+      breakdown.interestSimilarity = Math.round(interestSimilarity * 100) / 100;
+      breakdown.interestScore = Math.round(interestSimilarity * 30);
+      score += breakdown.interestScore;
+
+      // Child age compatibility (0-20 points)
+      const childAgeSimilarity = jaccardSimilarity(userProfile.childAges, candidate.childAges);
+      breakdown.childAgeScore = Math.round(childAgeSimilarity * 20);
+      score += breakdown.childAgeScore;
+
+      // Family form alignment (0-10 points)
+      if (userProfile.familyForm && candidate.familyForm && userProfile.familyForm === candidate.familyForm) {
+        breakdown.familyFormScore = 10;
+        score += 10;
+      }
+
+      return {
+        profile: candidate,
+        score: Math.round(score),
+        breakdown,
+      };
+    });
+
+    const topMatches = scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, parseInt(limit, 10))
+      .filter(m => m.score > 0);
+
+    res.json({ matches: topMatches });
+  } catch (err) {
+    console.error('❌ Fehler beim Matching-Algorithmus:', err);
+    res.status(500).json({ error: 'Matching konnte nicht durchgeführt werden' });
+  }
+});
+
+/**
+ * POST /api/parent-matching/record-action
+ * Record user action (like, contact, pass)
+ */
+app.post('/api/parent-matching/record-action', async (req, res) => {
+  const { userId, matchedProfileId, action, familyId } = req.body;
+
+  if (!userId || !matchedProfileId || !action) {
+    return res.status(400).json({ error: 'userId, matchedProfileId, action erforderlich' });
+  }
+
+  const validActions = ['like', 'contact', 'pass', 'favorite'];
+  if (!validActions.includes(action)) {
+    return res.status(400).json({ error: `Ungültige Aktion. Erlaubt: ${validActions.join(', ')}` });
+  }
+
+  try {
+    const record = await prisma.parentMatchingAction.create({
+      data: {
+        familyId: familyId || userId,
+        profileId: matchedProfileId,
+        action,
+        actorUserId: userId,
+      },
+    });
+
+    res.status(201).json({ action: record });
+  } catch (err) {
+    console.error('❌ Fehler beim Speichern der Aktion:', err);
+    res.status(500).json({ error: 'Aktion konnte nicht gespeichert werden' });
+  }
+});
+
+// ============================================================================
+// GEMEINSAM SATT - Shared Recipes (Modern & Secure)
+// ============================================================================
+
+/**
+ * GET /api/food-feed/recipes
+ * List recipes with pagination, filtering, and sorting
+ */
+app.get('/api/food-feed/recipes', async (req, res) => {
+  const { skip = '0', take = '20', category, difficulty, search, sortBy = 'createdAt' } = req.query;
+
+  try {
+    const where = {
+      isPublished: true,
+    };
+
+    if (category) {
+      where.category = String(category);
+    }
+
+    if (difficulty) {
+      where.difficulty = String(difficulty);
+    }
+
+    if (search) {
+      const searchTerm = String(search).toLowerCase();
+      where.OR = [
+        { title: { contains: searchTerm, mode: 'insensitive' } },
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+        { tags: { hasSome: [searchTerm] } },
+      ];
+    }
+
+    const recipes = await prisma.sharedRecipe.findMany({
+      where,
+      orderBy: sortBy === 'rating' ? { rating: 'desc' } : { createdAt: 'desc' },
+      skip: Math.max(0, parseInt(skip, 10)),
+      take: Math.min(100, parseInt(take, 10)),
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        category: true,
+        difficulty: true,
+        prepTimeMinutes: true,
+        servings: true,
+        imageUrl: true,
+        rating: true,
+        ratingCount: true,
+        viewCount: true,
+        createdAt: true,
+      },
+    });
+
+    const total = await prisma.sharedRecipe.count({ where });
+
+    res.json({ recipes, total, pagination: { skip: parseInt(skip, 10), take: parseInt(take, 10) } });
+  } catch (err) {
+    console.error('❌ Fehler beim Abrufen von Rezepten:', err);
+    res.status(500).json({ error: 'Rezepte konnten nicht geladen werden' });
+  }
+});
+
+/**
+ * GET /api/food-feed/recipes/:id
+ * Get full recipe details
+ */
+app.get('/api/food-feed/recipes/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({
+      where: { id },
+      include: { ratings: { take: 5 } },
+    });
+
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    // Increment view count
+    await prisma.sharedRecipe.update({
+      where: { id },
+      data: { viewCount: { increment: 1 } },
+    });
+
+    res.json({ recipe });
+  } catch (err) {
+    console.error('❌ Fehler beim Abrufen des Rezepts:', err);
+    res.status(500).json({ error: 'Rezept konnte nicht geladen werden' });
+  }
+});
+
+/**
+ * POST /api/food-feed/recipes
+ * Create a new shared recipe (requires auth)
+ */
+app.post('/api/food-feed/recipes', async (req, res) => {
+  const { userId, familyId, title, description, category, difficulty, prepTimeMinutes, servings, ingredients, instructions, tags, imageUrl } = req.body;
+
+  // Validation
+  if (!userId) {
+    return res.status(401).json({ error: 'userId erforderlich' });
+  }
+
+  if (!title || title.length < 3 || title.length > 200) {
+    return res.status(400).json({ error: 'Titel muss zwischen 3 und 200 Zeichen lang sein' });
+  }
+
+  if (!Array.isArray(ingredients) || ingredients.length === 0) {
+    return res.status(400).json({ error: 'Mindestens ein Zutat erforderlich' });
+  }
+
+  if (!Array.isArray(instructions) || instructions.length === 0) {
+    return res.status(400).json({ error: 'Mindestens eine Anweisung erforderlich' });
+  }
+
+  if (!['leicht', 'mittel', 'schwer'].includes(difficulty)) {
+    return res.status(400).json({ error: 'Ungültiger Schwierigkeitsgrad' });
+  }
+
+  try {
+    const recipe = await prisma.sharedRecipe.create({
+      data: {
+        creatorUserId: userId,
+        familyId: familyId || null,
+        title: String(title).slice(0, 200),
+        description: description ? String(description).slice(0, 1000) : null,
+        category: String(category || 'dinner').slice(0, 50),
+        difficulty: String(difficulty),
+        prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes, 10) : null,
+        servings: servings ? Math.max(1, parseInt(servings, 10)) : 2,
+        ingredients: JSON.stringify(
+          ingredients.map(ing => ({
+            name: String(ing.name || '').slice(0, 100),
+            quantity: String(ing.quantity || ''),
+            unit: String(ing.unit || '').slice(0, 20),
+          })),
+        ),
+        instructions: JSON.stringify(instructions.map(ins => String(ins).slice(0, 500))),
+        tags: Array.isArray(tags) ? tags.map(t => String(t).slice(0, 30)).slice(0, 10) : [],
+        imageUrl: imageUrl ? String(imageUrl).slice(0, 500) : null,
+        publishedAt: new Date(),
+      },
+    });
+
+    res.status(201).json({ recipe });
+  } catch (err) {
+    console.error('❌ Fehler beim Erstellen des Rezepts:', err);
+    res.status(500).json({ error: 'Rezept konnte nicht erstellt werden' });
+  }
+});
+
+/**
+ * PUT /api/food-feed/recipes/:id
+ * Update a recipe (owner only)
+ */
+app.put('/api/food-feed/recipes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId, title, description, category, difficulty, prepTimeMinutes, servings, ingredients, instructions, tags } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'userId erforderlich' });
+  }
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    if (recipe.creatorUserId !== userId) {
+      return res.status(403).json({ error: 'Nur der Ersteller kann dieses Rezept bearbeiten' });
+    }
+
+    const updated = await prisma.sharedRecipe.update({
+      where: { id },
+      data: {
+        title: title ? String(title).slice(0, 200) : undefined,
+        description: description !== undefined ? (description ? String(description).slice(0, 1000) : null) : undefined,
+        category: category ? String(category).slice(0, 50) : undefined,
+        difficulty: difficulty && ['leicht', 'mittel', 'schwer'].includes(difficulty) ? difficulty : undefined,
+        prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes, 10) : undefined,
+        servings: servings ? Math.max(1, parseInt(servings, 10)) : undefined,
+        ingredients: ingredients ? JSON.stringify(ingredients.map(ing => ({ name: String(ing.name || '').slice(0, 100), quantity: String(ing.quantity || ''), unit: String(ing.unit || '').slice(0, 20) }))) : undefined,
+        instructions: instructions ? JSON.stringify(instructions.map(ins => String(ins).slice(0, 500))) : undefined,
+        tags: tags ? tags.map(t => String(t).slice(0, 30)).slice(0, 10) : undefined,
+        updatedAt: new Date(),
+      },
+    });
+
+    res.json({ recipe: updated });
+  } catch (err) {
+    console.error('❌ Fehler beim Aktualisieren des Rezepts:', err);
+    res.status(500).json({ error: 'Rezept konnte nicht aktualisiert werden' });
+  }
+});
+
+/**
+ * DELETE /api/food-feed/recipes/:id
+ * Delete a recipe (owner only)
+ */
+app.delete('/api/food-feed/recipes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'userId erforderlich' });
+  }
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    if (recipe.creatorUserId !== userId) {
+      return res.status(403).json({ error: 'Nur der Ersteller kann dieses Rezept löschen' });
+    }
+
+    await prisma.sharedRecipe.delete({ where: { id } });
+
+    res.json({ success: true, message: 'Rezept gelöscht' });
+  } catch (err) {
+    console.error('❌ Fehler beim Löschen des Rezepts:', err);
+    res.status(500).json({ error: 'Rezept konnte nicht gelöscht werden' });
+  }
+});
+
+/**
+ * POST /api/food-feed/recipes/:id/rate
+ * Rate a recipe
+ */
+app.post('/api/food-feed/recipes/:id/rate', async (req, res) => {
+  const { id } = req.params;
+  const { userId, rating, comment } = req.body;
+
+  if (!userId || !rating) {
+    return res.status(400).json({ error: 'userId und rating erforderlich' });
+  }
+
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Rating muss zwischen 1 und 5 liegen' });
+  }
+
+  try {
+    // Upsert rating
+    const recipeRating = await prisma.recipeRating.upsert({
+      where: { recipeId_userId: { recipeId: id, userId } },
+      update: { rating, comment: comment ? String(comment).slice(0, 500) : null },
+      create: { recipeId: id, userId, rating, comment: comment ? String(comment).slice(0, 500) : null },
+    });
+
+    // Recalculate recipe rating stats
+    const ratings = await prisma.recipeRating.findMany({ where: { recipeId: id } });
+    const avgRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length : 0;
+
+    await prisma.sharedRecipe.update({
+      where: { id },
+      data: {
+        rating: Math.round(avgRating * 100) / 100,
+        ratingCount: ratings.length,
+      },
+    });
+
+    res.status(201).json({ rating: recipeRating });
+  } catch (err) {
+    console.error('❌ Fehler beim Speichern des Ratings:', err);
+    res.status(500).json({ error: 'Rating konnte nicht gespeichert werden' });
+  }
+});
+
 // Server starten
 app.listen(PORT, '0.0.0.0', () => {
   if (allowedOrigins.length > 0) {

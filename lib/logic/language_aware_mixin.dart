@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/main.dart';
+import 'package:parentpeak/main.dart';
 
 /// Mixin für State-Klassen, die auf Sprachänderungen reagieren sollen
 mixin LanguageAwareMixin<T extends StatefulWidget> on State<T> {

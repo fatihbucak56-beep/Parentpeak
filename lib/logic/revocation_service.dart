@@ -1,17 +1,29 @@
 import 'dart:async';
 
-/// Simple demo stub used by the demo app. Production implementation is
-/// provided by `RevocationServiceImpl` in `revocation_service_impl.dart`.
+import 'package:http/http.dart' as http;
+
+import 'revocation_service_impl.dart';
+import 'secure_storage.dart';
+
+/// Thin compatibility wrapper around the production revocation client.
 class RevocationService {
-  final String baseUrl;
-  final Duration delay;
+  final RevocationServiceImpl _impl;
 
-  RevocationService({required this.baseUrl, this.delay = const Duration(seconds: 1)});
+  RevocationService({
+    required String baseUrl,
+    http.Client? client,
+    SecureStorage? secureStorage,
+  }) : _impl = RevocationServiceImpl(
+          baseUrl: baseUrl,
+          client: client,
+          secureStorage: secureStorage,
+        );
 
-  /// Simulate revoke - succeeds for non-empty uuids except "fail-uuid"
   Future<bool> revokeDevice(String deviceUuid, String reason) async {
-    await Future.delayed(delay);
-    if (deviceUuid == 'fail-uuid') return false;
-    return true;
+    return _impl.revokeDevice(deviceUuid, reason);
   }
+
+  Future<void> localWipe() => _impl.localWipe();
+
+  void dispose() => _impl.dispose();
 }

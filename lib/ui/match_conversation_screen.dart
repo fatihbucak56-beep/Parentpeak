@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/parent_matching_backend_service.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/parent_matching_backend_service.dart';
 import 'dart:async';
 
 class MatchConversationScreen extends StatefulWidget {

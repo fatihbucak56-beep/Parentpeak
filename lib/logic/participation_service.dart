@@ -1,6 +1,6 @@
-import 'package:trusted_circle_demo/models/event_participation.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/logic/event_backend_service.dart';
+import 'package:parentpeak/models/event_participation.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/logic/event_backend_service.dart';
 
 class ParticipationService {
   static final List<EventParticipation> _participations = [];

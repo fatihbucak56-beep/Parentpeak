@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/participation_service.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/ui/meetup_chat_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/participation_service.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/ui/meetup_chat_screen.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final MeetupEvent event;

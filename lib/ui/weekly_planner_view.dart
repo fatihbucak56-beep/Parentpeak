@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:trusted_circle_demo/logic/weekly_planner_controller.dart';
-import 'package:trusted_circle_demo/models/day_plan.dart';
-import 'package:trusted_circle_demo/models/recipe.dart';
+import 'package:parentpeak/logic/weekly_planner_controller.dart';
+import 'package:parentpeak/models/day_plan.dart';
+import 'package:parentpeak/models/recipe.dart';
 
 enum PlannerTone { warm, clear, premium }
 

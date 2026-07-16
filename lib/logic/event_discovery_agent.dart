@@ -13,8 +13,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/models/discovered_event.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/models/discovered_event.dart';
 
 class EventDiscoveryAgent {
   static final EventDiscoveryAgent instance = EventDiscoveryAgent._();

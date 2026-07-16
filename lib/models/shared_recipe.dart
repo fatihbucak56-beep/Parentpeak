@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/models/food_share_post.dart';
+import 'package:parentpeak/models/food_share_post.dart';
 
 enum RecipeDifficulty { einfach, mittel, fortgeschritten }
 

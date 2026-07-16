@@ -1,8 +1,8 @@
-import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:parentpeak/config/api_config.dart';
 import 'package:flutter/foundation.dart';
-import 'package:trusted_circle_demo/logic/backend_api_client.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/models/meetup_chat.dart';
+import 'package:parentpeak/logic/backend_api_client.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/models/meetup_chat.dart';
 
 class MeetupChatService {
   MeetupChatService({BackendApiClient? apiClient})

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:trusted_circle_demo/l10n/app_localizations.dart';
-import 'package:trusted_circle_demo/models/trusted_device.dart';
-import 'package:trusted_circle_demo/ui/device_management_screen.dart';
+import 'package:parentpeak/l10n/app_localizations.dart';
+import 'package:parentpeak/models/trusted_device.dart';
+import 'package:parentpeak/ui/device_management_screen.dart';
 
 void main() {
   testWidgets('DeviceManagementScreen revoke flow success', (WidgetTester tester) async {

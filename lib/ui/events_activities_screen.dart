@@ -1,19 +1,19 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
-import 'package:trusted_circle_demo/logic/event_discovery_agent.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
-import 'package:trusted_circle_demo/logic/event_service.dart';
-import 'package:trusted_circle_demo/models/event_invitation.dart';
-import 'package:trusted_circle_demo/models/discovered_event.dart';
-import 'package:trusted_circle_demo/models/meetup_event.dart';
-import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
-import 'package:trusted_circle_demo/ui/create_event_screen.dart';
-import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
-import 'package:trusted_circle_demo/ui/event_detail_screen.dart';
-import 'package:trusted_circle_demo/ui/event_invitations_screen.dart';
+import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/event_discovery_agent.dart';
+import 'package:parentpeak/logic/product_metrics_service.dart';
+import 'package:parentpeak/logic/event_service.dart';
+import 'package:parentpeak/models/event_invitation.dart';
+import 'package:parentpeak/models/discovered_event.dart';
+import 'package:parentpeak/models/meetup_event.dart';
+import 'package:parentpeak/ui/calendar_screen.dart';
+import 'package:parentpeak/ui/chat_screen.dart';
+import 'package:parentpeak/ui/create_event_screen.dart';
+import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
+import 'package:parentpeak/ui/event_detail_screen.dart';
+import 'package:parentpeak/ui/event_invitations_screen.dart';
 
 class EventsActivitiesScreen extends StatefulWidget {
   const EventsActivitiesScreen({super.key});

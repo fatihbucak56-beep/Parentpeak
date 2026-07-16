@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
+import 'package:parentpeak/logic/gemini_ai_service.dart';
 
 class PedagogicalChatBackend {
   PedagogicalChatBackend({GeminiAIService? geminiService})

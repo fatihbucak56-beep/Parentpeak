@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/models/care_activity.dart';
-import 'package:trusted_circle_demo/models/expense.dart';
+import 'package:parentpeak/models/care_activity.dart';
+import 'package:parentpeak/models/expense.dart';
 
 class SavingsOpportunity {
   const SavingsOpportunity({

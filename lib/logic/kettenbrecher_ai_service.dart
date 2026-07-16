@@ -1,5 +1,5 @@
-import 'package:trusted_circle_demo/config/api_config.dart';
-import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
+import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/gemini_ai_service.dart';
 
 class KettenbrecherAiService {
   KettenbrecherAiService({GeminiAIService? geminiService})

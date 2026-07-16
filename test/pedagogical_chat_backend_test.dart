@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trusted_circle_demo/logic/pedagogical_chat_backend.dart';
+import 'package:parentpeak/logic/pedagogical_chat_backend.dart';
 
 void main() {
   group('PedagogicalChatBackend safety routing', () {

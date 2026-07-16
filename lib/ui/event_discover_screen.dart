@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:trusted_circle_demo/logic/event_discovery_agent.dart';
-import 'package:trusted_circle_demo/models/discovered_event.dart';
+import 'package:parentpeak/logic/event_discovery_agent.dart';
+import 'package:parentpeak/models/discovered_event.dart';
 
 class EventDiscoverScreen extends StatefulWidget {
   const EventDiscoverScreen({super.key});

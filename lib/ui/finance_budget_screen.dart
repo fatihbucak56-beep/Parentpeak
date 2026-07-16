@@ -9,12 +9,12 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:trusted_circle_demo/logic/advanced_balance_provider.dart';
-import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/finance_storage_service.dart';
-import 'package:trusted_circle_demo/logic/receipt_ocr_service.dart';
-import 'package:trusted_circle_demo/models/care_activity.dart';
-import 'package:trusted_circle_demo/models/expense.dart';
+import 'package:parentpeak/logic/advanced_balance_provider.dart';
+import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/logic/finance_storage_service.dart';
+import 'package:parentpeak/logic/receipt_ocr_service.dart';
+import 'package:parentpeak/models/care_activity.dart';
+import 'package:parentpeak/models/expense.dart';
 
 class FinanceBudgetScreen extends StatefulWidget {
   const FinanceBudgetScreen({super.key});

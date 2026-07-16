@@ -170,7 +170,7 @@ class GemeinsamSattBackendService {
         'sortBy': sortBy,
       };
 
-      final uri = Uri.parse('$_apiUrl/food-feed/recipes').replace(queryParameters: queryParams);
+      final uri = Uri.parse('$_apiUrl/api/food-feed/recipes').replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(uri);
 
@@ -198,7 +198,7 @@ class GemeinsamSattBackendService {
 
     try {
       final response = await _httpClient.get(
-        Uri.parse('$_apiUrl/food-feed/recipes/$id'),
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$id'),
       );
 
       if (response.statusCode == 404) {
@@ -243,7 +243,7 @@ class GemeinsamSattBackendService {
 
     try {
       final response = await _httpClient.post(
-        Uri.parse('$_apiUrl/food-feed/recipes'),
+        Uri.parse('$_apiUrl/api/food-feed/recipes'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'userId': userId,
@@ -303,7 +303,7 @@ class GemeinsamSattBackendService {
       if (tags != null) body['tags'] = tags;
 
       final response = await _httpClient.put(
-        Uri.parse('$_apiUrl/food-feed/recipes/$id'),
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$id'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
@@ -335,7 +335,7 @@ class GemeinsamSattBackendService {
 
     try {
       final response = await _httpClient.delete(
-        Uri.parse('$_apiUrl/food-feed/recipes/$id'),
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$id'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'userId': userId}),
       );
@@ -374,7 +374,7 @@ class GemeinsamSattBackendService {
 
     try {
       final response = await _httpClient.post(
-        Uri.parse('$_apiUrl/food-feed/recipes/$recipeId/rate'),
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/rate'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'userId': userId,

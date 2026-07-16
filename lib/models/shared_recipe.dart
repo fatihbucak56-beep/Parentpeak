@@ -20,6 +20,10 @@ class SharedRecipe {
   final List<String> likedByUserIds;
   final List<FoodShareComment> comments;
   final bool isSavedByMe;
+  final double averageRating;
+  final int ratingCount;
+  final int viewCount;
+  final double relevanceScore;
   final DateTime createdAt;
 
   const SharedRecipe({
@@ -39,6 +43,10 @@ class SharedRecipe {
     this.likedByUserIds = const [],
     this.comments = const [],
     this.isSavedByMe = false,
+    this.averageRating = 0,
+    this.ratingCount = 0,
+    this.viewCount = 0,
+    this.relevanceScore = 0,
     required this.createdAt,
   });
 
@@ -68,6 +76,10 @@ class SharedRecipe {
     List<String>? likedByUserIds,
     List<FoodShareComment>? comments,
     bool? isSavedByMe,
+    double? averageRating,
+    int? ratingCount,
+    int? viewCount,
+    double? relevanceScore,
   }) {
     return SharedRecipe(
       id: id,
@@ -86,6 +98,10 @@ class SharedRecipe {
       likedByUserIds: likedByUserIds ?? this.likedByUserIds,
       comments: comments ?? this.comments,
       isSavedByMe: isSavedByMe ?? this.isSavedByMe,
+      averageRating: averageRating ?? this.averageRating,
+      ratingCount: ratingCount ?? this.ratingCount,
+      viewCount: viewCount ?? this.viewCount,
+      relevanceScore: relevanceScore ?? this.relevanceScore,
       createdAt: createdAt,
     );
   }

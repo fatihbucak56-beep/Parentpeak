@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/models/food_share_post.dart';
 import 'package:parentpeak/models/shared_recipe.dart';
 import 'package:parentpeak/models/meal_plan.dart';
@@ -23,17 +24,33 @@ class GemeinsamSattScreen extends StatefulWidget {
   State<GemeinsamSattScreen> createState() => _GemeinsamSattScreenState();
 }
 
+enum _RecipeFeedMode { forYou, newest, bestRated, quickMeals }
+
 class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     with SingleTickerProviderStateMixin {
-  static const String _myUserId = 'mama_fatih';
   late final TabController _tabController;
   final TextEditingController _commentController = TextEditingController();
-  final backend_service.GemeinsamSattBackendService _service = 
+  final backend_service.GemeinsamSattBackendService _service =
       backend_service.GemeinsamSattBackendService();
 
   late List<FoodSharePost> _posts;
   late List<SharedRecipe> _recipes;
   late WeekPlan _weekPlan;
+  bool _isLoadingRecipes = false;
+  _RecipeFeedMode _recipeFeedMode = _RecipeFeedMode.forYou;
+
+  String get _myUserId =>
+      AuthService.instance.currentUser?.uid.trim().isNotEmpty == true
+          ? AuthService.instance.currentUser!.uid.trim()
+          : 'guest_parent';
+
+  String get _myDisplayName {
+    final raw = AuthService.instance.currentUser?.displayName.trim();
+    if (raw == null || raw.isEmpty) {
+      return 'Ein Elternteil';
+    }
+    return raw;
+  }
 
   @override
   void initState() {
@@ -42,7 +59,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     _posts = _buildDemoPosts();
     _recipes = [];
     _weekPlan = _buildDemoWeekPlan();
-    
+
     // Load recipes from backend
     _loadRecipes();
     // Load meal plan from API
@@ -69,65 +86,125 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   }
 
   Future<void> _loadRecipes() async {
+    setState(() => _isLoadingRecipes = true);
     try {
-      // Fetch recipes from backend with pagination
       final result = await _service.fetchRecipes(
         skip: 0,
-        take: 20,
+        take: 40,
+        sortBy:
+            _recipeFeedMode == _RecipeFeedMode.bestRated ? 'rating' : 'createdAt',
       );
-      
-      if (result.containsKey('recipes') && result['recipes'] is List) {
-        final recipes = (result['recipes'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(_convertBackendRecipeToUI)
-            .toList();
-        
-        if (mounted) {
-          setState(() {
-            _recipes = recipes;
-          });
-        }
-      }
+
+      final backendRecipes = (result['recipes'] as List?)
+              ?.whereType<backend_service.SharedRecipe>()
+              .toList() ??
+          const <backend_service.SharedRecipe>[];
+
+      final recipes = backendRecipes
+          .map(_convertBackendRecipeToUI)
+          .map((recipe) => recipe.copyWith(relevanceScore: _scoreForCurrentParent(recipe)))
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _recipes = recipes;
+        _isLoadingRecipes = false;
+      });
     } catch (e) {
       debugPrint('GemeinsamSattScreen._loadRecipes(): failed: $e');
-      // Fallback to demo recipes
-      if (mounted) {
-        setState(() {
-          _recipes = _buildDemoRecipes();
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _recipes = _buildDemoRecipes()
+            .map((recipe) =>
+                recipe.copyWith(relevanceScore: _scoreForCurrentParent(recipe)))
+            .toList();
+        _isLoadingRecipes = false;
+      });
     }
   }
 
   // Convert backend recipe format to UI model
-  SharedRecipe _convertBackendRecipeToUI(Map<String, dynamic> data) {
-    final title = (data['title'] ?? '').toString();
-    final category = (data['category'] ?? 'Allgemein').toString();
-    
+  SharedRecipe _convertBackendRecipeToUI(backend_service.SharedRecipe data) {
+    final title = data.title;
+    final category = data.category;
+    final ingredients = data.ingredients
+        .map((e) =>
+            '${e['quantity'] ?? ''} ${e['unit'] ?? ''} ${e['name'] ?? ''}'.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
     return SharedRecipe(
-      id: (data['id'] ?? '').toString(),
-      authorId: (data['creatorUserId'] ?? '').toString(),
-      authorName: _getUserDisplayName(data['creatorUserId']),
-      authorInitials: _getInitials((data['creatorUserId'] ?? '').toString()),
-      authorColor: _getColorForAuthor((data['creatorUserId'] ?? '').toString()),
+      id: data.id,
+      authorId: (data.creatorUserId ?? '').toString(),
+      authorName: _getUserDisplayName(data.creatorUserId),
+      authorInitials: _getInitials((data.creatorUserId ?? '').toString()),
+      authorColor: _getColorForAuthor((data.creatorUserId ?? '').toString()),
       title: title,
-      description: (data['description'] ?? '').toString(),
+      description: (data.description ?? '').toString(),
       imageEmoji: _getEmojiForCategory(category),
-      durationMinutes: (data['prepTimeMinutes'] as num?)?.toInt() ?? 30,
-      difficulty: _parseDifficulty(data['difficulty']),
-      tags: (data['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      likedByUserIds: [], // TODO: fetch from ratings
-      ingredients: (data['ingredients'] as List?)?.map((e) {
-        if (e is Map) {
-          return '${e['amount'] ?? ''} ${e['unit'] ?? ''} ${e['name'] ?? ''}'.trim();
-        }
-        return e.toString();
-      }).toList() ?? [],
-      steps: (data['instructions'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      createdAt: data['createdAt'] is String
-          ? DateTime.tryParse(data['createdAt'] as String) ?? DateTime.now()
-          : DateTime.now(),
+      durationMinutes: data.prepTimeMinutes ?? 30,
+      difficulty: _parseDifficulty(data.difficulty),
+      tags: data.tags,
+      likedByUserIds: data.rating > 0 ? ['seed_like'] : const [],
+      ingredients: ingredients,
+      steps: data.instructions,
+      averageRating: data.rating,
+      ratingCount: data.ratingCount,
+      viewCount: data.viewCount,
+      createdAt: data.createdAt,
     );
+  }
+
+  List<SharedRecipe> get _sortedRecipes {
+    final list = List<SharedRecipe>.from(_recipes);
+    switch (_recipeFeedMode) {
+      case _RecipeFeedMode.forYou:
+        list.sort((a, b) => b.relevanceScore.compareTo(a.relevanceScore));
+        break;
+      case _RecipeFeedMode.newest:
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case _RecipeFeedMode.bestRated:
+        list.sort((a, b) {
+          final ratingComp = b.averageRating.compareTo(a.averageRating);
+          if (ratingComp != 0) return ratingComp;
+          return b.ratingCount.compareTo(a.ratingCount);
+        });
+        break;
+      case _RecipeFeedMode.quickMeals:
+        list.sort((a, b) => a.durationMinutes.compareTo(b.durationMinutes));
+        break;
+    }
+    return list;
+  }
+
+  double _scoreForCurrentParent(SharedRecipe recipe) {
+    final lowerTags = recipe.tags.map((e) => e.toLowerCase()).toList();
+    final timeFit = recipe.durationMinutes <= 25 ? 1.0 : recipe.durationMinutes <= 40 ? 0.7 : 0.4;
+    final childFit = lowerTags.any((tag) =>
+            tag.contains('kinder') ||
+            tag.contains('baby') ||
+            tag.contains('familie'))
+        ? 1.0
+        : 0.55;
+    final trust = recipe.ratingCount > 0
+        ? (recipe.averageRating / 5).clamp(0.0, 1.0)
+        : 0.45;
+    final freshnessDays = DateTime.now().difference(recipe.createdAt).inDays;
+    final freshness = freshnessDays <= 2
+        ? 1.0
+        : freshnessDays <= 7
+            ? 0.75
+            : 0.45;
+    final interest = recipe.viewCount > 0
+        ? (recipe.viewCount / 100).clamp(0.0, 1.0)
+        : 0.35;
+
+    return (0.30 * timeFit) +
+        (0.25 * childFit) +
+        (0.20 * trust) +
+        (0.15 * freshness) +
+        (0.10 * interest);
   }
 
   RecipeDifficulty _parseDifficulty(dynamic value) {
@@ -139,6 +216,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       case 'mittel':
       case 'medium':
         return RecipeDifficulty.mittel;
+      case 'leicht':
+        return RecipeDifficulty.einfach;
+      case 'schwer':
+        return RecipeDifficulty.fortgeschritten;
       case 'fortgeschritten':
       case 'schwierig':
       case 'hard':
@@ -150,13 +231,15 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   }
 
   String _getUserDisplayName(String? userId) {
+    if (userId == _myUserId) {
+      return _myDisplayName;
+    }
     final names = {
       'mueller': 'Familie Müller',
       'kaya': 'Familie Kaya',
       'nguyen': 'Familie Nguyen',
-      'mama_fatih': 'Familie Fatih',
     };
-    return names[userId] ?? 'Unbekannt';
+    return names[userId] ?? 'Familie aus der Community';
   }
 
   String _getInitials(String userId) {
@@ -183,6 +266,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       'Fisch': '🐟',
       'Dessert': '🍰',
       'Frühstück': '🍳',
+      'breakfast': '🍳',
+      'lunch': '🍲',
+      'dinner': '🍝',
+      'snack': '🥙',
     };
     return emojis[category] ?? '🍽️';
   }
@@ -440,6 +527,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   // -------------------------------------------------------
 
   Widget _buildRecipesFeed() {
+    if (_isLoadingRecipes) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (_recipes.isEmpty) {
       return _buildEmptyState(
         emoji: '📖',
@@ -447,31 +538,140 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         subtitle: 'Teile dein Lieblingsrezept mit anderen Eltern!',
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      itemCount: _recipes.length,
-      itemBuilder: (context, i) => _RecipeCard(
-        recipe: _recipes[i],
-        myUserId: _myUserId,
-        onLike: () => _toggleRecipeLike(_recipes[i].id),
-        onSave: () => _toggleSave(_recipes[i].id),
-        onTap: () => _showRecipeDetail(_recipes[i]),
+
+    final recipes = _sortedRecipes;
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFF2D7D1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'So werden Rezepte gezeigt',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1A2A3A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Standard ist Fuer dich: kinderfreundlich, schnell, gut bewertet und aktuell.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6B778C),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildRecipeModeChip(
+                      label: 'Fuer dich',
+                      mode: _RecipeFeedMode.forYou,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildRecipeModeChip(
+                      label: 'Neueste',
+                      mode: _RecipeFeedMode.newest,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildRecipeModeChip(
+                      label: 'Top bewertet',
+                      mode: _RecipeFeedMode.bestRated,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildRecipeModeChip(
+                      label: 'Schnell unter 30 min',
+                      mode: _RecipeFeedMode.quickMeals,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 100),
+            itemCount: recipes.length,
+            itemBuilder: (context, i) => _RecipeCard(
+              recipe: recipes[i],
+              myUserId: _myUserId,
+              onLike: () => _toggleRecipeLike(recipes[i]),
+              onSave: () => _toggleSave(recipes[i].id),
+              onTap: () => _showRecipeDetail(recipes[i]),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecipeModeChip({
+    required String label,
+    required _RecipeFeedMode mode,
+  }) {
+    final selected = _recipeFeedMode == mode;
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) {
+        setState(() => _recipeFeedMode = mode);
+        _loadRecipes();
+      },
+      selectedColor: _brandLight,
+      checkmarkColor: _brand,
+      side: BorderSide(
+        color: selected ? _brand : const Color(0xFFE9EEF5),
+      ),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        color: selected ? _brand : const Color(0xFF516072),
       ),
     );
   }
 
-  void _toggleRecipeLike(String recipeId) {
+  Future<void> _toggleRecipeLike(SharedRecipe recipe) async {
+    final alreadyLiked = recipe.likedByUserIds.contains(_myUserId);
+    if (alreadyLiked) {
+      _showSnack('Du hast dieses Rezept bereits empfohlen.');
+      return;
+    }
+
+    final result = await _service.rateRecipe(
+      recipeId: recipe.id,
+      userId: _myUserId,
+      rating: 5,
+      comment: 'Sehr hilfreich fuer Familienalltag',
+    );
+
+    if (result == null) {
+      _showSnack(_service.lastSyncError ?? 'Empfehlung konnte nicht gespeichert werden.');
+      return;
+    }
+
     setState(() {
-      final idx = _recipes.indexWhere((r) => r.id == recipeId);
+      final idx = _recipes.indexWhere((r) => r.id == recipe.id);
       if (idx == -1) return;
-      final recipe = _recipes[idx];
-      final liked = recipe.likedByUserIds.contains(_myUserId);
-      final updated = liked
-          ? (List<String>.from(recipe.likedByUserIds)..remove(_myUserId))
-          : (List<String>.from(recipe.likedByUserIds)..add(_myUserId));
-      _recipes[idx] = recipe.copyWith(likedByUserIds: updated);
+      final updated = List<String>.from(_recipes[idx].likedByUserIds)..add(_myUserId);
+      _recipes[idx] = _recipes[idx].copyWith(
+        likedByUserIds: updated,
+        ratingCount: _recipes[idx].ratingCount + 1,
+        averageRating: (_recipes[idx].averageRating + 5) / 2,
+      );
     });
     HapticFeedback.lightImpact();
+    _showSnack('Danke! Deine Empfehlung hilft anderen Eltern.');
   }
 
   void _toggleSave(String recipeId) {
@@ -501,11 +701,38 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _CreateRecipeSheet(
-        onSubmit: (recipe) {
-          setState(() => _recipes.insert(0, recipe));
-          _showSnack('Dein Rezept ist jetzt für alle sichtbar! 🎉');
+        onSubmit: (draft) async {
+          final created = await _service.createRecipe(
+            userId: _myUserId,
+            title: draft.title,
+            description: draft.description,
+            category: draft.category,
+            difficulty: draft.difficulty,
+            prepTimeMinutes: draft.durationMinutes,
+            servings: draft.servings,
+            ingredients: draft.ingredients,
+            instructions: draft.steps,
+            tags: draft.tags,
+          );
+
+          if (!mounted) return false;
+          if (created == null) {
+            _showSnack(_service.lastSyncError ?? 'Rezept konnte nicht geteilt werden.');
+            return false;
+          }
+
+          final mappedRecipe = _convertBackendRecipeToUI(created);
+          setState(() {
+            _recipes.insert(
+              0,
+              mappedRecipe.copyWith(
+                relevanceScore: _scoreForCurrentParent(mappedRecipe),
+              ),
+            );
+          });
+          _showSnack('Dein Rezept ist jetzt fuer alle sichtbar!');
+          return true;
         },
-        myUserId: _myUserId,
       ),
     );
   }
@@ -2004,6 +2231,23 @@ class _RecipeCardState extends State<_RecipeCard>
                       const SizedBox(width: 8),
                       Text(recipe.authorName,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF516072))),
+                      const Spacer(),
+                      if (recipe.ratingCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF7ED),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${recipe.averageRating.toStringAsFixed(1)} ★ · ${recipe.ratingCount}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFE07B39),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -2032,6 +2276,16 @@ class _RecipeCardState extends State<_RecipeCard>
                       )).toList(),
                     ),
                   ],
+
+                  const SizedBox(height: 8),
+                  Text(
+                    'Reichweite: ${recipe.viewCount} Aufrufe',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF8A9AB0),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
 
                   const SizedBox(height: 12),
                   const Divider(height: 1, color: Color(0xFFF0F4F8)),
@@ -2163,7 +2417,10 @@ class _RecipeDetailSheet extends StatelessWidget {
                       const SizedBox(width: 8),
                       _statChip(Icons.bar_chart_rounded, recipe.difficultyLabel),
                       const SizedBox(width: 8),
-                      _statChip(Icons.favorite_rounded, '${recipe.likedByUserIds.length} Likes'),
+                      _statChip(Icons.star_rounded,
+                          '${recipe.averageRating.toStringAsFixed(1)} (${recipe.ratingCount})'),
+                      const SizedBox(width: 8),
+                      _statChip(Icons.visibility_rounded, '${recipe.viewCount}'),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -2264,15 +2521,38 @@ class _RecipeDetailSheet extends StatelessWidget {
   }
 }
 
+class _RecipeDraft {
+  final String title;
+  final String description;
+  final String category;
+  final String difficulty;
+  final int durationMinutes;
+  final int servings;
+  final List<Map<String, String>> ingredients;
+  final List<String> steps;
+  final List<String> tags;
+
+  const _RecipeDraft({
+    required this.title,
+    required this.description,
+    required this.category,
+    required this.difficulty,
+    required this.durationMinutes,
+    required this.servings,
+    required this.ingredients,
+    required this.steps,
+    required this.tags,
+  });
+}
+
 // ============================================================
 // CREATE RECIPE SHEET
 // ============================================================
 
 class _CreateRecipeSheet extends StatefulWidget {
-  final Function(SharedRecipe) onSubmit;
-  final String myUserId;
+  final Future<bool> Function(_RecipeDraft) onSubmit;
 
-  const _CreateRecipeSheet({required this.onSubmit, required this.myUserId});
+  const _CreateRecipeSheet({required this.onSubmit});
 
   @override
   State<_CreateRecipeSheet> createState() => _CreateRecipeSheetState();
@@ -2284,7 +2564,9 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
   final _ingredientsCtrl = TextEditingController();
   final _stepsCtrl = TextEditingController();
   int _duration = 30;
+  int _servings = 4;
   RecipeDifficulty _difficulty = RecipeDifficulty.einfach;
+  String _category = 'dinner';
   String _emoji = '🍲';
 
   final List<String> _emojis = ['🍲', '🍝', '🥗', '🍱', '🥘', '🍜', '🥙', '🫕', '🍛', '🥞'];
@@ -2351,6 +2633,24 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
             TextField(controller: _descCtrl, maxLines: 2, decoration: _inputDeco('Was macht dieses Rezept besonders?')),
             const SizedBox(height: 12),
 
+            const Text('Kategorie', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              initialValue: _category,
+              items: const [
+                DropdownMenuItem(value: 'breakfast', child: Text('Fruehstueck')),
+                DropdownMenuItem(value: 'lunch', child: Text('Mittagessen')),
+                DropdownMenuItem(value: 'dinner', child: Text('Abendessen')),
+                DropdownMenuItem(value: 'snack', child: Text('Snack')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _category = value);
+              },
+              decoration: _inputDeco('Kategorie waehlen'),
+            ),
+            const SizedBox(height: 12),
+
             const Text('Zutaten (eine pro Zeile)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
             const SizedBox(height: 6),
             TextField(controller: _ingredientsCtrl, maxLines: 4,
@@ -2397,6 +2697,38 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const Text('Portionen', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          IconButton.outlined(
+                            onPressed: () {
+                              if (_servings > 1) setState(() => _servings -= 1);
+                            },
+                            icon: const Icon(Icons.remove_rounded, size: 18),
+                            padding: const EdgeInsets.all(4),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              '$_servings',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          IconButton.filled(
+                            style: IconButton.styleFrom(backgroundColor: _brand, padding: const EdgeInsets.all(4)),
+                            onPressed: () => setState(() => _servings += 1),
+                            icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       const Text('Schwierigkeit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
                       const SizedBox(height: 6),
                       DropdownButton<RecipeDifficulty>(
@@ -2424,30 +2756,44 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   final title = _titleCtrl.text.trim();
                   if (title.isEmpty) return;
                   final ingredients = _ingredientsCtrl.text
                       .split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
                   final steps = _stepsCtrl.text
                       .split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-                  final recipe = SharedRecipe(
-                    id: 'r-${DateTime.now().millisecondsSinceEpoch}',
-                    authorId: widget.myUserId,
-                    authorName: 'Ich (Familie Fatih)',
-                    authorInitials: 'FF',
-                    authorColor: _brand,
+                  final draft = _RecipeDraft(
                     title: title,
                     description: _descCtrl.text.trim(),
-                    imageEmoji: _emoji,
+                    category: _category,
+                    difficulty: _difficulty == RecipeDifficulty.einfach
+                        ? 'leicht'
+                        : _difficulty == RecipeDifficulty.mittel
+                            ? 'mittel'
+                            : 'schwer',
                     durationMinutes: _duration,
-                    difficulty: _difficulty,
-                    ingredients: ingredients.isEmpty ? ['Zutaten werden noch ergänzt'] : ingredients,
+                    servings: _servings,
+                    ingredients: (ingredients.isEmpty
+                            ? ['Zutaten werden noch ergänzt']
+                            : ingredients)
+                        .map(
+                          (value) => {
+                            'name': value,
+                            'quantity': '',
+                            'unit': '',
+                          },
+                        )
+                        .toList(),
                     steps: steps.isEmpty ? ['Zubereitung wird noch ergänzt'] : steps,
-                    createdAt: DateTime.now(),
+                    tags: _buildDraftTags(_duration, _difficulty, _category),
                   );
-                  Navigator.pop(context);
-                  widget.onSubmit(recipe);
+
+                  final success = await widget.onSubmit(draft);
+                  if (!context.mounted) return;
+                  if (success) {
+                    Navigator.pop(context);
+                  }
                 },
                 child: const Text('Rezept teilen 📖',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
@@ -2457,6 +2803,19 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
         ),
       ),
     );
+  }
+
+  List<String> _buildDraftTags(
+    int duration,
+    RecipeDifficulty difficulty,
+    String category,
+  ) {
+    final tags = <String>['familie'];
+    if (duration <= 30) tags.add('schnell');
+    if (difficulty == RecipeDifficulty.einfach) tags.add('kinderfreundlich');
+    if (category == 'snack') tags.add('alltagssnack');
+    if (category == 'breakfast') tags.add('fruehstueck');
+    return tags;
   }
 
   InputDecoration _inputDeco(String hint) {

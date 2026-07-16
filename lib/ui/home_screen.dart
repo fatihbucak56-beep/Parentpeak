@@ -48,7 +48,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   static const String _recentTilesStorageKey = 'home.recent_tiles.v1';
   static const String _tileOrderStorageKey = 'home.tile_order.v1';
   static const String _parentMatchStorageKey = 'parent_matching.v1';
@@ -59,10 +60,20 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _recentTileLabels = const [];
   List<String> _customTileOrderLabels = const [];
   int _newParentMatchesCount = 0;
+  late final AnimationController _attentionController;
+  late final Animation<double> _attentionAnimation;
 
   @override
   void initState() {
     super.initState();
+    _attentionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _attentionAnimation = CurvedAnimation(
+      parent: _attentionController,
+      curve: Curves.easeInOut,
+    );
     languageService.addListener(_onLanguageChanged);
     _restoreRecentTiles();
     _restoreTileOrder();
@@ -75,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _attentionController.dispose();
     languageService.removeListener(_onLanguageChanged);
     super.dispose();
   }
@@ -533,6 +545,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                         _newParentMatchesCount > 0,
                                   )
                               : null,
+                          attentionAnimation:
+                              isParentMatchTile && _newParentMatchesCount > 0
+                                  ? _attentionAnimation
+                                  : null,
                           icon: action.icon,
                           color: action.color,
                           compact: true,
@@ -861,9 +877,10 @@ class _HomeScreenState extends State<HomeScreen> {
     VoidCallback? onTap,
     VoidCallback? onLongPress,
     VoidCallback? onQuickAction,
+    Animation<double>? attentionAnimation,
   }) {
     final theme = Theme.of(context);
-    return Card(
+    final tileCard = Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -1022,6 +1039,35 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
+    );
+
+    if (attentionAnimation == null) {
+      return tileCard;
+    }
+
+    return AnimatedBuilder(
+      animation: attentionAnimation,
+      child: tileCard,
+      builder: (context, child) {
+        final t = attentionAnimation.value;
+        final scale = 1 + (0.012 * t);
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.08 + (0.10 * t)),
+                  blurRadius: 8 + (10 * t),
+                  spreadRadius: 0.2 + (0.6 * t),
+                ),
+              ],
+            ),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }

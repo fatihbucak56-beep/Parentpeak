@@ -6266,8 +6266,7 @@ app.get('/api/events', async (req, res) => {
       take: Math.min(parseInt(maxResults, 10) || 50, 100),
       skip: parseInt(offset, 10) || 0,
       include: {
-        participants: { select: { userId: true, status: true } },
-        hoster: { select: { id: true, firstName: true, lastName: true, avatar: true } }
+        participants: { select: { userId: true, status: true } }
       }
     });
 
@@ -6290,7 +6289,6 @@ app.get('/api/events', async (req, res) => {
     const formattedEvents = events.map(e => ({
       id: e.id,
       hosterId: e.hosterId,
-      hoster: e.hoster,
       title: e.title,
       description: e.description,
       location: e.location,
@@ -6331,7 +6329,6 @@ app.get('/api/events/:id', async (req, res) => {
         participants: {
           include: { user: { select: { id: true, firstName: true, lastName: true, avatar: true } } }
         },
-        hoster: { select: { id: true, firstName: true, lastName: true, avatar: true, bio: true } },
         chat: { include: { messages: { take: 5, orderBy: { createdAt: 'desc' } } } }
       }
     });

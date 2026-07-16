@@ -1,13 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
 import 'package:trusted_circle_demo/logic/todo_backend_service.dart';
-import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
-import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -22,7 +15,6 @@ class _TodoScreenState extends State<TodoScreen> {
   List<Map<String, dynamic>> _todos = [];
   bool _loading = true;
   String? _syncError;
-  Timer? _autoSyncRetryTimer;
 
   final TextEditingController _controller = TextEditingController();
 
@@ -40,63 +32,10 @@ class _TodoScreenState extends State<TodoScreen> {
       _loading = false;
       _syncError = _todoService.lastSyncError;
     });
-    _scheduleAutoSyncRetry();
-  }
-
-  void _scheduleAutoSyncRetry() {
-    _autoSyncRetryTimer?.cancel();
-    final hasSyncError = _syncError != null && _syncError!.trim().isNotEmpty;
-    if (!hasSyncError) return;
-    _autoSyncRetryTimer = Timer(const Duration(seconds: 10), () {
-      if (!mounted) return;
-      _loadTodos();
-    });
-  }
-
-  Future<void> _openDevelopmentFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'todo',
-      from: 'todo_sync_error',
-      to: 'development',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
-      ),
-    );
-  }
-
-  Future<void> _openChatFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'todo',
-      from: 'todo_sync_error',
-      to: 'chat',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
-    );
-  }
-
-  Future<void> _openCalendarFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'todo',
-      from: 'todo_sync_error',
-      to: 'calendar',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CalendarScreen()),
-    );
   }
 
   @override
   void dispose() {
-    _autoSyncRetryTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -104,45 +43,74 @@ class _TodoScreenState extends State<TodoScreen> {
   Future<void> _addTodo() async {
     if (_controller.text.trim().isEmpty) return;
     final title = _controller.text.trim();
-    _controller.clear();
-
-    final created = await _todoService.addTodo(
-      title: title,
-      assignee: 'Familie',
-      category: 'Allgemein',
-    );
-    if (!mounted) return;
-
-    setState(() {
-      _todos.insert(0, created);
-      _syncError = _todoService.lastSyncError;
-    });
-    _scheduleAutoSyncRetry();
+    try {
+      final created = await _todoService.addTodo(
+        title: title,
+        assignee: 'Familie',
+        category: 'Allgemein',
+      );
+      if (!mounted) return;
+      _controller.clear();
+      setState(() {
+        _todos.insert(0, created);
+        _syncError = _todoService.lastSyncError;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _syncError = _todoService.lastSyncError;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_syncError ?? 'Todo konnte nicht gespeichert werden.')),
+      );
+    }
   }
 
   Future<void> _toggleDone(int index, bool value) async {
     final id = _todos[index]['id']?.toString();
     if (id == null || id.isEmpty) return;
+    final previous = _todos[index]['done'] as bool;
     setState(() => _todos[index]['done'] = value);
-    await _todoService.updateDone(id, value);
-    if (!mounted) return;
-    setState(() {
-      _syncError = _todoService.lastSyncError;
-    });
-    _scheduleAutoSyncRetry();
+    try {
+      await _todoService.updateDone(id, value);
+      if (!mounted) return;
+      setState(() {
+        _syncError = _todoService.lastSyncError;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _todos[index]['done'] = previous;
+        _syncError = _todoService.lastSyncError;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_syncError ?? 'Todo-Status konnte nicht gespeichert werden.')),
+      );
+    }
   }
 
   Future<void> _removeTodo(int index) async {
     final id = _todos[index]['id']?.toString();
+    final removed = _todos[index];
     setState(() => _todos.removeAt(index));
-    if (id != null && id.isNotEmpty) {
+    if (id == null || id.isEmpty) return;
+
+    try {
       await _todoService.deleteTodo(id);
+      if (!mounted) return;
+      setState(() {
+        _syncError = _todoService.lastSyncError;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _todos.insert(index, removed);
+        _syncError = _todoService.lastSyncError;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_syncError ?? 'Todo konnte nicht geloescht werden.')),
+      );
     }
-    if (!mounted) return;
-    setState(() {
-      _syncError = _todoService.lastSyncError;
-    });
-    _scheduleAutoSyncRetry();
   }
 
   @override
@@ -173,61 +141,15 @@ class _TodoScreenState extends State<TodoScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: ListTile(
                   leading: Icon(
-                    Icons.cloud_done_rounded,
+                    Icons.cloud_off_rounded,
                     color: theme.colorScheme.primary,
                   ),
-                  title: const Text('Lokaler Modus aktiv'),
+                  title: const Text('Server-Sync fehlgeschlagen'),
                   subtitle: Text(_syncError!),
                   trailing: TextButton(
                     onPressed: _loadTodos,
                     child: const Text('Erneut versuchen'),
                   ),
-                ),
-              ),
-            ),
-          if (_syncError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Aenderungen bleiben lokal gespeichert und werden beim naechsten Sync automatisch nachgesendet.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _openChatFallback,
-                          icon: const Icon(Icons.tips_and_updates_rounded),
-                          label: const Text('Zur KI-Beratung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openDevelopmentFallback,
-                          icon: const Icon(Icons.insights_rounded),
-                          label: const Text('Zu Entwicklung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openCalendarFallback,
-                          icon: const Icon(Icons.calendar_month_rounded),
-                          label: const Text('Zum Kalender'),
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
               ),
             ),

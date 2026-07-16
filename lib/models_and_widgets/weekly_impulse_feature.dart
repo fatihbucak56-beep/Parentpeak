@@ -201,7 +201,6 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
   Map<String, String> _reportReasonByPostId = <String, String>{};
   Map<String, List<String>> _extraCommentsByPostId =
       <String, List<String>>{};
-  List<_CommunityPost> _customPosts = <_CommunityPost>[];
   String? _selectedResonance;
   bool _isLoaded = false;
 
@@ -239,12 +238,6 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
 
   String get _prefsPrefix => 'weekly_impulse_hub.${widget.impulse.id}';
 
-  bool get _usesRemoteCommunity =>
-      widget.impulse.communityPosts.isNotEmpty ||
-      widget.onCreateCommunityPost != null ||
-      widget.onToggleLikePost != null ||
-      widget.onAddComment != null;
-
   Future<void> _restoreLocalState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -259,7 +252,6 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
       final rawReportReasons = prefs.getString('$_prefsPrefix.reportReasons');
       final resonance = prefs.getString('$_prefsPrefix.resonance');
       final rawComments = prefs.getString('$_prefsPrefix.comments');
-      final rawPosts = prefs.getString('$_prefsPrefix.posts');
 
       if (!mounted) {
         return;
@@ -273,7 +265,6 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
         _reportReasonByPostId = _decodeReportReasons(rawReportReasons);
         _selectedResonance = resonance;
         _extraCommentsByPostId = _decodeComments(rawComments);
-        _customPosts = _decodePosts(rawPosts);
         _isLoaded = true;
       });
     } catch (_) {
@@ -317,22 +308,6 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
     );
   }
 
-  List<_CommunityPost> _decodePosts(String? rawPosts) {
-    if (rawPosts == null || rawPosts.isEmpty) {
-      return <_CommunityPost>[];
-    }
-
-    final decoded = jsonDecode(rawPosts);
-    if (decoded is! List<dynamic>) {
-      return <_CommunityPost>[];
-    }
-
-    return decoded
-        .whereType<Map<String, dynamic>>()
-        .map(_CommunityPost.fromJson)
-        .toList();
-  }
-
   Future<void> _persistState() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('$_prefsPrefix.liked', _likedPostIds.toList());
@@ -354,10 +329,11 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
       '$_prefsPrefix.comments',
       jsonEncode(_extraCommentsByPostId),
     );
-    await prefs.setString(
-      '$_prefsPrefix.posts',
-      jsonEncode(_customPosts.map((post) => post.toJson()).toList()),
-    );
+  }
+
+  void _showActionError(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   List<String> _extractSentences(String text) {
@@ -465,38 +441,7 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
       ];
     }
 
-    return <_CommunityPost>[
-      _CommunityPost(
-        id: '${widget.impulse.id}.parent.seed',
-        authorName: 'Miriam, Mama von 2 Kindern',
-        role: _roleParent,
-        verifiedExpert: false,
-        verificationLabel: '',
-        title: 'Kurze Antworten haben uns entlastet',
-        body:
-            'Wir muessen nicht jede Warum-Frage ganz ausdiskutieren. Seit wir zuerst das Gefuehl spiegeln und dann nur kurz antworten, gibt es deutlich weniger Machtkampf.',
-        seedLikeCount: 18,
-        seedComments: const <String>[
-          'Das nehmen wir heute direkt mit in unseren Abend.',
-          'Kurz antworten hilft bei uns auch enorm.',
-        ],
-      ),
-      _CommunityPost(
-        id: '${widget.impulse.id}.educator.seed',
-        authorName: 'Seda, Erzieherin',
-        role: _roleEducator,
-        verifiedExpert: true,
-        verificationLabel: 'Verifizierte Fachstimme',
-        title: 'Praxis aus der Gruppe',
-        body:
-            'Wenn Kinder in der Warum-Phase haeufig nachfragen, hilft oft ein ruhiger Blickkontakt und ein Satz wie: Ich hoere dich, ich antworte dir kurz und bleibe bei dir.',
-        seedLikeCount: 24,
-        seedComments: const <String>[
-          'Schoen formuliert, das wirkt sehr beruhigend.',
-        ],
-      ),
-      ..._customPosts,
-    ];
+    return <_CommunityPost>[];
   }
 
   IconData _iconForCompanion(String formatLabel, int index) {
@@ -552,23 +497,16 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
 
   Future<void> _toggleLikePost(String postId) async {
     final currentlyLiked = _likedPostIds.contains(postId);
-    if (widget.onToggleLikePost != null) {
-      try {
-        await widget.onToggleLikePost!(postId, currentlyLiked);
-        return;
-      } catch (_) {
-        // Fallback to local interaction when backend is unavailable.
-      }
+    if (widget.onToggleLikePost == null) {
+      _showActionError('Like ist aktuell nicht verfuegbar.');
+      return;
     }
 
-    setState(() {
-      if (currentlyLiked) {
-        _likedPostIds.remove(postId);
-      } else {
-        _likedPostIds.add(postId);
-      }
-    });
-    await _persistState();
+    try {
+      await widget.onToggleLikePost!(postId, currentlyLiked);
+    } catch (_) {
+      _showActionError('Like konnte nicht gespeichert werden.');
+    }
   }
 
   Future<void> _selectResonance(String label) async {
@@ -578,33 +516,27 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
     await _persistState();
   }
 
-  Future<void> _addComment(String postId, String comment) async {
+  Future<bool> _addComment(String postId, String comment) async {
     final trimmed = comment.trim();
     if (trimmed.isEmpty) {
-      return;
+      return false;
     }
 
-    if (widget.onAddComment != null) {
-      try {
-        await widget.onAddComment!(postId, trimmed);
-        return;
-      } catch (_) {
-        // Fallback to local comment storage when backend is unavailable.
-      }
+    if (widget.onAddComment == null) {
+      _showActionError('Kommentare sind aktuell nicht verfuegbar.');
+      return false;
     }
 
-    setState(() {
-      final existing = _extraCommentsByPostId[postId] ?? <String>[];
-      _extraCommentsByPostId = <String, List<String>>{
-        ..._extraCommentsByPostId,
-        postId: <String>[...existing, trimmed],
-      };
-    });
-
-    await _persistState();
+    try {
+      await widget.onAddComment!(postId, trimmed);
+      return true;
+    } catch (_) {
+      _showActionError('Kommentar konnte nicht gesendet werden.');
+      return false;
+    }
   }
 
-  Future<void> _createCommunityPost({
+  Future<bool> _createCommunityPost({
     required String title,
     required String body,
     required String role,
@@ -612,35 +544,21 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
     final trimmedTitle = title.trim();
     final trimmedBody = body.trim();
     if (trimmedTitle.isEmpty || trimmedBody.isEmpty) {
-      return;
+      return false;
     }
 
-    if (widget.onCreateCommunityPost != null) {
-      try {
-        await widget.onCreateCommunityPost!(trimmedTitle, trimmedBody, role);
-        return;
-      } catch (_) {
-        // Fallback to local creation when backend is unavailable.
-      }
+    if (widget.onCreateCommunityPost == null) {
+      _showActionError('Community-Posting ist aktuell nicht verfuegbar.');
+      return false;
     }
 
-    final newPost = _CommunityPost(
-      id: '${widget.impulse.id}.user.${DateTime.now().millisecondsSinceEpoch}',
-      authorName: role == _roleEducator ? 'Dein Praxisimpuls' : 'Deine Erfahrung',
-      role: role,
-      verifiedExpert: false,
-      verificationLabel: '',
-      title: trimmedTitle,
-      body: trimmedBody,
-      seedLikeCount: 0,
-      seedComments: const <String>[],
-    );
-
-    setState(() {
-      _customPosts = <_CommunityPost>[newPost, ..._customPosts];
-    });
-
-    await _persistState();
+    try {
+      await widget.onCreateCommunityPost!(trimmedTitle, trimmedBody, role);
+      return true;
+    } catch (_) {
+      _showActionError('Beitrag konnte nicht veroeffentlicht werden.');
+      return false;
+    }
   }
 
   Future<void> _hidePost(String postId) async {
@@ -659,26 +577,30 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
     await _persistState();
   }
 
-  Future<void> _reportPost(String postId, String reason) async {
+  Future<bool> _reportPost(String postId, String reason) async {
     final trimmedReason = reason.trim();
     if (trimmedReason.isEmpty) {
-      return;
+      return false;
     }
 
-    if (widget.onReportPost != null) {
-      try {
-        await widget.onReportPost!(postId, trimmedReason);
-      } catch (_) {
-        // Keep local moderation available when backend reporting is unavailable.
-      }
+    if (widget.onReportPost == null) {
+      _showActionError('Melden ist aktuell nicht verfuegbar.');
+      return false;
     }
 
-    setState(() {
-      _reportedPostIds.add(postId);
-      _hiddenPostIds.add(postId);
-      _reportReasonByPostId[postId] = trimmedReason;
-    });
-    await _persistState();
+    try {
+      await widget.onReportPost!(postId, trimmedReason);
+      setState(() {
+        _reportedPostIds.add(postId);
+        _hiddenPostIds.add(postId);
+        _reportReasonByPostId[postId] = trimmedReason;
+      });
+      await _persistState();
+      return true;
+    } catch (_) {
+      _showActionError('Beitrag konnte nicht gemeldet werden.');
+      return false;
+    }
   }
 
   Future<void> _showComposeSheet() async {
@@ -776,12 +698,12 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: () async {
-                        await _createCommunityPost(
+                        final created = await _createCommunityPost(
                           title: titleController.text,
                           body: bodyController.text,
                           role: selectedRole,
                         );
-                        if (!mounted) {
+                        if (!created || !mounted) {
                           return;
                         }
                         Navigator.of(this.context).pop();
@@ -890,8 +812,8 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () async {
-                    await _addComment(post.id, commentController.text);
-                    if (!context.mounted) {
+                    final sent = await _addComment(post.id, commentController.text);
+                    if (!sent || !context.mounted) {
                       return;
                     }
                     Navigator.of(context).pop();
@@ -1195,8 +1117,8 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
                         final reason = note.isEmpty
                             ? selectedReason
                             : '$selectedReason: $note';
-                        await _reportPost(post.id, reason);
-                        if (!context.mounted) {
+                        final reported = await _reportPost(post.id, reason);
+                        if (!reported || !context.mounted) {
                           return;
                         }
                         Navigator.of(context).pop();
@@ -1831,9 +1753,7 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _usesRemoteCommunity
-                        ? 'Echte Community-Reaktionen mit lokalem Fallback, falls das Backend ausfaellt.'
-                        : 'Ruhige Erfahrungen statt lauter Social-Posts.',
+                    'Echte Community-Reaktionen aus dem Live-Backend.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1882,6 +1802,18 @@ class _WeeklyImpulseCardState extends State<WeeklyImpulseCard> {
           ),
           const SizedBox(height: 12),
         ],
+        if (posts.where((post) => !_hiddenPostIds.contains(post.id)).isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Text(
+              'Noch keine Community-Beitraege vorhanden. Teile den ersten Praxisimpuls.',
+            ),
+          ),
         ...posts.where((post) => !_hiddenPostIds.contains(post.id)).map((post) {
           final likeCount = post.isRemote
             ? post.seedLikeCount
@@ -2191,37 +2123,4 @@ class _CommunityPost {
     this.isRemote = false,
   });
 
-  factory _CommunityPost.fromJson(Map<String, dynamic> json) {
-    return _CommunityPost(
-      id: json['id'] as String? ?? '',
-      authorName: json['authorName'] as String? ?? '',
-      role: json['role'] as String? ?? '',
-      verifiedExpert: json['verifiedExpert'] as bool? ?? false,
-      verificationLabel: json['verificationLabel'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      body: json['body'] as String? ?? '',
-      seedLikeCount: json['seedLikeCount'] as int? ?? 0,
-      seedComments: (json['seedComments'] as List<dynamic>? ?? const <dynamic>[])
-          .map((item) => item.toString())
-          .toList(),
-      viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
-      isRemote: json['isRemote'] as bool? ?? false,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'id': id,
-      'authorName': authorName,
-      'role': role,
-      'verifiedExpert': verifiedExpert,
-      'verificationLabel': verificationLabel,
-      'title': title,
-      'body': body,
-      'seedLikeCount': seedLikeCount,
-      'seedComments': seedComments,
-      'viewerHasLiked': viewerHasLiked,
-      'isRemote': isRemote,
-    };
-  }
 }

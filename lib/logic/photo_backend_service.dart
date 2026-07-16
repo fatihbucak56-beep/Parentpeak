@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
 
 import 'backend_api_client.dart';
@@ -11,73 +8,56 @@ class PhotoBackendService {
   final BackendApiClient? apiClient;
   String? lastSyncError;
 
-  static const String _storageKey = 'backend.photos.v1';
-
   Future<List<Map<String, dynamic>>> fetchAlbums() async {
     lastSyncError = null;
 
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.getJson(APIConfig.getBackendPhotosPath());
-        final albums = _parseAlbumList(payload);
-        if (albums.isNotEmpty) {
-          await _persist(albums);
-          return albums;
-        }
-      } catch (e) {
-        lastSyncError = _friendlySyncError(
-          action: 'Server-Sync fehlgeschlagen',
-          error: e,
-        );
-      }
+    if (apiClient == null) {
+      lastSyncError = 'Foto-Backend ist nicht konfiguriert.';
+      return <Map<String, dynamic>>[];
     }
 
-    final local = await _readLocal();
-    if (local.isNotEmpty) {
-      return local;
+    try {
+      final payload = await apiClient!.getJson(APIConfig.getBackendPhotosPath());
+      return _parseAlbumList(payload);
+    } catch (e) {
+      lastSyncError = _friendlySyncError(
+        action: 'Server-Sync fehlgeschlagen',
+        error: e,
+      );
+      return <Map<String, dynamic>>[];
     }
-
-    return [];
   }
 
   Future<Map<String, dynamic>> addAlbum({required String title}) async {
-    final item = {
-      'id': DateTime.now().microsecondsSinceEpoch.toString(),
-      'title': title,
-      'date': DateTime.now().toIso8601String(),
-      'count': 0,
-    };
-
-    final current = await _readLocal();
-    current.insert(0, item);
-    await _persist(current);
-
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.postJsonAny(
-          APIConfig.getBackendPhotosPath(),
-          {
-            'familyId': APIConfig.getBackendFamilyId(),
-            'title': title,
-            'photoCount': 0,
-            'createdAt': DateTime.now().toUtc().toIso8601String(),
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-
-        final normalized = _parseSingleAlbum(payload);
-        if (normalized != null) {
-          item['id'] = normalized['id'];
-        }
-      } catch (e) {
-        lastSyncError = _friendlySyncError(
-          action: 'Foto-Album konnte nicht auf dem Server gespeichert werden',
-          error: e,
-        );
-      }
+    lastSyncError = null;
+    if (apiClient == null) {
+      throw StateError('Foto-Backend ist nicht konfiguriert.');
     }
 
-    return item;
+    try {
+      final payload = await apiClient!.postJsonAny(
+        APIConfig.getBackendPhotosPath(),
+        {
+          'familyId': APIConfig.getBackendFamilyId(),
+          'title': title,
+          'photoCount': 0,
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+          'schemaVersion': APIConfig.getBackendApiVersion(),
+        },
+      );
+
+      final normalized = _parseSingleAlbum(payload);
+      if (normalized == null) {
+        throw StateError('Ungueltige Album-Antwort vom Server.');
+      }
+      return normalized;
+    } catch (e) {
+      lastSyncError = _friendlySyncError(
+        action: 'Foto-Album konnte nicht auf dem Server gespeichert werden',
+        error: e,
+      );
+      rethrow;
+    }
   }
 
   String _friendlySyncError({
@@ -90,7 +70,7 @@ class PhotoBackendService {
         raw.contains('tls') ||
         raw.contains('ssl') ||
         raw.contains('certificate')) {
-      return 'Server-Verbindung aktuell nicht sicher verfuegbar. Daten bleiben lokal gespeichert.';
+      return 'Server-Verbindung aktuell nicht sicher verfuegbar.';
     }
 
     if (raw.contains('socketexception') ||
@@ -98,31 +78,10 @@ class PhotoBackendService {
         raw.contains('connection refused') ||
         raw.contains('timed out') ||
         raw.contains('timeout')) {
-      return 'Keine Verbindung zum Server. Daten bleiben lokal gespeichert.';
+      return 'Keine Verbindung zum Server.';
     }
 
     return '$action: $error';
-  }
-
-  Future<List<Map<String, dynamic>>> _readLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw == null || raw.isEmpty) return [];
-
-    final decoded = jsonDecode(raw);
-    if (decoded is List) {
-      return decoded
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
-    }
-
-    return [];
-  }
-
-  Future<void> _persist(List<Map<String, dynamic>> albums) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, jsonEncode(albums));
   }
 
   List<Map<String, dynamic>> _parseAlbumList(dynamic payload) {

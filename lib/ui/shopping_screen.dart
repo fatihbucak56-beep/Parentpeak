@@ -1,16 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
-import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
 import 'package:trusted_circle_demo/logic/shopping_backend_service.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations_all.dart';
-import 'package:trusted_circle_demo/ui/calendar_screen.dart';
-import 'package:trusted_circle_demo/ui/chat_screen.dart';
-import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 
 class ShoppingScreen extends StatefulWidget {
   const ShoppingScreen({super.key});
@@ -26,7 +19,6 @@ class _ShoppingScreenState extends State<ShoppingScreen>
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   String? _syncError;
-  Timer? _autoSyncRetryTimer;
 
   final TextEditingController _controller = TextEditingController();
 
@@ -49,76 +41,35 @@ class _ShoppingScreenState extends State<ShoppingScreen>
       _loading = false;
       _syncError = _shoppingService.lastSyncError;
     });
-    _scheduleAutoSyncRetry();
-  }
-
-  void _scheduleAutoSyncRetry() {
-    _autoSyncRetryTimer?.cancel();
-    final hasSyncError = _syncError != null && _syncError!.trim().isNotEmpty;
-    if (!hasSyncError) return;
-    _autoSyncRetryTimer = Timer(const Duration(seconds: 10), () {
-      if (!mounted) return;
-      _loadItems();
-    });
-  }
-
-  Future<void> _openDevelopmentFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'shopping',
-      from: 'shopping_sync_error',
-      to: 'development',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
-      ),
-    );
-  }
-
-  Future<void> _openChatFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'shopping',
-      from: 'shopping_sync_error',
-      to: 'chat',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
-    );
-  }
-
-  Future<void> _openCalendarFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'shopping',
-      from: 'shopping_sync_error',
-      to: 'calendar',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CalendarScreen()),
-    );
   }
 
   Future<void> _toggleItemChecked(Map<String, dynamic> item, bool checked) async {
+    final previous = item['checked'] as bool;
     setState(() => item['checked'] = checked);
     final id = item['id']?.toString();
     if (id != null && id.isNotEmpty) {
-      await _shoppingService.updateChecked(id, checked);
+      try {
+        await _shoppingService.updateChecked(id, checked);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          item['checked'] = previous;
+          _syncError = _shoppingService.lastSyncError;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_syncError ?? 'Status konnte nicht gespeichert werden.')),
+        );
+        return;
+      }
     }
     if (!mounted) return;
     setState(() {
       _syncError = _shoppingService.lastSyncError;
     });
-    _scheduleAutoSyncRetry();
   }
 
   @override
   void dispose() {
-    _autoSyncRetryTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -126,19 +77,27 @@ class _ShoppingScreenState extends State<ShoppingScreen>
   Future<void> _addItem() async {
     if (_controller.text.trim().isEmpty) return;
     final name = _controller.text.trim();
-    _controller.clear();
+    try {
+      final created = await _shoppingService.addItem(
+        name: name,
+        category: _t('category_general'),
+      );
+      if (!mounted) return;
 
-    final created = await _shoppingService.addItem(
-      name: name,
-      category: _t('category_general'),
-    );
-    if (!mounted) return;
-
-    setState(() {
-      _items.insert(0, created);
-      _syncError = _shoppingService.lastSyncError;
-    });
-    _scheduleAutoSyncRetry();
+      _controller.clear();
+      setState(() {
+        _items.insert(0, created);
+        _syncError = _shoppingService.lastSyncError;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _syncError = _shoppingService.lastSyncError;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_syncError ?? 'Eintrag konnte nicht gespeichert werden.')),
+      );
+    }
   }
 
   Future<void> _deleteItem(int index) async {
@@ -146,13 +105,24 @@ class _ShoppingScreenState extends State<ShoppingScreen>
     final id = item['id']?.toString();
     setState(() => _items.removeAt(index));
     if (id != null && id.isNotEmpty) {
-      await _shoppingService.deleteItem(id);
+      try {
+        await _shoppingService.deleteItem(id);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _items.insert(index, item);
+          _syncError = _shoppingService.lastSyncError;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_syncError ?? 'Eintrag konnte nicht geloescht werden.')),
+        );
+        return;
+      }
     }
     if (!mounted) return;
     setState(() {
       _syncError = _shoppingService.lastSyncError;
     });
-    _scheduleAutoSyncRetry();
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.showSnackBar(
       SnackBar(
@@ -200,61 +170,15 @@ class _ShoppingScreenState extends State<ShoppingScreen>
                 borderRadius: BorderRadius.circular(12),
                 child: ListTile(
                   leading: Icon(
-                    Icons.cloud_done_rounded,
+                    Icons.cloud_off_rounded,
                     color: theme.colorScheme.primary,
                   ),
-                  title: const Text('Lokaler Modus aktiv'),
+                  title: const Text('Server-Sync fehlgeschlagen'),
                   subtitle: Text(_syncError!),
                   trailing: TextButton(
                     onPressed: _loadItems,
                     child: const Text('Erneut versuchen'),
                   ),
-                ),
-              ),
-            ),
-          if (_syncError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Aenderungen bleiben lokal gespeichert und werden beim naechsten Sync automatisch nachgesendet.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _openChatFallback,
-                          icon: const Icon(Icons.tips_and_updates_rounded),
-                          label: const Text('Zur KI-Beratung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openDevelopmentFallback,
-                          icon: const Icon(Icons.insights_rounded),
-                          label: const Text('Zu Entwicklung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openCalendarFallback,
-                          icon: const Icon(Icons.calendar_month_rounded),
-                          label: const Text('Zum Kalender'),
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
               ),
             ),

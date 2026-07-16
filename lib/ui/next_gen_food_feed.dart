@@ -33,9 +33,6 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   late final List<Recipe> _recipes = _buildRecipes();
-      final List<CommunitySnack> _fallbackSnacks = const <CommunitySnack>[];
-      final List<AudioHack> _fallbackAudioHacks = const <AudioHack>[];
-      final List<IngredientShare> _fallbackShares = const <IngredientShare>[];
 
   List<CommunitySnack> _snacks = const [];
   List<AudioHack> _audioHacks = const [];
@@ -196,10 +193,9 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
     final firstPage = await _backend.loadCommunitySnacksPage(
       page: 1,
       pageSize: _snackPageSize,
-      fallback: _fallbackSnacks,
     );
-    final audio = await _backend.loadAudioHacks(fallback: _fallbackAudioHacks);
-    final shares = await _backend.loadIngredientShares(fallback: _fallbackShares);
+    final audio = await _backend.loadAudioHacks();
+    final shares = await _backend.loadIngredientShares();
 
     if (!mounted) return;
 
@@ -230,7 +226,6 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
     final page = await _backend.loadCommunitySnacksPage(
       page: _nextSnackPage,
       pageSize: _snackPageSize,
-      fallback: _fallbackSnacks,
     );
 
     if (!mounted) return;
@@ -358,7 +353,18 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
             final updatedSnack = snack.copyWith(
               likesCount: snack.likesCount + (liked ? 0 : 1),
             );
-            final savedSnack = await _backend.publishCommunitySnack(updatedSnack);
+            CommunitySnack savedSnack;
+            try {
+              savedSnack = await _backend.publishCommunitySnack(updatedSnack);
+            } catch (_) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(_backend.lastSyncError ?? 'Like konnte nicht gespeichert werden.'),
+                ),
+              );
+              return;
+            }
             if (!mounted) return;
             setState(() {
               _snacks = [
@@ -741,7 +747,21 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
                               locationCoordinates: _myLocation,
                             );
 
-                            final savedSnack = await _backend.publishCommunitySnack(snack);
+                            CommunitySnack savedSnack;
+                            try {
+                              savedSnack = await _backend.publishCommunitySnack(snack);
+                            } catch (_) {
+                              if (!mounted || !context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    _backend.lastSyncError ??
+                                        'Snack konnte nicht veroeffentlicht werden.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
 
                             AudioHack? savedHack;
                             final audioUrl = audioUrlController.text.trim();
@@ -757,7 +777,20 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
                                     ? null
                                     : audioTranscriptController.text.trim(),
                               );
-                              savedHack = await _backend.publishAudioHack(hack);
+                              try {
+                                savedHack = await _backend.publishAudioHack(hack);
+                              } catch (_) {
+                                if (!mounted || !context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      _backend.lastSyncError ??
+                                          'Audio-Hack konnte nicht veroeffentlicht werden.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                             }
 
                             IngredientShare? savedShare;
@@ -771,7 +804,20 @@ class _NextGenFoodFeedScreenState extends State<NextGenFoodFeedScreen> {
                                 geoHash: 'u33dc9',
                                 location: _myLocation,
                               );
-                              savedShare = await _backend.publishIngredientShare(share);
+                              try {
+                                savedShare = await _backend.publishIngredientShare(share);
+                              } catch (_) {
+                                if (!mounted || !context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      _backend.lastSyncError ??
+                                          'Zutat konnte nicht veroeffentlicht werden.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                             }
 
                             if (!mounted || !context.mounted) return;

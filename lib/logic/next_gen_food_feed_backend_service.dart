@@ -33,40 +33,11 @@ class NextGenFoodFeedBackendService {
   Future<CommunitySnackPageResult> loadCommunitySnacksPage({
     required int page,
     required int pageSize,
-    required List<CommunitySnack> fallback,
   }) async {
     lastSyncError = null;
 
-    if (apiClient != null) {
-      try {
-        final path =
-            '${APIConfig.getBackendCommunitySnacksPath()}?page=$page&pageSize=$pageSize';
-        final payload = await apiClient!.getJson(path);
-        final parsed = _parseSnacks(payload);
-        if (parsed.isNotEmpty) {
-          if (page == 1) {
-            await _saveSnacksLocal(parsed);
-          }
-
-          final metaMap = _extractMeta(payload);
-          final hasMore = _boolFromMeta(metaMap, 'hasMore') ?? (parsed.length >= pageSize);
-          final nextPage = _intFromMeta(metaMap, 'nextPage') ?? (page + 1);
-
-          return CommunitySnackPageResult(
-            items: parsed,
-            hasMore: hasMore,
-            nextPage: nextPage,
-          );
-        }
-      } catch (e) {
-        lastSyncError = _friendlySyncError('Snack-Feed lokal aktiv', e);
-      }
-    }
-
-    final local = await _readSnacksLocal();
-    final source = local.isNotEmpty ? local : fallback;
-    final start = (page - 1) * pageSize;
-    if (start >= source.length) {
+    if (apiClient == null) {
+      lastSyncError = 'Snack-Feed Backend nicht konfiguriert.';
       return CommunitySnackPageResult(
         items: const [],
         hasMore: false,
@@ -74,185 +45,200 @@ class NextGenFoodFeedBackendService {
       );
     }
 
-    final end = (start + pageSize) > source.length ? source.length : (start + pageSize);
-    final slice = source.sublist(start, end);
+    try {
+      final path =
+          '${APIConfig.getBackendCommunitySnacksPath()}?page=$page&pageSize=$pageSize';
+      final payload = await apiClient!.getJson(path);
+      final parsed = _parseSnacks(payload);
+      if (page == 1 && parsed.isNotEmpty) {
+        await _saveSnacksLocal(parsed);
+      }
 
-    return CommunitySnackPageResult(
-      items: slice,
-      hasMore: end < source.length,
-      nextPage: page + 1,
-    );
+      final metaMap = _extractMeta(payload);
+      final hasMore = _boolFromMeta(metaMap, 'hasMore') ?? (parsed.length >= pageSize);
+      final nextPage = _intFromMeta(metaMap, 'nextPage') ?? (page + 1);
+
+      return CommunitySnackPageResult(
+        items: parsed,
+        hasMore: hasMore,
+        nextPage: nextPage,
+      );
+    } catch (e) {
+      lastSyncError = _friendlySyncError('Snack-Feed Sync fehlgeschlagen', e);
+      return CommunitySnackPageResult(
+        items: const [],
+        hasMore: false,
+        nextPage: page,
+      );
+    }
   }
 
-  Future<List<CommunitySnack>> loadCommunitySnacks({
-    required List<CommunitySnack> fallback,
-  }) async {
+  Future<List<CommunitySnack>> loadCommunitySnacks() async {
     lastSyncError = null;
 
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.getJson(APIConfig.getBackendCommunitySnacksPath());
-        final parsed = _parseSnacks(payload);
-        if (parsed.isNotEmpty) {
-          await _saveSnacksLocal(parsed);
-          return parsed;
-        }
-      } catch (e) {
-        lastSyncError = _friendlySyncError('Snack-Feed lokal aktiv', e);
-      }
+    if (apiClient == null) {
+      lastSyncError = 'Snack-Feed Backend nicht konfiguriert.';
+      return const [];
     }
 
-    final local = await _readSnacksLocal();
-    if (local.isNotEmpty) return local;
-
-    await _saveSnacksLocal(fallback);
-    return fallback;
+    try {
+      final payload = await apiClient!.getJson(APIConfig.getBackendCommunitySnacksPath());
+      final parsed = _parseSnacks(payload);
+      if (parsed.isNotEmpty) {
+        await _saveSnacksLocal(parsed);
+      }
+      return parsed;
+    } catch (e) {
+      lastSyncError = _friendlySyncError('Snack-Feed Sync fehlgeschlagen', e);
+      return const [];
+    }
   }
 
-  Future<List<AudioHack>> loadAudioHacks({
-    required List<AudioHack> fallback,
-  }) async {
+  Future<List<AudioHack>> loadAudioHacks() async {
     lastSyncError = null;
 
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.getJson(APIConfig.getBackendAudioHacksPath());
-        final parsed = _parseAudioHacks(payload);
-        if (parsed.isNotEmpty) {
-          await _saveAudioHacksLocal(parsed);
-          return parsed;
-        }
-      } catch (e) {
-        lastSyncError = _friendlySyncError('Audio-Hacks lokal aktiv', e);
-      }
+    if (apiClient == null) {
+      lastSyncError = 'Audio-Hacks Backend nicht konfiguriert.';
+      return const [];
     }
 
-    final local = await _readAudioHacksLocal();
-    if (local.isNotEmpty) return local;
-
-    await _saveAudioHacksLocal(fallback);
-    return fallback;
+    try {
+      final payload = await apiClient!.getJson(APIConfig.getBackendAudioHacksPath());
+      final parsed = _parseAudioHacks(payload);
+      if (parsed.isNotEmpty) {
+        await _saveAudioHacksLocal(parsed);
+      }
+      return parsed;
+    } catch (e) {
+      lastSyncError = _friendlySyncError('Audio-Hacks Sync fehlgeschlagen', e);
+      return const [];
+    }
   }
 
-  Future<List<IngredientShare>> loadIngredientShares({
-    required List<IngredientShare> fallback,
-  }) async {
+  Future<List<IngredientShare>> loadIngredientShares() async {
     lastSyncError = null;
 
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.getJson(APIConfig.getBackendIngredientSharesPath());
-        final parsed = _parseIngredientShares(payload);
-        if (parsed.isNotEmpty) {
-          await _saveSharesLocal(parsed);
-          return parsed;
-        }
-      } catch (e) {
-        lastSyncError = _friendlySyncError('Zutaten-Retter lokal aktiv', e);
-      }
+    if (apiClient == null) {
+      lastSyncError = 'Zutaten-Retter Backend nicht konfiguriert.';
+      return const [];
     }
 
-    final local = await _readSharesLocal();
-    if (local.isNotEmpty) return local;
-
-    await _saveSharesLocal(fallback);
-    return fallback;
+    try {
+      final payload = await apiClient!.getJson(APIConfig.getBackendIngredientSharesPath());
+      final parsed = _parseIngredientShares(payload);
+      if (parsed.isNotEmpty) {
+        await _saveSharesLocal(parsed);
+      }
+      return parsed;
+    } catch (e) {
+      lastSyncError = _friendlySyncError('Zutaten-Retter Sync fehlgeschlagen', e);
+      return const [];
+    }
   }
 
   Future<CommunitySnack> publishCommunitySnack(CommunitySnack snack) async {
     lastSyncError = null;
 
-    final local = await _readSnacksLocal();
-    final index = local.indexWhere((item) => item.id == snack.id);
-    if (index >= 0) {
-      local[index] = snack;
-    } else {
-      local.insert(0, snack);
+    if (apiClient == null) {
+      throw StateError('Snack-Feed Backend nicht konfiguriert.');
     }
-    await _saveSnacksLocal(local);
 
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.postJsonAny(
-          APIConfig.getBackendCommunitySnacksPath(),
-          {
-            ...snack.toMap(),
-            'familyId': APIConfig.getBackendFamilyId(),
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-        final normalized = _parseSingleSnack(payload);
-        if (normalized != null) return normalized;
-      } catch (e) {
-        lastSyncError = _friendlySyncError('Snack Upload lokal gespeichert', e);
+    try {
+      final payload = await apiClient!.postJsonAny(
+        APIConfig.getBackendCommunitySnacksPath(),
+        {
+          ...snack.toMap(),
+          'familyId': APIConfig.getBackendFamilyId(),
+          'schemaVersion': APIConfig.getBackendApiVersion(),
+        },
+      );
+      final normalized = _parseSingleSnack(payload);
+      if (normalized != null) {
+        final local = await _readSnacksLocal();
+        final index = local.indexWhere((item) => item.id == normalized.id);
+        if (index >= 0) {
+          local[index] = normalized;
+        } else {
+          local.insert(0, normalized);
+        }
+        await _saveSnacksLocal(local);
+        return normalized;
       }
+      return snack;
+    } catch (e) {
+      lastSyncError = _friendlySyncError('Snack Upload fehlgeschlagen', e);
+      rethrow;
     }
-
-    return snack;
   }
 
   Future<AudioHack> publishAudioHack(AudioHack hack) async {
     lastSyncError = null;
 
-    final local = await _readAudioHacksLocal();
-    final index = local.indexWhere((item) => item.id == hack.id);
-    if (index >= 0) {
-      local[index] = hack;
-    } else {
-      local.insert(0, hack);
+    if (apiClient == null) {
+      throw StateError('Audio-Hacks Backend nicht konfiguriert.');
     }
-    await _saveAudioHacksLocal(local);
 
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.postJsonAny(
-          APIConfig.getBackendAudioHacksPath(),
-          {
-            ...hack.toMap(),
-            'familyId': APIConfig.getBackendFamilyId(),
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-        final normalized = _parseSingleAudioHack(payload);
-        if (normalized != null) return normalized;
-      } catch (e) {
-        lastSyncError = _friendlySyncError('Audio-Hack Upload lokal gespeichert', e);
+    try {
+      final payload = await apiClient!.postJsonAny(
+        APIConfig.getBackendAudioHacksPath(),
+        {
+          ...hack.toMap(),
+          'familyId': APIConfig.getBackendFamilyId(),
+          'schemaVersion': APIConfig.getBackendApiVersion(),
+        },
+      );
+      final normalized = _parseSingleAudioHack(payload);
+      if (normalized != null) {
+        final local = await _readAudioHacksLocal();
+        final index = local.indexWhere((item) => item.id == normalized.id);
+        if (index >= 0) {
+          local[index] = normalized;
+        } else {
+          local.insert(0, normalized);
+        }
+        await _saveAudioHacksLocal(local);
+        return normalized;
       }
+      return hack;
+    } catch (e) {
+      lastSyncError = _friendlySyncError('Audio-Hack Upload fehlgeschlagen', e);
+      rethrow;
     }
-
-    return hack;
   }
 
   Future<IngredientShare> publishIngredientShare(IngredientShare share) async {
     lastSyncError = null;
 
-    final local = await _readSharesLocal();
-    final index = local.indexWhere((item) => item.id == share.id);
-    if (index >= 0) {
-      local[index] = share;
-    } else {
-      local.insert(0, share);
+    if (apiClient == null) {
+      throw StateError('Zutaten-Retter Backend nicht konfiguriert.');
     }
-    await _saveSharesLocal(local);
 
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.postJsonAny(
-          APIConfig.getBackendIngredientSharesPath(),
-          {
-            ...share.toMap(),
-            'familyId': APIConfig.getBackendFamilyId(),
-            'schemaVersion': APIConfig.getBackendApiVersion(),
-          },
-        );
-        final normalized = _parseSingleIngredientShare(payload);
-        if (normalized != null) return normalized;
-      } catch (e) {
-        lastSyncError = _friendlySyncError('Zutaten-Retter Upload lokal gespeichert', e);
+    try {
+      final payload = await apiClient!.postJsonAny(
+        APIConfig.getBackendIngredientSharesPath(),
+        {
+          ...share.toMap(),
+          'familyId': APIConfig.getBackendFamilyId(),
+          'schemaVersion': APIConfig.getBackendApiVersion(),
+        },
+      );
+      final normalized = _parseSingleIngredientShare(payload);
+      if (normalized != null) {
+        final local = await _readSharesLocal();
+        final index = local.indexWhere((item) => item.id == normalized.id);
+        if (index >= 0) {
+          local[index] = normalized;
+        } else {
+          local.insert(0, normalized);
+        }
+        await _saveSharesLocal(local);
+        return normalized;
       }
+      return share;
+    } catch (e) {
+      lastSyncError = _friendlySyncError('Zutaten-Retter Upload fehlgeschlagen', e);
+      rethrow;
     }
-
-    return share;
   }
 
   List<CommunitySnack> _parseSnacks(dynamic payload) {

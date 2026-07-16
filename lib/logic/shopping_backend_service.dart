@@ -1,7 +1,3 @@
-import 'dart:convert';
-
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'backend_api_client.dart';
 import 'contracts/shopping_contract.dart';
 
@@ -11,25 +7,23 @@ class ShoppingBackendService {
   final BackendApiClient? apiClient;
   String? lastSyncError;
 
-  static const String _storageKey = 'backend.shopping.v1';
-
   Future<List<Map<String, dynamic>>> fetchItems() async {
     lastSyncError = null;
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.getJson(ShoppingContract.shoppingPath);
-        final items = ShoppingContract.parseList(payload);
-        await _persist(items);
-        return items;
-      } catch (e) {
-        lastSyncError = _friendlySyncError(
-          action: 'Server-Sync fehlgeschlagen',
-          error: e,
-        );
-      }
+    if (apiClient == null) {
+      lastSyncError = 'Shopping-Backend ist nicht konfiguriert.';
+      return const <Map<String, dynamic>>[];
     }
 
-    return _readLocal();
+    try {
+      final payload = await apiClient!.getJson(ShoppingContract.shoppingPath);
+      return ShoppingContract.parseList(payload);
+    } catch (e) {
+      lastSyncError = _friendlySyncError(
+        action: 'Server-Sync fehlgeschlagen',
+        error: e,
+      );
+      return const <Map<String, dynamic>>[];
+    }
   }
 
   Future<Map<String, dynamic>> addItem({
@@ -37,81 +31,65 @@ class ShoppingBackendService {
     required String category,
   }) async {
     lastSyncError = null;
-    final item = {
-      'id': DateTime.now().microsecondsSinceEpoch.toString(),
-      'name': name,
-      'checked': false,
-      'category': category,
-    };
-
-    final current = await _readLocal();
-    current.insert(0, item);
-    await _persist(current);
-
-    if (apiClient != null) {
-      try {
-        final requestBody = ShoppingContract.buildCreatePayload(
-          name: name,
-          category: category,
-        );
-        final payload = await apiClient!
-            .postJsonAny(ShoppingContract.shoppingPath, requestBody);
-        final normalized = ShoppingContract.parseSingleItem(payload);
-        if (normalized != null) {
-          item['id'] = normalized['id'];
-        }
-      } catch (e) {
-        lastSyncError = _friendlySyncError(
-          action: 'Shopping-Item konnte nicht auf Server gespeichert werden',
-          error: e,
-        );
-      }
+    if (apiClient == null) {
+      throw StateError('Shopping-Backend ist nicht konfiguriert.');
     }
 
-    return item;
+    try {
+      final requestBody = ShoppingContract.buildCreatePayload(
+        name: name,
+        category: category,
+      );
+      final payload = await apiClient!
+          .postJsonAny(ShoppingContract.shoppingPath, requestBody);
+      final normalized = ShoppingContract.parseSingleItem(payload);
+      if (normalized == null) {
+        throw StateError('Ungueltige Shopping-Antwort vom Server.');
+      }
+      return normalized;
+    } catch (e) {
+      lastSyncError = _friendlySyncError(
+        action: 'Shopping-Item konnte nicht auf Server gespeichert werden',
+        error: e,
+      );
+      rethrow;
+    }
   }
 
   Future<void> updateChecked(String id, bool checked) async {
     lastSyncError = null;
-    final current = await _readLocal();
-    final idx = current.indexWhere((i) => i['id'] == id);
-    if (idx == -1) return;
+    if (apiClient == null) {
+      throw StateError('Shopping-Backend ist nicht konfiguriert.');
+    }
 
-    final updated = Map<String, dynamic>.from(current[idx]);
-    updated['checked'] = checked;
-    current[idx] = updated;
-    await _persist(current);
-
-    if (apiClient != null) {
-      try {
-        await apiClient!.putJson(
-          ShoppingContract.itemByIdPath(id),
-          ShoppingContract.buildUpdatePayload(checked: checked),
-        );
-      } catch (e) {
-        lastSyncError = _friendlySyncError(
-          action: 'Shopping-Status konnte nicht synchronisiert werden',
-          error: e,
-        );
-      }
+    try {
+      await apiClient!.putJson(
+        ShoppingContract.itemByIdPath(id),
+        ShoppingContract.buildUpdatePayload(checked: checked),
+      );
+    } catch (e) {
+      lastSyncError = _friendlySyncError(
+        action: 'Shopping-Status konnte nicht synchronisiert werden',
+        error: e,
+      );
+      rethrow;
     }
   }
 
   Future<void> deleteItem(String id) async {
     lastSyncError = null;
-    final current = await _readLocal();
-    current.removeWhere((i) => i['id'] == id);
-    await _persist(current);
+    if (apiClient == null) {
+      throw StateError('Shopping-Backend ist nicht konfiguriert.');
+    }
 
-    if (apiClient != null) {
-      try {
-        await apiClient!.delete(ShoppingContract.itemByIdPath(id));
-      } catch (e) {
-        lastSyncError = _friendlySyncError(
-          action: 'Shopping-Item konnte nicht auf Server gelöscht werden',
-          error: e,
-        );
-      }
+    try {
+      await apiClient!.delete(ShoppingContract.itemByIdPath(id));
+    } catch (e) {
+      lastSyncError = _friendlySyncError(
+        action: 'Shopping-Item konnte nicht auf Server gelöscht werden',
+        error: e,
+      );
+      rethrow;
     }
   }
 
@@ -125,7 +103,7 @@ class ShoppingBackendService {
         raw.contains('tls') ||
         raw.contains('ssl') ||
         raw.contains('certificate')) {
-      return 'Server-Verbindung aktuell nicht sicher verfuegbar. Daten bleiben lokal gespeichert.';
+      return 'Server-Verbindung aktuell nicht sicher verfuegbar.';
     }
 
     if (raw.contains('socketexception') ||
@@ -133,30 +111,9 @@ class ShoppingBackendService {
         raw.contains('connection refused') ||
         raw.contains('timed out') ||
         raw.contains('timeout')) {
-      return 'Keine Verbindung zum Server. Daten bleiben lokal gespeichert.';
+      return 'Keine Verbindung zum Server.';
     }
 
     return '$action: $error';
-  }
-
-  Future<List<Map<String, dynamic>>> _readLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw == null || raw.isEmpty) return [];
-
-    final decoded = jsonDecode(raw);
-    if (decoded is List) {
-      return decoded
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
-    }
-
-    return [];
-  }
-
-  Future<void> _persist(List<Map<String, dynamic>> items) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, jsonEncode(items));
   }
 }

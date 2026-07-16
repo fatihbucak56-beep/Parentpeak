@@ -62,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen>
   List<String> _customTileOrderLabels = const [];
   int _newParentMatchesCount = 0;
   DateTime? _lastParentMatchHapticAt;
+  bool _isOpeningParentMatchQuickAction = false;
   late final AnimationController _attentionController;
   late final Animation<double> _attentionAnimation;
 
@@ -257,6 +258,9 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _openParentMatchQuickAction({
     required bool openNewConnections,
   }) async {
+    if (_isOpeningParentMatchQuickAction) return;
+    _isOpeningParentMatchQuickAction = true;
+
     final now = DateTime.now();
     final shouldHaptic = _lastParentMatchHapticAt == null ||
         now.difference(_lastParentMatchHapticAt!) >= const Duration(seconds: 1);
@@ -264,18 +268,22 @@ class _HomeScreenState extends State<HomeScreen>
       await HapticFeedback.lightImpact();
       _lastParentMatchHapticAt = now;
     }
-    await _storeRecentTileTap('Eltern Match');
-    if (!mounted) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ParentMatchingScreen(
-          openNewConnectionsOnOpen: openNewConnections,
+    try {
+      await _storeRecentTileTap('Eltern Match');
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ParentMatchingScreen(
+            openNewConnectionsOnOpen: openNewConnections,
+          ),
         ),
-      ),
-    );
-    if (!mounted) return;
-    await _restoreParentMatchStatusHint();
+      );
+      if (!mounted) return;
+      await _restoreParentMatchStatusHint();
+    } finally {
+      _isOpeningParentMatchQuickAction = false;
+    }
   }
 
   Future<void> _restoreParentMatchStatusHint() async {

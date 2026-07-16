@@ -87,8 +87,8 @@ const stripeWebhookToleranceSec = Number.parseInt(
 );
 const stripeSecretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
 const allowMockPaymentFallback =
-  (process.env.ALLOW_MOCK_PAYMENT_FALLBACK ||
-    (process.env.NODE_ENV === 'production' ? '0' : '1')) === '1';
+  process.env.NODE_ENV !== 'production' &&
+  (process.env.ALLOW_MOCK_PAYMENT_FALLBACK || '0') === '1';
 
 // Stripe client — initialized if secret key is available.
 let stripe = null;
@@ -1546,26 +1546,24 @@ async function ensureBackendUser(userId, displayName) {
 
 async function ensurePaymentContext(eventId, hosterId) {
   const trimmedEventId = (eventId || '').toString().trim();
-  const trimmedHosterId = await ensureBackendUser(hosterId || DEMO_USER_ID, hosterId || 'Demo Host');
-  const sourceEvent = events.find(item => item.id === trimmedEventId);
+  const trimmedHosterId = (hosterId || '').toString().trim();
 
-  await prisma.event.upsert({
-    where: { id: trimmedEventId },
-    update: {},
-    create: {
-      id: trimmedEventId,
-      hosterId: trimmedHosterId,
-      title: sourceEvent?.title || `Event ${trimmedEventId}`,
-      description: sourceEvent?.description || 'Automatisch fuer Payment-Persistenz angelegt',
-      startDate: sourceEvent?.eventDate ? new Date(sourceEvent.eventDate) : new Date(),
-      location: sourceEvent?.location || '',
-      status: sourceEvent?.status === 'active' ? 'upcoming' : (sourceEvent?.status || 'upcoming'),
-      eventType: sourceEvent?.category || 'generic',
-      maxParticipants: Number.isFinite(Number(sourceEvent?.maxParticipants))
-        ? Number(sourceEvent.maxParticipants)
-        : null,
-    },
-  });
+  if (!trimmedEventId || !trimmedHosterId) {
+    throw new Error('eventId und hosterId sind erforderlich');
+  }
+
+  const [eventRecord, userRecord] = await Promise.all([
+    prisma.event.findUnique({ where: { id: trimmedEventId } }),
+    prisma.user.findUnique({ where: { id: trimmedHosterId } }),
+  ]);
+
+  if (!eventRecord) {
+    throw new Error('Event nicht gefunden');
+  }
+
+  if (!userRecord) {
+    throw new Error('Hoster nicht gefunden');
+  }
 
   return { eventId: trimmedEventId, hosterId: trimmedHosterId };
 }

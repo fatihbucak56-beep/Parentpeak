@@ -5,6 +5,16 @@ import 'package:trusted_circle_demo/config/api_config.dart';
 
 import 'backend_api_client.dart';
 
+class ParentMatchActionResult {
+  const ParentMatchActionResult({
+    required this.connected,
+    required this.matchState,
+  });
+
+  final bool connected;
+  final String matchState;
+}
+
 class ParentMatchingBackendService {
   ParentMatchingBackendService({this.apiClient});
 
@@ -45,12 +55,17 @@ class ParentMatchingBackendService {
     return [];
   }
 
-  Future<bool> sendAction({
+  Future<ParentMatchActionResult> sendAction({
     required String profileId,
     required String action,
     String? userId,
   }) async {
-    if (apiClient == null) return action == 'like';
+    if (apiClient == null) {
+      return ParentMatchActionResult(
+        connected: action == 'like',
+        matchState: action == 'like' ? 'pending' : 'none',
+      );
+    }
 
     try {
       final payload = await apiClient!.postJsonAny(
@@ -66,12 +81,27 @@ class ParentMatchingBackendService {
       );
 
       if (payload is Map<String, dynamic>) {
-        return payload['connected'] == true;
+        final connected = payload['connected'] == true;
+        final matchState = (payload['matchState'] ??
+                (connected
+                    ? 'matched'
+                    : (action == 'like' ? 'pending' : 'none')))
+            .toString();
+        return ParentMatchActionResult(
+          connected: connected,
+          matchState: matchState,
+        );
       }
-      return action == 'like';
+      return ParentMatchActionResult(
+        connected: action == 'like',
+        matchState: action == 'like' ? 'pending' : 'none',
+      );
     } catch (e) {
       lastSyncError = 'Matching-Aktion konnte nicht synchronisiert werden: $e';
-      return action == 'like';
+      return ParentMatchActionResult(
+        connected: action == 'like',
+        matchState: action == 'like' ? 'pending' : 'none',
+      );
     }
   }
 

@@ -281,6 +281,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     return list[_currentIndex];
   }
 
+  List<_ParentProfile> get _pendingProfiles {
+    final matchedIds = _matchedProfiles.map((p) => p.id).toSet();
+    return _likedProfiles.where((p) => !matchedIds.contains(p.id)).toList();
+  }
+
   void _moveNext() {
     final list = _filteredProfiles;
     if (list.isEmpty) return;
@@ -402,7 +407,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
 
     _moveNext();
     _persistState();
-    final connected = await _service.sendAction(
+    final result = await _service.sendAction(
       profileId: profile.id,
       action: 'like',
       userId: _currentUserId,
@@ -410,10 +415,18 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     await _refreshConnectionsFromBackend();
     if (!mounted) return;
 
-    if (connected) {
+    if (result.connected || result.matchState == 'matched') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Verbindung aktiv mit ${profile.name} ($score%)'),
+          content: Text('Match bestätigt mit ${profile.name} ($score%)'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else if (result.matchState == 'pending') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Anfrage an ${profile.name} gesendet. Wir melden uns, sobald es gegenseitig ist.'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -924,6 +937,13 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                 ),
                 const SizedBox(width: 8),
                 _StatPill(
+                  icon: Icons.hourglass_top_rounded,
+                  label: 'Ausstehend',
+                  value: _pendingProfiles.length,
+                  color: const Color(0xFFF59E0B),
+                ),
+                const SizedBox(width: 8),
+                _StatPill(
                   icon: Icons.handshake_rounded,
                   label: 'Verbindungen',
                   value: _matchedProfiles.length,
@@ -997,6 +1017,42 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
               ],
             ),
             const SizedBox(height: 10),
+            if (_pendingProfiles.isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.tertiaryContainer
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ausstehende Anfragen',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _pendingProfiles
+                          .map((p) => Chip(
+                                avatar: const Icon(
+                                  Icons.hourglass_top_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(p.name),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+                ),
+              ),
             if (_matchedProfiles.isNotEmpty)
               Container(
                 width: double.infinity,

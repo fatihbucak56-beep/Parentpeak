@@ -456,6 +456,55 @@ async function runTests() {
     failed++;
   }
 
+  // Test 12: Severe content auto-archive on create
+  try {
+    console.log('\n🛡️  Test 12: Severe content auto-archive on create');
+    const severeData = {
+      userId: 'user-safe-check',
+      title: 'Betrug Angebot Demo',
+      description: 'Nur für Moderationsprüfung',
+      location: 'Berlin',
+      latitude: 52.52,
+      longitude: 13.405,
+      category: 'toy',
+      condition: 'good',
+      isFree: true,
+      visibility: 'nearby',
+      shareRadiusKm: 10,
+    };
+
+    const createRes = await makeRequest('POST', '/api/treasures', severeData, BEARER_TOKEN);
+    if (createRes.status !== 201 || !createRes.body.treasure?.id) {
+      throw new Error(`Expected 201 with treasure id, got ${createRes.status}: ${JSON.stringify(createRes.body)}`);
+    }
+
+    if (createRes.body.treasure.status !== 'archived' || createRes.body.moderation?.autoArchivedOnCreate !== true) {
+      throw new Error(`Expected auto-archived create result, got: ${JSON.stringify(createRes.body)}`);
+    }
+
+    const archivedId = createRes.body.treasure.id;
+    const availableList = await makeRequest('GET', '/api/treasures?status=available&visibility=nearby&maxResults=100');
+    if (availableList.status !== 200 || !Array.isArray(availableList.body.treasures)) {
+      throw new Error(`Expected 200 with treasures array, got ${availableList.status}`);
+    }
+
+    const existsInAvailable = availableList.body.treasures.some((item) => item.id === archivedId);
+    if (existsInAvailable) {
+      throw new Error('Expected severe listing to be hidden from available feed');
+    }
+
+    const cleanupRes = await makeRequest('DELETE', `/api/treasures/${archivedId}?userId=user-safe-check`, null, BEARER_TOKEN);
+    if (cleanupRes.status !== 200 && cleanupRes.status !== 204) {
+      throw new Error(`Expected cleanup delete 200/204, got ${cleanupRes.status}`);
+    }
+
+    console.log('  ✓ Severe content is auto-archived and hidden from available feed');
+    passed++;
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
   // Summary
   console.log('\n==================================================');
   console.log(`Tests passed: ${passed}`);

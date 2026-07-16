@@ -6579,6 +6579,7 @@ app.post('/api/treasures', async (req, res) => {
     // Calculate expiry: 30 days from now
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
+    const severeContent = isTreasureContentSevere({ title, description });
 
     const treasure = await prisma.treasureItem.create({
       data: {
@@ -6596,12 +6597,18 @@ app.post('/api/treasures', async (req, res) => {
         shareRadiusKm: shareRadiusKm ? parseFloat(shareRadiusKm) : 10,
         photoUrl: photoUrl ? String(photoUrl).slice(0, 500) : null,
         expiresAt: expiresAt,
-        status: 'available',
+        status: severeContent ? 'archived' : 'available',
       },
       include: { ratings: true, handovers: true }
     });
 
-    res.status(201).json({ treasure });
+    res.status(201).json({
+      treasure,
+      moderation: {
+        autoArchivedOnCreate: severeContent,
+        reason: severeContent ? 'severe_content_keyword_match' : 'none',
+      },
+    });
   } catch (err) {
     console.error('❌ Treasure creation error:', err.message, err);
     res.status(500).json({ error: `Treasure creation failed: ${err.message}` });
@@ -6719,6 +6726,21 @@ function isTreasureReportSevere({ reason, note }) {
 function shouldAutoArchiveTreasure({ severe, recentReportCount }) {
   if (severe) return true;
   return recentReportCount >= 3;
+}
+
+function isTreasureContentSevere({ title, description }) {
+  const text = `${String(title || '').toLowerCase()} ${String(description || '').toLowerCase()}`;
+  const severeKeywords = [
+    'gewalt',
+    'hass',
+    'sex',
+    'nackt',
+    'missbrauch',
+    'betrug',
+    'scam',
+    'drohung',
+  ];
+  return severeKeywords.some(keyword => text.includes(keyword));
 }
 
 /**

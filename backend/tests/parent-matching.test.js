@@ -4,7 +4,9 @@
  */
 
 const http = require('http');
-const API_BASE = 'http://localhost:3000';
+const https = require('https');
+const API_BASE = process.env.API_BASE || 'https://parentpeak.onrender.com';
+const BEARER_TOKEN = process.env.BEARER_TOKEN || '';
 
 // Test data
 const testProfile1 = {
@@ -50,6 +52,7 @@ const testProfile3 = {
 function makeRequest(method, path, body = null, token = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, API_BASE);
+    const protocol = url.protocol === 'https:' ? https : http;
     const options = {
       hostname: url.hostname,
       port: url.port,
@@ -61,7 +64,7 @@ function makeRequest(method, path, body = null, token = null) {
       },
     };
 
-    const req = http.request(options, (res) => {
+    const req = protocol.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -71,7 +74,7 @@ function makeRequest(method, path, body = null, token = null) {
             body: data ? JSON.parse(data) : null,
           });
         } catch (e) {
-          reject(e);
+          reject(new Error(`Failed to parse response: ${e.message}`));
         }
       });
     });
@@ -84,7 +87,8 @@ function makeRequest(method, path, body = null, token = null) {
 
 // Test Suite
 async function runTests() {
-  console.log('\n🧪 Parent Matching Integration Tests\n');
+  console.log('\n🧪 Parent Matching Integration Tests');
+  console.log(`📍 API Base: ${API_BASE}\n`);
   
   let profileId1, profileId2, profileId3;
   let passed = 0;
@@ -93,15 +97,24 @@ async function runTests() {
   // Test 1: Create profiles
   try {
     console.log('📝 Test 1: Create profiles');
-    const res1 = await makeRequest('POST', '/api/parent-matching/profiles', testProfile1);
+    const res1 = await makeRequest('POST', '/api/parent-matching/profiles', testProfile1, BEARER_TOKEN);
+    if (res1.status !== 201 && res1.status !== 200) {
+      throw new Error(`Expected 200/201, got ${res1.status}: ${JSON.stringify(res1.body)}`);
+    }
     profileId1 = res1.body.profile.id;
     console.log(`  ✓ Profile 1 created: ${profileId1}`);
     
-    const res2 = await makeRequest('POST', '/api/parent-matching/profiles', testProfile2);
+    const res2 = await makeRequest('POST', '/api/parent-matching/profiles', testProfile2, BEARER_TOKEN);
+    if (res2.status !== 201 && res2.status !== 200) {
+      throw new Error(`Expected 200/201, got ${res2.status}: ${JSON.stringify(res2.body)}`);
+    }
     profileId2 = res2.body.profile.id;
     console.log(`  ✓ Profile 2 created: ${profileId2}`);
     
-    const res3 = await makeRequest('POST', '/api/parent-matching/profiles', testProfile3);
+    const res3 = await makeRequest('POST', '/api/parent-matching/profiles', testProfile3, BEARER_TOKEN);
+    if (res3.status !== 201 && res3.status !== 200) {
+      throw new Error(`Expected 200/201, got ${res3.status}: ${JSON.stringify(res3.body)}`);
+    }
     profileId3 = res3.body.profile.id;
     console.log(`  ✓ Profile 3 created (Munich): ${profileId3}`);
     passed++;
@@ -114,6 +127,10 @@ async function runTests() {
   try {
     console.log('\n🎯 Test 2: Find matches for profile 1 (Berlin)');
     const res = await makeRequest('GET', `/api/parent-matching/find?userId=${profileId1}`);
+    
+    if (res.status !== 200) {
+      throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
     
     if (!Array.isArray(res.body.matches)) {
       throw new Error('Expected matches array');
@@ -150,7 +167,11 @@ async function runTests() {
       userId: profileId1,
       matchedProfileId: profileId2,
       action: 'like',
-    });
+    }, BEARER_TOKEN);
+    
+    if (res.status !== 200) {
+      throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
     
     if (res.body.success) {
       console.log(`  ✓ Action recorded successfully`);
@@ -170,12 +191,12 @@ async function runTests() {
       userId: profileId1,
       matchedProfileId: profileId3,
       action: 'pass',
-    });
+    }, BEARER_TOKEN);
     await makeRequest('POST', '/api/parent-matching/record-action', {
       userId: profileId2,
       matchedProfileId: profileId1,
       action: 'favorite',
-    });
+    }, BEARER_TOKEN);
     console.log(`  ✓ Multiple actions recorded`);
     passed++;
   } catch (e) {

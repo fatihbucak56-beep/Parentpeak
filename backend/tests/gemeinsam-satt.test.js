@@ -4,7 +4,9 @@
  */
 
 const http = require('http');
-const API_BASE = 'http://localhost:3000';
+const https = require('https');
+const API_BASE = process.env.API_BASE || 'https://parentpeak.onrender.com';
+const BEARER_TOKEN = process.env.BEARER_TOKEN || '';
 
 const testRecipe1 = {
   title: 'Klassischer Kartoffelsalat',
@@ -50,6 +52,7 @@ const testRecipe2 = {
 function makeRequest(method, path, body = null, token = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, API_BASE);
+    const protocol = url.protocol === 'https:' ? https : http;
     const options = {
       hostname: url.hostname,
       port: url.port,
@@ -61,7 +64,7 @@ function makeRequest(method, path, body = null, token = null) {
       },
     };
 
-    const req = http.request(options, (res) => {
+    const req = protocol.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -71,7 +74,7 @@ function makeRequest(method, path, body = null, token = null) {
             body: data ? JSON.parse(data) : null,
           });
         } catch (e) {
-          reject(e);
+          reject(new Error(`Failed to parse response: ${e.message}`));
         }
       });
     });
@@ -84,7 +87,8 @@ function makeRequest(method, path, body = null, token = null) {
 
 // Test Suite
 async function runTests() {
-  console.log('\n🍳 Gemeinsam Satt Integration Tests\n');
+  console.log('\n🍳 Gemeinsam Satt Integration Tests');
+  console.log(`📍 API Base: ${API_BASE}\n`);
   
   let recipeId1, recipeId2;
   let passed = 0;
@@ -98,7 +102,11 @@ async function runTests() {
       ...testRecipe1,
       creatorUserId: testUserId,
       familyId: 'family-1',
-    });
+    }, BEARER_TOKEN);
+    
+    if (res1.status !== 201 && res1.status !== 200) {
+      throw new Error(`Expected 200/201, got ${res1.status}: ${JSON.stringify(res1.body)}`);
+    }
     
     if (!res1.body.recipe || !res1.body.recipe.id) {
       throw new Error('Recipe creation failed');
@@ -111,7 +119,10 @@ async function runTests() {
       ...testRecipe2,
       creatorUserId: testUserId,
       familyId: 'family-1',
-    });
+    }, BEARER_TOKEN);
+    if (res2.status !== 201 && res2.status !== 200) {
+      throw new Error(`Expected 200/201, got ${res2.status}: ${JSON.stringify(res2.body)}`);
+    }
     recipeId2 = res2.body.recipe.id;
     console.log(`  ✓ Recipe 2 created: ${recipeId2}`);
     passed++;
@@ -124,6 +135,10 @@ async function runTests() {
   try {
     console.log('\n📋 Test 2: List recipes with pagination');
     const res = await makeRequest('GET', '/api/food-feed/recipes?skip=0&take=10');
+    
+    if (res.status !== 200) {
+      throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
     
     if (Array.isArray(res.body.recipes)) {
       console.log(`  ✓ Found ${res.body.recipes.length} recipe(s)`);
@@ -141,6 +156,10 @@ async function runTests() {
   try {
     console.log('\n🏷️  Test 3: Filter recipes by category');
     const res = await makeRequest('GET', '/api/food-feed/recipes?category=Salat&take=10');
+    
+    if (res.status !== 200) {
+      throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
     
     const salatRecipes = res.body.recipes.filter(r => r.category === 'Salat');
     console.log(`  ✓ Found ${salatRecipes.length} Salat recipe(s)`);
@@ -180,7 +199,7 @@ async function runTests() {
       userId: 'rater-1',
       rating: 5,
       comment: 'Sehr lecker!',
-    });
+    }, BEARER_TOKEN);
     
     console.log(`  ✓ Recipe rated`);
     
@@ -206,11 +225,11 @@ async function runTests() {
     await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/rate`, {
       userId: 'rater-2',
       rating: 4,
-    });
+    }, BEARER_TOKEN);
     await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/rate`, {
       userId: 'rater-3',
       rating: 5,
-    });
+    }, BEARER_TOKEN);
     
     const recipeRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}`);
     const expectedAvg = (5 + 4 + 5) / 3;
@@ -230,7 +249,7 @@ async function runTests() {
       creatorUserId: testUserId,
       title: 'Kartoffelsalat - Südwestdeutsche Variante',
       description: 'Aktualisierte Beschreibung',
-    });
+    }, BEARER_TOKEN);
     
     if (updateRes.body.recipe) {
       console.log(`  ✓ Recipe updated: ${updateRes.body.recipe.title}`);
@@ -249,7 +268,7 @@ async function runTests() {
     const unauthorizedRes = await makeRequest('PUT', `/api/food-feed/recipes/${recipeId1}`, {
       creatorUserId: 'wrong-user',
       title: 'Hacked title',
-    });
+    }, BEARER_TOKEN);
     
     if (unauthorizedRes.status === 403) {
       console.log(`  ✓ Correctly rejected unauthorized update (403)`);
@@ -270,7 +289,7 @@ async function runTests() {
     console.log('\n🗑️  Test 9: Delete recipe');
     const deleteRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId2}`, {
       creatorUserId: testUserId,
-    });
+    }, BEARER_TOKEN);
     
     if (deleteRes.body.success) {
       console.log(`  ✓ Recipe deleted`);

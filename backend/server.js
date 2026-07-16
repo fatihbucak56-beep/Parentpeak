@@ -5331,6 +5331,11 @@ app.post('/admin/migrate-db', async (req, res) => {
       ALTER TABLE "Event" DROP CONSTRAINT IF EXISTS "Event_hosterId_fkey";
     `);
 
+    // Drop foreign key constraint for TreasureItem userId if it exists
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "TreasureItem" DROP CONSTRAINT IF EXISTS "TreasureItem_userId_fkey";
+    `);
+
     // Create TreasureItem table if it doesn't exist
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "TreasureItem" (
@@ -5362,7 +5367,6 @@ app.post('/admin/migrate-db', async (req, res) => {
         "views" INTEGER NOT NULL DEFAULT 0,
         "rating" DOUBLE PRECISION NOT NULL DEFAULT 0,
         "ratingCount" INTEGER NOT NULL DEFAULT 0,
-        CONSTRAINT "TreasureItem_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE,
         CONSTRAINT "TreasureItem_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "Family" ("id") ON DELETE SET NULL
       );
     `);

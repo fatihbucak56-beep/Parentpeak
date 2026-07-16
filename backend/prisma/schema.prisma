@@ -36,7 +36,6 @@ model User {
   paymentTransactions   PaymentTransaction[]
   messages              Message[]
   chatReports           ChatReport[]
-  treasureCreated       TreasureItem[]  @relation("TreasureCreator")
   treasureRatingsGiven  TreasureRating[]  @relation("TreasureRatingFrom")
   handoverRequests      TreasureHandover[]  @relation("TreasureHandoverRequester")
   
@@ -225,9 +224,8 @@ model ChatReport {
 model TreasureItem {
   id                    String   @id @default(cuid())
   
-  // Creator/Owner
+  // Creator/Owner (can be any external user, not necessarily in User table)
   userId                String
-  user                  User     @relation("TreasureCreator", fields: [userId], references: [id], onDelete: Cascade)
   
   // Family context (optional)
   familyId              String?

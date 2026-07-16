@@ -176,7 +176,7 @@ void main() {
       });
 
       final svc = EventBackendService(apiClient: _client(mockHttp));
-      final ok = await svc.deleteEvent('ev1');
+      final ok = await svc.deleteEvent('ev1', hosterId: 'host1');
       expect(ok, isTrue);
       expect(captured!.method, 'DELETE');
     });
@@ -186,7 +186,7 @@ void main() {
           http.Response('{"error":"forbidden"}', 403,
               headers: {'content-type': 'application/json'}));
       final svc = EventBackendService(apiClient: _client(mockHttp));
-      final ok = await svc.deleteEvent('ev1');
+      final ok = await svc.deleteEvent('ev1', hosterId: 'host1');
       expect(ok, isFalse);
     });
   });

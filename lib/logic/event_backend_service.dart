@@ -21,8 +21,8 @@ class EventBackendService {
 
   bool get isEnabled => _apiClient != null;
 
-  String get _eventsPath => APIConfig.getBackendEventsPath();
-  String get _invitationsPath => APIConfig.getBackendEventInvitationsPath();
+  String get _eventsPath => '/api/events';
+  String get _invitationsPath => '/api/events/invitations';
 
   Future<List<MeetupEvent>> fetchEvents({
     String? status,
@@ -34,11 +34,14 @@ class EventBackendService {
     try {
       final query = <String, String>{
         if (status != null && status.isNotEmpty) 'status': status,
-        if (hostUserId != null && hostUserId.isNotEmpty) 'hostUserId': hostUserId,
-        'limit': limit.toString(),
+        if (hostUserId != null && hostUserId.isNotEmpty) 'hosterId': hostUserId,
+        'maxResults': limit.toString(),
         'offset': offset.toString(),
       };
       final payload = await _apiClient!.getJson(_appendQuery(_eventsPath, query));
+      if (payload is Map<String, dynamic> && payload.containsKey('events')) {
+        return _parseEventList(payload['events']);
+      }
       return _parseEventList(payload);
     } catch (e) {
       lastSyncError = 'Events konnten nicht geladen werden: $e';
@@ -57,18 +60,19 @@ class EventBackendService {
     if (_apiClient == null) return [];
     try {
       final query = <String, String>{
-        'viewerUserId': viewerUserId,
-        'viewerLatitude': viewerLatitude.toString(),
-        'viewerLongitude': viewerLongitude.toString(),
-        'limit': limit.toString(),
+        'latitude': viewerLatitude.toString(),
+        'longitude': viewerLongitude.toString(),
+        'radiusKm': '25',
+        'maxResults': limit.toString(),
         'offset': offset.toString(),
+        'status': 'upcoming',
+        'visibility': 'publicNearby',
       };
-      if (ageGroups != null && ageGroups.isNotEmpty) {
-        query['ageGroups'] = ageGroups.map((e) => e.name).join(',');
-      }
 
-      final payload =
-          await _apiClient!.getJson(_appendQuery('$_eventsPath/discover', query));
+      final payload = await _apiClient!.getJson(_appendQuery(_eventsPath, query));
+      if (payload is Map<String, dynamic> && payload.containsKey('events')) {
+        return _parseEventList(payload['events']);
+      }
       return _parseEventList(payload);
     } catch (e) {
       lastSyncError = 'Event-Discovery fehlgeschlagen: $e';
@@ -79,7 +83,10 @@ class EventBackendService {
   Future<MeetupEvent?> fetchEventById(String id) async {
     if (_apiClient == null) return null;
     try {
-      final payload = await _apiClient!.getJson('$_eventsPath/item/$id');
+      final payload = await _apiClient!.getJson('$_eventsPath/$id');
+      if (payload is Map<String, dynamic> && payload.containsKey('event')) {
+        return _parseSingleEvent(payload['event']);
+      }
       return _parseSingleEvent(payload);
     } catch (e) {
       lastSyncError = 'Event konnte nicht geladen werden: $e';
@@ -90,7 +97,24 @@ class EventBackendService {
   Future<MeetupEvent?> createEvent(MeetupEvent event) async {
     if (_apiClient == null) return null;
     try {
-      final payload = await _apiClient!.postJsonAny(_eventsPath, event.toJson());
+      final eventData = {
+        'hosterId': event.hosterId,
+        'title': event.title,
+        'description': event.description,
+        'location': event.location,
+        'latitude': event.latitude,
+        'longitude': event.longitude,
+        'startDate': event.eventDate.toIso8601String(),
+        'eventType': event.category.name,
+        'visibility': event.visibility.name,
+        'maxParticipants': event.maxParticipants,
+        'imageUrl': event.photoUrl,
+      };
+
+      final payload = await _apiClient!.postJsonAny(_eventsPath, eventData);
+      if (payload is Map<String, dynamic> && payload.containsKey('event')) {
+        return _parseSingleEvent(payload['event']);
+      }
       return _parseSingleEvent(payload);
     } catch (e) {
       lastSyncError = 'Event konnte nicht erstellt werden: $e';
@@ -98,10 +122,10 @@ class EventBackendService {
     }
   }
 
-  Future<bool> deleteEvent(String id) async {
+  Future<bool> deleteEvent(String id, {required String hosterId}) async {
     if (_apiClient == null) return false;
     try {
-      await _apiClient!.delete('$_eventsPath/item/$id');
+      await _apiClient!.deleteJson('$_eventsPath/$id', {'hosterId': hosterId});
       return true;
     } catch (e) {
       lastSyncError = 'Event konnte nicht gelöscht werden: $e';
@@ -118,9 +142,12 @@ class EventBackendService {
     try {
       final body = <String, dynamic>{
         ...fields,
-        if (requestingUserId != null) 'requestingUserId': requestingUserId,
+        if (requestingUserId != null) 'hosterId': requestingUserId,
       };
-      final payload = await _apiClient!.putJson('$_eventsPath/item/$id', body);
+      final payload = await _apiClient!.putJson('$_eventsPath/$id', body);
+      if (payload is Map<String, dynamic> && payload.containsKey('event')) {
+        return _parseSingleEvent(payload['event']);
+      }
       return _parseSingleEvent(payload);
     } catch (e) {
       lastSyncError = 'Event konnte nicht aktualisiert werden: $e';

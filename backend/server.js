@@ -6137,6 +6137,293 @@ app.post('/api/food-feed/recipes/:id/rate', async (req, res) => {
   }
 });
 
+/**
+ * EVENTS & AKTIVITÄTEN - Community Event System
+ */
+
+/**
+ * Haversine distance calculation (in km)
+ * Calculates great-circle distance between two points on Earth
+ */
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * POST /api/events
+ * Create a new community event
+ */
+app.post('/api/events', async (req, res) => {
+  const {
+    hosterId, title, description, location, latitude, longitude,
+    startDate, endDate, eventType, visibility, shareRadiusKm, maxParticipants,
+    costPerPerson, imageUrl, ageGroups
+  } = req.body;
+
+  // Validate required fields
+  if (!hosterId || !title || !location || latitude === undefined || longitude === undefined) {
+    return res.status(400).json({
+      error: 'hosterId, title, location, latitude, longitude erforderlich'
+    });
+  }
+
+  // Validate coordinates
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'Ungültige Koordinaten' });
+  }
+
+  // Validate title length
+  if (String(title).length < 3 || String(title).length > 200) {
+    return res.status(400).json({ error: 'Titel muss 3-200 Zeichen lang sein' });
+  }
+
+  try {
+    const event = await prisma.event.create({
+      data: {
+        hosterId: String(hosterId).slice(0, 100),
+        title: String(title).slice(0, 200),
+        description: description ? String(description).slice(0, 2000) : null,
+        location: String(location).slice(0, 200),
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        startDate: startDate ? new Date(startDate) : new Date(),
+        endDate: endDate ? new Date(endDate) : null,
+        eventType: eventType ? String(eventType).slice(0, 50) : 'generic',
+        visibility: visibility ? String(visibility).slice(0, 50) : 'publicNearby',
+        shareRadiusKm: shareRadiusKm ? parseFloat(shareRadiusKm) : 25,
+        maxParticipants: maxParticipants ? parseInt(maxParticipants, 10) : null,
+        costPerPerson: costPerPerson ? parseFloat(costPerPerson) : null,
+        imageUrl: imageUrl ? String(imageUrl).slice(0, 500) : null,
+        status: 'upcoming',
+      },
+      include: { participants: true }
+    });
+
+    res.status(201).json({ event });
+  } catch (err) {
+    console.error('❌ Event creation error:', err);
+    res.status(500).json({ error: 'Event konnte nicht erstellt werden' });
+  }
+});
+
+/**
+ * GET /api/events
+ * Discover and list events with filtering
+ * Query params: status, eventType, visibility, latitude, longitude, radiusKm, maxResults, hosterId
+ */
+app.get('/api/events', async (req, res) => {
+  const {
+    status = 'upcoming',
+    eventType,
+    visibility = 'publicNearby',
+    latitude,
+    longitude,
+    radiusKm = 25,
+    maxResults = 50,
+    offset = 0,
+    hosterId
+  } = req.query;
+
+  try {
+    const where = {
+      status: String(status),
+      visibility: String(visibility),
+      ...(eventType && { eventType: String(eventType) }),
+      ...(hosterId && { hosterId: String(hosterId) }),
+    };
+
+    let events = await prisma.event.findMany({
+      where,
+      orderBy: { startDate: 'asc' },
+      take: Math.min(parseInt(maxResults, 10) || 50, 100),
+      skip: parseInt(offset, 10) || 0,
+      include: {
+        participants: { select: { userId: true, status: true } },
+        hoster: { select: { id: true, firstName: true, lastName: true, avatar: true } }
+      }
+    });
+
+    // Filter by geographic proximity if coordinates provided
+    if (latitude !== undefined && longitude !== undefined) {
+      const viewerLat = parseFloat(latitude);
+      const viewerLon = parseFloat(longitude);
+      const maxDistance = parseFloat(radiusKm) || 25;
+
+      events = events.filter(event => {
+        const distance = haversineDistance(viewerLat, viewerLon, event.latitude, event.longitude);
+        return distance <= maxDistance;
+      }).sort((a, b) => {
+        const distA = haversineDistance(viewerLat, viewerLon, a.latitude, a.longitude);
+        const distB = haversineDistance(viewerLat, viewerLon, b.latitude, b.longitude);
+        return distA - distB; // Closest first
+      });
+    }
+
+    const formattedEvents = events.map(e => ({
+      id: e.id,
+      hosterId: e.hosterId,
+      hoster: e.hoster,
+      title: e.title,
+      description: e.description,
+      location: e.location,
+      latitude: e.latitude,
+      longitude: e.longitude,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      eventType: e.eventType,
+      visibility: e.visibility,
+      shareRadiusKm: e.shareRadiusKm,
+      maxParticipants: e.maxParticipants,
+      currentParticipants: e.participants.filter(p => p.status !== 'declined').length,
+      costPerPerson: e.costPerPerson,
+      imageUrl: e.imageUrl,
+      status: e.status,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+    }));
+
+    res.json({ events: formattedEvents, total: formattedEvents.length });
+  } catch (err) {
+    console.error('❌ Events list error:', err);
+    res.status(500).json({ error: 'Events konnten nicht geladen werden' });
+  }
+});
+
+/**
+ * GET /api/events/:id
+ * Get single event details
+ */
+app.get('/api/events/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const event = await prisma.event.findUnique({
+      where: { id },
+      include: {
+        participants: {
+          include: { user: { select: { id: true, firstName: true, lastName: true, avatar: true } } }
+        },
+        hoster: { select: { id: true, firstName: true, lastName: true, avatar: true, bio: true } },
+        chat: { include: { messages: { take: 5, orderBy: { createdAt: 'desc' } } } }
+      }
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    const formattedEvent = {
+      ...event,
+      currentParticipants: event.participants.filter(p => p.status !== 'declined').length,
+      isFull: event.maxParticipants ? 
+        event.participants.filter(p => p.status !== 'declined').length >= event.maxParticipants : 
+        false,
+      spotsAvailable: event.maxParticipants ? 
+        Math.max(0, event.maxParticipants - event.participants.filter(p => p.status !== 'declined').length) : 
+        null,
+    };
+
+    res.json({ event: formattedEvent });
+  } catch (err) {
+    console.error('❌ Event detail error:', err);
+    res.status(500).json({ error: 'Event konnte nicht geladen werden' });
+  }
+});
+
+/**
+ * PUT /api/events/:id
+ * Update event (owner only)
+ */
+app.put('/api/events/:id', async (req, res) => {
+  const { id } = req.params;
+  const { hosterId, title, description, location, latitude, longitude, startDate, endDate, maxParticipants } = req.body;
+
+  if (!hosterId) {
+    return res.status(400).json({ error: 'hosterId erforderlich' });
+  }
+
+  try {
+    // Verify ownership
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    if (event.hosterId !== String(hosterId)) {
+      return res.status(403).json({ error: 'Nur der Ersteller kann das Event bearbeiten' });
+    }
+
+    // Validate coordinates if provided
+    if (latitude !== undefined || longitude !== undefined) {
+      const lat = latitude !== undefined ? parseFloat(latitude) : event.latitude;
+      const lon = longitude !== undefined ? parseFloat(longitude) : event.longitude;
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+        return res.status(400).json({ error: 'Ungültige Koordinaten' });
+      }
+    }
+
+    const updatedEvent = await prisma.event.update({
+      where: { id },
+      data: {
+        ...(title && { title: String(title).slice(0, 200) }),
+        ...(description && { description: String(description).slice(0, 2000) }),
+        ...(location && { location: String(location).slice(0, 200) }),
+        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
+        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
+        ...(startDate && { startDate: new Date(startDate) }),
+        ...(endDate && { endDate: new Date(endDate) }),
+        ...(maxParticipants !== undefined && { maxParticipants: parseInt(maxParticipants, 10) }),
+        updatedAt: new Date(),
+      },
+      include: { participants: true }
+    });
+
+    res.json({ event: updatedEvent });
+  } catch (err) {
+    console.error('❌ Event update error:', err);
+    res.status(500).json({ error: 'Event konnte nicht aktualisiert werden' });
+  }
+});
+
+/**
+ * DELETE /api/events/:id
+ * Delete event (owner only)
+ */
+app.delete('/api/events/:id', async (req, res) => {
+  const { id } = req.params;
+  const { hosterId } = req.body;
+
+  if (!hosterId) {
+    return res.status(400).json({ error: 'hosterId erforderlich' });
+  }
+
+  try {
+    // Verify ownership
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) {
+      return res.status(404).json({ error: 'Event nicht gefunden' });
+    }
+
+    if (event.hosterId !== String(hosterId)) {
+      return res.status(403).json({ error: 'Nur der Ersteller kann das Event löschen' });
+    }
+
+    await prisma.event.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Event delete error:', err);
+    res.status(500).json({ error: 'Event konnte nicht gelöscht werden' });
+  }
+});
+
 // Server starten
 app.listen(PORT, '0.0.0.0', () => {
   if (allowedOrigins.length > 0) {

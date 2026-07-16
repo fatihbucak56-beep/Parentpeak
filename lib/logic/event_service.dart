@@ -283,7 +283,15 @@ class EventService {
       _throwBackendRequired('Event löschen');
     }
 
-    final removed = await _backend.deleteEvent(eventId);
+    // Get hosterId from cached event
+    MeetupEvent? cachedEvent;
+    try {
+      cachedEvent = _cachedEvents.firstWhere((e) => e.id == eventId);
+    } catch (e) {
+      _throwBackendRequired('Event nicht gefunden');
+    }
+
+    final removed = await _backend.deleteEvent(eventId, hosterId: cachedEvent.hosterId);
     if (!removed) {
       _throwBackendRequired('Event löschen');
     }

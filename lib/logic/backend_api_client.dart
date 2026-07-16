@@ -109,6 +109,22 @@ class BackendApiClient {
     }
   }
 
+  Future<dynamic> deleteJson(String path, Map<String, dynamic> body) async {
+    final response = await _httpClient
+        .delete(
+          _uri(path),
+          headers: _headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('DELETE $path failed: ${response.statusCode}');
+    }
+
+    return _decodeResponse(response.body);
+  }
+
   /// Uploads an image file via multipart POST to [path] (field name: 'image').
   /// Returns the decoded JSON response or throws on failure.
   Future<Map<String, dynamic>> uploadImageFile(

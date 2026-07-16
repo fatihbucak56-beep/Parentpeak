@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:trusted_circle_demo/config/api_config.dart';
 import 'package:trusted_circle_demo/models/food_share_post.dart';
 import 'package:trusted_circle_demo/models/shared_recipe.dart';
+import 'package:trusted_circle_demo/models/meal_plan.dart';
+import 'package:trusted_circle_demo/services/meal_planner_service.dart';
 
 // ============================================================
 // GEMEINSAM SATT — Eltern-Essenssolidarität
@@ -27,13 +30,37 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
 
   late List<FoodSharePost> _posts;
   late List<SharedRecipe> _recipes;
+  late WeekPlan _weekPlan;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _posts = _buildDemoPosts();
     _recipes = _buildDemoRecipes();
+    _weekPlan = _buildDemoWeekPlan();
+    
+    // Load meal plan from API
+    _loadWeekMealPlan();
+  }
+
+  Future<void> _loadWeekMealPlan() async {
+    try {
+      final familyId = APIConfig.getBackendFamilyId();
+      final weekPlan = await MealPlannerService.getWeekMealPlan(
+        familyId,
+        DateTime.now(),
+      );
+      
+      if (weekPlan != null && weekPlan.days.isNotEmpty) {
+        setState(() {
+          _weekPlan = weekPlan;
+        });
+      }
+    } catch (e) {
+      debugPrint('GemeinsamSattScreen._loadWeekMealPlan(): failed: $e');
+      // Keep using demo data
+    }
   }
 
   @override
@@ -91,11 +118,26 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
           indicatorColor: _brand,
           labelColor: _brand,
           unselectedLabelColor: const Color(0xFF8A9AB0),
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          indicatorSize: TabBarIndicatorSize.tab,
+          isScrollable: false,
           tabs: const [
-            Tab(text: 'In meiner Nähe'),
-            Tab(text: 'Rezepte'),
-            Tab(text: 'Meine Angebote'),
+            Tab(
+              icon: Icon(Icons.location_on_rounded, size: 20),
+              text: 'Nähe',
+            ),
+            Tab(
+              icon: Icon(Icons.menu_book_rounded, size: 20),
+              text: 'Rezepte',
+            ),
+            Tab(
+              icon: Icon(Icons.calendar_month_rounded, size: 20),
+              text: 'Planer',
+            ),
+            Tab(
+              icon: Icon(Icons.favorite_rounded, size: 20),
+              text: 'Angebote',
+            ),
           ],
         ),
       ),
@@ -104,26 +146,41 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         children: [
           _buildNearbyFeed(),
           _buildRecipesFeed(),
+          _buildMealPlanTab(),
           _buildMyOffers(),
         ],
       ),
       floatingActionButton: AnimatedBuilder(
         animation: _tabController,
         builder: (context, _) {
-          final isRecipeTab = _tabController.index == 1;
+          final tabIndex = _tabController.index;
+          final isRecipeTab = tabIndex == 1;
+          final isMealTab = tabIndex == 2;
           return FloatingActionButton.extended(
             backgroundColor: _brand,
             foregroundColor: Colors.white,
             icon: Icon(isRecipeTab
                 ? Icons.menu_book_rounded
-                : Icons.add_circle_outline_rounded),
+                : isMealTab
+                    ? Icons.add_rounded
+                    : Icons.add_circle_outline_rounded),
             label: Text(
-              isRecipeTab ? 'Rezept teilen' : 'Ich habe extra gekocht!',
+              isRecipeTab
+                  ? 'Rezept teilen'
+                  : isMealTab
+                      ? 'Mahlzeit hinzufügen'
+                      : 'Ich habe extra gekocht!',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            onPressed: () => isRecipeTab
-                ? _openCreateRecipe(context)
-                : _openCreatePost(context),
+            onPressed: () {
+              if (isRecipeTab) {
+                _openCreateRecipe(context);
+              } else if (isMealTab) {
+                _openAddMeal(context);
+              } else {
+                _openCreatePost(context);
+              }
+            },
           );
         },
       ),
@@ -154,6 +211,104 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         onComment: () => _showComments(available[i]),
       ),
     );
+  }
+
+  // -------------------------------------------------------
+  // MEAL PLANNER TAB
+  // -------------------------------------------------------
+
+  Widget _buildMealPlanTab() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          color: _cardBg,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Diese Woche',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF516072),
+                ),
+              ),
+              Text(
+                '${_weekPlan.weekStart.day}. - ${_weekPlan.weekStart.add(const Duration(days: 6)).day}. ${_monthName(_weekPlan.weekStart.month)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _brand,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+            itemCount: 7,
+            itemBuilder: (context, i) {
+              final dayPlan =
+                  _weekPlan.getDay(i) ?? DayPlan(date: _weekPlan.weekStart.add(Duration(days: i)));
+              return _DayPlanCard(
+                dayPlan: dayPlan,
+                onAddMeal: () => _openAddMealForDay(context, dayPlan.date),
+                onRemoveMeal: (type) {
+                  setState(() {
+                    _weekPlan = _weekPlan.updateDay(dayPlan.removeMeal(type));
+                  });
+                  _showSnack('Mahlzeit entfernt');
+                },
+                onTapMeal: (meal) => _showMealDetail(meal),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openAddMeal(BuildContext context) {
+    _openAddMealForDay(context, DateTime.now());
+  }
+
+  void _openAddMealForDay(BuildContext context, DateTime date) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddMealSheet(
+        date: date,
+        onSubmit: (meal) {
+          final dayPlan = _weekPlan.getDay(
+                date.difference(_weekPlan.weekStart.toDateOnly).inDays,
+              ) ??
+              DayPlan(date: date);
+          setState(() {
+            _weekPlan = _weekPlan.updateDay(dayPlan.addMeal(meal));
+          });
+          _showSnack('Mahlzeit hinzugefügt ✅');
+        },
+      ),
+    );
+  }
+
+  void _showMealDetail(Meal meal) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MealDetailSheet(meal: meal),
+    );
+  }
+
+  String _monthName(int month) {
+    const months = [
+      'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+    ];
+    return months[month - 1];
   }
 
   // -------------------------------------------------------
@@ -418,6 +573,62 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   // -------------------------------------------------------
   // DEMO DATA
   // -------------------------------------------------------
+
+  WeekPlan _buildDemoWeekPlan() {
+    final today = DateTime.now().toDateOnly;
+    final days = <DayPlan>[];
+    for (int i = 0; i < 7; i++) {
+      final date = today.add(Duration(days: i - (today.weekday - 1)));
+      if (i == 0) {
+        days.add(
+          DayPlan(
+            date: date,
+            meals: const [
+              Meal(
+                id: '1',
+                title: 'Müsli mit Joghurt',
+                type: MealType.breakfast,
+                description: 'Mit Beeren und Honig',
+              ),
+              Meal(
+                id: '2',
+                title: 'Pasta Bolognese',
+                type: MealType.lunch,
+                description: 'Hausgemacht, kinderfreundlich',
+                ingredients: ['500g Pasta', '400g Hack', 'Tomaten', 'Zwiebel'],
+              ),
+            ],
+          ),
+        );
+      } else if (i == 2) {
+        days.add(
+          DayPlan(
+            date: date,
+            meals: const [
+              Meal(
+                id: '3',
+                title: 'Pancakes',
+                type: MealType.breakfast,
+              ),
+              Meal(
+                id: '4',
+                title: 'Fischstäbchen mit Kartoffeln',
+                type: MealType.lunch,
+              ),
+              Meal(
+                id: '5',
+                title: 'Obst & Käse',
+                type: MealType.snack,
+              ),
+            ],
+          ),
+        );
+      } else {
+        days.add(DayPlan(date: date));
+      }
+    }
+    return WeekPlan(weekStart: today.subtract(Duration(days: today.weekday - 1)), days: days);
+  }
 
   List<FoodSharePost> _buildDemoPosts() {
     return [
@@ -2133,6 +2344,549 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
       focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _brand, width: 1.5)),
+    );
+  }
+}
+
+// ============================================================
+// MEAL PLANNER COMPONENTS
+// ============================================================
+
+class _DayPlanCard extends StatelessWidget {
+  final DayPlan dayPlan;
+  final VoidCallback onAddMeal;
+  final Function(MealType) onRemoveMeal;
+  final Function(Meal) onTapMeal;
+
+  const _DayPlanCard({
+    required this.dayPlan,
+    required this.onAddMeal,
+    required this.onRemoveMeal,
+    required this.onTapMeal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: BoxDecoration(
+        color: dayPlan.isToday ? const Color(0xFFFFF1EE) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: dayPlan.isToday ? const Color(0xFFE8543A) : const Color(0xFFE8E8E8),
+          width: dayPlan.isToday ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Header with day name
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: dayPlan.isToday ? const Color(0xFFE8543A) : const Color(0xFFF5F5F5),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      dayPlan.dayName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: dayPlan.isToday ? Colors.white : const Color(0xFF516072),
+                      ),
+                    ),
+                    Text(
+                      '${dayPlan.dayOfMonth}.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: dayPlan.isToday ? Colors.white70 : const Color(0xFF8A9BA8),
+                      ),
+                    ),
+                  ],
+                ),
+                if (dayPlan.isToday)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Heute',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFE8543A),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Meals list
+          if (dayPlan.meals.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+              alignment: Alignment.center,
+              child: Column(
+                children: [
+                  Text(
+                    '📅 Nichts geplant',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF516072).withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: onAddMeal,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Mahlzeit hinzufügen'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFE8543A),
+                      side: const BorderSide(color: Color(0xFFE8543A)),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: [
+                  ...dayPlan.meals.map((meal) => _MealListItem(
+                    meal: meal,
+                    onTap: () => onTapMeal(meal),
+                    onRemove: () => onRemoveMeal(meal.type),
+                  )),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onAddMeal,
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Hinzufügen'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFE8543A),
+                          side: const BorderSide(color: Color(0xFFE8543A)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MealListItem extends StatelessWidget {
+  final Meal meal;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+
+  const _MealListItem({
+    required this.meal,
+    required this.onTap,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: meal.type.color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: meal.type.color.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Text(meal.type.emoji, style: const TextStyle(fontSize: 18)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      meal.title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A2A3A),
+                      ),
+                    ),
+                    if (meal.description != null && meal.description!.isNotEmpty)
+                      Text(
+                        meal.description!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF8A9BA8),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                iconSize: 16,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                color: const Color(0xFF8A9BA8),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddMealSheet extends StatefulWidget {
+  final DateTime date;
+  final Function(Meal) onSubmit;
+
+  const _AddMealSheet({
+    required this.date,
+    required this.onSubmit,
+  });
+
+  @override
+  State<_AddMealSheet> createState() => _AddMealSheetState();
+}
+
+class _AddMealSheetState extends State<_AddMealSheet> {
+  late MealType _selectedType;
+  late TextEditingController _titleController;
+  late TextEditingController _descController;
+  late TextEditingController _ingredientsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedType = MealType.lunch;
+    _titleController = TextEditingController();
+    _descController = TextEditingController();
+    _ingredientsController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    _ingredientsController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_titleController.text.trim().isEmpty) return;
+
+    final meal = Meal(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _titleController.text.trim(),
+      type: _selectedType,
+      description: _descController.text.trim(),
+      ingredients: _ingredientsController.text
+          .split('\n')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList(),
+    );
+    widget.onSubmit(meal);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Mahlzeit hinzufügen',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A2A3A),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    color: const Color(0xFF516072),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Meal type selector
+              const Text(
+                'Mahlzeitentyp',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF516072),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: MealType.values.map((type) {
+                  final isSelected = _selectedType == type;
+                  return FilterChip(
+                    label: Text('${type.emoji} ${type.label}'),
+                    selected: isSelected,
+                    onSelected: (_) => setState(() => _selectedType = type),
+                    backgroundColor: Colors.white,
+                    selectedColor: type.color.withValues(alpha: 0.2),
+                    side: BorderSide(
+                      color: isSelected ? type.color : const Color(0xFFE8E8E8),
+                      width: isSelected ? 2 : 1,
+                    ),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: type.color,
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+              // Title
+              TextField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  labelText: 'Mahlzeitenname *',
+                  hintText: 'z.B. Spaghetti Carbonara',
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFD),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE8543A), width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Description
+              TextField(
+                controller: _descController,
+                decoration: InputDecoration(
+                  labelText: 'Beschreibung',
+                  hintText: 'z.B. Mit frischem Parmesan',
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFD),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE8543A), width: 2),
+                  ),
+                ),
+                minLines: 2,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              // Ingredients
+              TextField(
+                controller: _ingredientsController,
+                decoration: InputDecoration(
+                  labelText: 'Zutaten (optional)',
+                  hintText: 'Eine pro Zeile:\nSpaghetti\nEier\nSpeck',
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFD),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE8543A), width: 2),
+                  ),
+                ),
+                minLines: 3,
+                maxLines: 6,
+              ),
+              const SizedBox(height: 24),
+              // Submit button
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE8543A),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Hinzufügen',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MealDetailSheet extends StatelessWidget {
+  final Meal meal;
+
+  const _MealDetailSheet({required this.meal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${meal.type.emoji} ${meal.type.label}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF8A9BA8),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          meal.title,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A2A3A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              if (meal.description != null && meal.description!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  meal.description!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF516072),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+              if (meal.ingredients.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Text(
+                  'Zutaten',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A2A3A),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...meal.ingredients.asMap().entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${entry.key + 1}.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFE8543A),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            entry.value,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF516072),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

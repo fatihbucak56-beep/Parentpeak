@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
+import 'package:trusted_circle_demo/logic/family_circle_service.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/models/trusted_device.dart';
 import 'package:trusted_circle_demo/ui/auth/login_screen.dart';
@@ -156,6 +157,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Familienkreis'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Familienkreis'));
     await tester.pumpAndSettle();
 
@@ -177,6 +183,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Events & Aktivitäten'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Events & Aktivitäten'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -270,6 +281,12 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await AuthService.instance.debugSeedSessionForTesting();
+
+    await FamilyCircleService.instance.sendRequest(
+      fromUserId: 'noah-user',
+      toUserId: 'debug_demo_user',
+      fromDisplayName: 'Noah Weber',
+    );
 
     await tester.pumpWidget(
       _buildTestApp(
@@ -375,6 +392,11 @@ void main() {
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Events & Aktivitäten'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Events & Aktivitäten'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -426,4 +448,5 @@ Future<void> _seedSession({
     serverTrialDaysRemaining: serverTrialDaysRemaining,
   );
   await prefs.setString('pp_current_user', jsonEncode(user.toJson()));
+  await AuthService.instance.initialize();
 }

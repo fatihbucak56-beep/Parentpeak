@@ -13,9 +13,11 @@
 
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
@@ -122,6 +124,8 @@ class ParentUser {
 class AuthService {
   static const _kUserKey = 'pp_current_user';
   static const _kUserProfilePrefix = 'pp_user_profile_';
+  static const _kLocalEmailIndexPrefix = 'pp_local_email_uid_';
+  static const _kLocalAuthRecordPrefix = 'pp_local_auth_record_';
 
   ParentUser? _currentUser;
   ParentUser? get currentUser => _currentUser;
@@ -173,7 +177,22 @@ class AuthService {
       return;
     }
 
-    _currentUser = null;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kUserKey);
+    if (raw == null || raw.isEmpty) {
+      _currentUser = null;
+      return;
+    }
+
+    try {
+      _currentUser = ParentUser.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } catch (e) {
+      _logIgnoredError('AuthService.initialize(): local session unreadable', e);
+      await prefs.remove(_kUserKey);
+      _currentUser = null;
+    }
   }
 
   // ── Registrierung ──────────────────────────────────────────────────────────
@@ -239,10 +258,50 @@ class AuthService {
       }
     }
 
-    return AuthResult.fail(
-      AuthErrorCode.networkError,
-      'Authentifizierung ist momentan nicht verfügbar. Bitte später erneut versuchen.',
+    final emailError = _validateEmail(email);
+    if (emailError != null) return emailError;
+
+    final passError = _validatePassword(password);
+    if (passError != null) return passError;
+
+    final cleanName = displayName.trim();
+    if (cleanName.isEmpty) {
+      return AuthResult.fail(
+          AuthErrorCode.unknown, 'Bitte gib deinen Namen ein.');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final normalizedEmail = _normalizeEmail(email);
+    final existingUid = prefs.getString(_localEmailIndexKey(normalizedEmail));
+    if (existingUid != null && existingUid.isNotEmpty) {
+      return AuthResult.fail(
+        AuthErrorCode.emailAlreadyInUse,
+        'Diese E-Mail-Adresse ist bereits registriert.',
+      );
+    }
+
+    final uid = 'local_${DateTime.now().microsecondsSinceEpoch}';
+    final salt = _generateSalt();
+    final user = ParentUser(
+      uid: uid,
+      email: normalizedEmail,
+      displayName: cleanName,
+      registeredAt: DateTime.now(),
+      isPremium: false,
     );
+
+    await _persistFirebaseProfile(prefs, user);
+    await prefs.setString(_localEmailIndexKey(normalizedEmail), uid);
+    await prefs.setString(
+      _localAuthRecordKey(uid),
+      jsonEncode({
+        'salt': salt,
+        'hash': _hashPassword(password: password, salt: salt),
+      }),
+    );
+    await _persistSession(prefs, user);
+    _currentUser = user;
+    return AuthResult.ok(user);
   }
 
   // ── Login ──────────────────────────────────────────────────────────────────
@@ -307,10 +366,64 @@ class AuthService {
       }
     }
 
-    return AuthResult.fail(
-      AuthErrorCode.networkError,
-      'Login ist momentan nicht verfügbar. Bitte später erneut versuchen.',
-    );
+    final emailError = _validateEmail(email);
+    if (emailError != null) return emailError;
+    if (password.isEmpty) {
+      return AuthResult.fail(
+          AuthErrorCode.wrongPassword, 'Bitte gib dein Passwort ein.');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final normalizedEmail = _normalizeEmail(email);
+    final uid = prefs.getString(_localEmailIndexKey(normalizedEmail));
+    if (uid == null || uid.isEmpty) {
+      return AuthResult.fail(
+        AuthErrorCode.userNotFound,
+        'Kein Konto mit dieser E-Mail-Adresse gefunden.',
+      );
+    }
+
+    final authRaw = prefs.getString(_localAuthRecordKey(uid));
+    if (authRaw == null || authRaw.isEmpty) {
+      return AuthResult.fail(
+        AuthErrorCode.wrongPassword,
+        'E-Mail oder Passwort ist nicht korrekt.',
+      );
+    }
+
+    try {
+      final authMap = jsonDecode(authRaw) as Map<String, dynamic>;
+      final salt = (authMap['salt'] ?? '').toString();
+      final hash = (authMap['hash'] ?? '').toString();
+      if (!_verifyPassword(password: password, salt: salt, expectedHash: hash)) {
+        return AuthResult.fail(
+          AuthErrorCode.wrongPassword,
+          'E-Mail oder Passwort ist nicht korrekt.',
+        );
+      }
+
+      final profileRaw = prefs.getString('$_kUserProfilePrefix$uid');
+      if (profileRaw == null || profileRaw.isEmpty) {
+        return AuthResult.fail(
+          AuthErrorCode.userNotFound,
+          'Kein Konto mit dieser E-Mail-Adresse gefunden.',
+        );
+      }
+
+      final user = ParentUser.fromJson(
+        jsonDecode(profileRaw) as Map<String, dynamic>,
+      );
+      _currentUser = user;
+      await _persistSession(prefs, user);
+      _triggerFcmInit(user.uid);
+      return AuthResult.ok(user);
+    } catch (e) {
+      _logIgnoredError('AuthService.login(): local profile/auth unreadable', e);
+      return AuthResult.fail(
+        AuthErrorCode.unknown,
+        'Login ist fehlgeschlagen. Bitte versuche es erneut.',
+      );
+    }
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────────
@@ -624,6 +737,32 @@ class AuthService {
 
   Future<void> _persistSession(SharedPreferences prefs, ParentUser user) async {
     await prefs.setString(_kUserKey, jsonEncode(user.toJson()));
+  }
+
+  String _normalizeEmail(String email) => email.trim().toLowerCase();
+
+  String _localEmailIndexKey(String normalizedEmail) =>
+      '$_kLocalEmailIndexPrefix$normalizedEmail';
+
+  String _localAuthRecordKey(String uid) => '$_kLocalAuthRecordPrefix$uid';
+
+  String _generateSalt() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  String _hashPassword({required String password, required String salt}) {
+    return sha256.convert(utf8.encode('$salt::$password')).toString();
+  }
+
+  bool _verifyPassword({
+    required String password,
+    required String salt,
+    required String expectedHash,
+  }) {
+    if (salt.isEmpty || expectedHash.isEmpty) return false;
+    return _hashPassword(password: password, salt: salt) == expectedHash;
   }
 
   AuthResult? _validateEmail(String email) {

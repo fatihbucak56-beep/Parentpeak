@@ -79,23 +79,28 @@ class FamilyCircleService {
     required bool accept,
     String? actingUserId,
   }) async {
-    if (_apiClient == null) {
-      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
+    if (_apiClient != null) {
+      try {
+        final path = APIConfig.getBackendFamilyRequestsPath();
+        final normalizedPath = path.endsWith('/')
+            ? '${path.substring(0, path.length - 1)}/$requestId'
+            : '$path/$requestId';
+        await _apiClient!.putJson(
+          normalizedPath,
+          {
+            'status': accept ? 'accepted' : 'declined',
+            if (actingUserId != null) 'actingUserId': actingUserId,
+            'updatedAt': DateTime.now().toUtc().toIso8601String(),
+            'schemaVersion': APIConfig.getBackendApiVersion(),
+          },
+        );
+      } catch (e) {
+        _logIgnoredError(
+          'FamilyCircleService.respondToRequest(): backend unavailable, using local state',
+          e,
+        );
+      }
     }
-
-    final path = APIConfig.getBackendFamilyRequestsPath();
-    final normalizedPath = path.endsWith('/')
-        ? '${path.substring(0, path.length - 1)}/$requestId'
-        : '$path/$requestId';
-    await _apiClient!.putJson(
-      normalizedPath,
-      {
-        'status': accept ? 'accepted' : 'declined',
-        if (actingUserId != null) 'actingUserId': actingUserId,
-        'updatedAt': DateTime.now().toUtc().toIso8601String(),
-        'schemaVersion': APIConfig.getBackendApiVersion(),
-      },
-    );
 
     final index = _incomingRequests.indexWhere((r) => r.id == requestId);
     if (index == -1) return;
@@ -122,37 +127,50 @@ class FamilyCircleService {
     required String toUserId,
     String? fromDisplayName,
   }) async {
-    if (_apiClient == null) {
-      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
+    if (_apiClient != null) {
+      try {
+        final payload = await _apiClient!.postJson(
+          APIConfig.getBackendFamilyRequestsPath(),
+          {
+            'fromUserId': fromUserId,
+            'toUserId': toUserId,
+            'actingUserId': fromUserId,
+            'status': 'pending',
+            'schemaVersion': APIConfig.getBackendApiVersion(),
+          },
+        );
+        final raw = payload['item'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(payload['item'] as Map)
+            : payload;
+        if ((raw['id'] ?? '').toString().isNotEmpty) {
+          final serverReq = FamilyConnectionRequest(
+            id: raw['id'].toString(),
+            fromUserId: fromUserId,
+            toUserId: toUserId,
+            fromDisplayName: fromDisplayName ?? fromUserId,
+            sentAt: DateTime.tryParse((raw['createdAt'] ?? '').toString()) ??
+                DateTime.now(),
+          );
+          _incomingRequests.add(serverReq);
+          return serverReq;
+        }
+      } catch (e) {
+        _logIgnoredError(
+          'FamilyCircleService.sendRequest(): backend unavailable, using local state',
+          e,
+        );
+      }
     }
 
-    final payload = await _apiClient!.postJson(
-      APIConfig.getBackendFamilyRequestsPath(),
-      {
-        'fromUserId': fromUserId,
-        'toUserId': toUserId,
-        'actingUserId': fromUserId,
-        'status': 'pending',
-        'schemaVersion': APIConfig.getBackendApiVersion(),
-      },
-    );
-    final raw = payload['item'] is Map<String, dynamic>
-        ? Map<String, dynamic>.from(payload['item'] as Map)
-        : payload;
-    if ((raw['id'] ?? '').toString().isEmpty) {
-      return null;
-    }
-
-    final serverReq = FamilyConnectionRequest(
-      id: raw['id'].toString(),
+    final localReq = FamilyConnectionRequest(
+      id: 'local_req_${DateTime.now().microsecondsSinceEpoch}',
       fromUserId: fromUserId,
       toUserId: toUserId,
       fromDisplayName: fromDisplayName ?? fromUserId,
-      sentAt: DateTime.tryParse((raw['createdAt'] ?? '').toString()) ??
-          DateTime.now(),
+      sentAt: DateTime.now(),
     );
-    _incomingRequests.add(serverReq);
-    return serverReq;
+    _incomingRequests.add(localReq);
+    return localReq;
   }
 
   /// Removes a family connection request by [requestId].
@@ -161,18 +179,23 @@ class FamilyCircleService {
     required String requestId,
     String? actingUserId,
   }) async {
-    if (_apiClient == null) {
-      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
+    if (_apiClient != null) {
+      try {
+        final basePath = APIConfig.getBackendFamilyRequestsPath();
+        final normalizedPath = basePath.endsWith('/')
+            ? '${basePath.substring(0, basePath.length - 1)}/$requestId'
+            : '$basePath/$requestId';
+        final queryParam = actingUserId != null
+            ? '?actingUserId=${Uri.encodeComponent(actingUserId)}'
+            : '';
+        await _apiClient!.delete('$normalizedPath$queryParam');
+      } catch (e) {
+        _logIgnoredError(
+          'FamilyCircleService.deleteRequest(): backend unavailable, using local state',
+          e,
+        );
+      }
     }
-
-    final basePath = APIConfig.getBackendFamilyRequestsPath();
-    final normalizedPath = basePath.endsWith('/')
-        ? '${basePath.substring(0, basePath.length - 1)}/$requestId'
-        : '$basePath/$requestId';
-    final queryParam = actingUserId != null
-        ? '?actingUserId=${Uri.encodeComponent(actingUserId)}'
-        : '';
-    await _apiClient!.delete('$normalizedPath$queryParam');
     _incomingRequests.removeWhere((r) => r.id == requestId);
   }
 
@@ -182,37 +205,49 @@ class FamilyCircleService {
     required String currentUserId,
     required String otherUserId,
   }) async {
-    if (_apiClient == null) {
-      throw StateError('Familienkreis ist aktuell nicht mit dem Backend verbunden.');
+    if (_apiClient != null) {
+      try {
+        final path = APIConfig.getBackendFamilyRequestsPath();
+        final qA =
+            '?fromUserId=${Uri.encodeComponent(currentUserId)}&toUserId=${Uri.encodeComponent(otherUserId)}&status=accepted';
+        final qB =
+            '?fromUserId=${Uri.encodeComponent(otherUserId)}&toUserId=${Uri.encodeComponent(currentUserId)}&status=accepted';
+
+        final resA = await _apiClient!.getJson('$path$qA');
+        final resB = await _apiClient!.getJson('$path$qB');
+        final candidates = [
+          ..._parseRequests(resA),
+          ..._parseRequests(resB),
+        ];
+
+        for (final req in candidates) {
+          final isPair =
+              (req.fromUserId == currentUserId && req.toUserId == otherUserId) ||
+                  (req.fromUserId == otherUserId && req.toUserId == currentUserId);
+          if (!isPair) continue;
+
+          await deleteRequest(
+            requestId: req.id,
+            actingUserId: currentUserId,
+          );
+          _connectionKeys.remove(_pairKey(currentUserId, otherUserId));
+          return true;
+        }
+      } catch (e) {
+        _logIgnoredError(
+          'FamilyCircleService.deleteConnectionWithUser(): backend unavailable, using local state',
+          e,
+        );
+    }
     }
 
-    final path = APIConfig.getBackendFamilyRequestsPath();
-    final qA =
-        '?fromUserId=${Uri.encodeComponent(currentUserId)}&toUserId=${Uri.encodeComponent(otherUserId)}&status=accepted';
-    final qB =
-        '?fromUserId=${Uri.encodeComponent(otherUserId)}&toUserId=${Uri.encodeComponent(currentUserId)}&status=accepted';
-
-    final resA = await _apiClient!.getJson('$path$qA');
-    final resB = await _apiClient!.getJson('$path$qB');
-    final candidates = [
-      ..._parseRequests(resA),
-      ..._parseRequests(resB),
-    ];
-
-    for (final req in candidates) {
-      final isPair = (req.fromUserId == currentUserId && req.toUserId == otherUserId) ||
-          (req.fromUserId == otherUserId && req.toUserId == currentUserId);
-      if (!isPair) continue;
-
-      await deleteRequest(
-        requestId: req.id,
-        actingUserId: currentUserId,
-      );
-      _connectionKeys.remove(_pairKey(currentUserId, otherUserId));
-      return true;
-    }
-
-    return false;
+    _incomingRequests.removeWhere((req) {
+      final isPair =
+          (req.fromUserId == currentUserId && req.toUserId == otherUserId) ||
+              (req.fromUserId == otherUserId && req.toUserId == currentUserId);
+      return isPair && req.status == FamilyRequestStatus.accepted;
+    });
+    return _connectionKeys.remove(_pairKey(currentUserId, otherUserId));
   }
 
   bool areUsersConnected({required String userA, required String userB}) {

@@ -2,13 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:parentpeak/config/feature_flags.dart';
 import 'package:parentpeak/logic/event_backend_service.dart';
 import 'package:parentpeak/logic/event_service.dart';
 import 'package:parentpeak/logic/family_circle_service.dart';
 import 'package:parentpeak/models/family_contact.dart';
 import 'package:parentpeak/models/meetup_event.dart';
 import 'package:parentpeak/logic/auth_service.dart';
-import 'package:parentpeak/ui/family_circle_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -53,6 +53,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _locationController = TextEditingController(text: 'Berlin, Deutschland');
     _maxParticipantsController = TextEditingController(text: '10');
     _loadFamilyContacts();
+    if (!FeatureFlags.enableFamilyCircle &&
+        _visibility == EventVisibility.familyCircle) {
+      _visibility = EventVisibility.publicNearby;
+    }
   }
 
   Future<void> _loadFamilyContacts() async {
@@ -400,15 +404,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     () => _visibility = EventVisibility.publicNearby,
                   ),
                 ),
-                _VisibilityOptionTile(
-                  title: 'Familienkreis (für deine Kontakte sichtbar)',
-                  subtitle:
-                      'Nur verbundene Eltern aus deinem Familienkreis sehen das Event.',
-                  selected: _visibility == EventVisibility.familyCircle,
-                  onTap: () => setState(
-                    () => _visibility = EventVisibility.familyCircle,
+                if (FeatureFlags.enableFamilyCircle)
+                  _VisibilityOptionTile(
+                    title: 'Familienkreis (für deine Kontakte sichtbar)',
+                    subtitle:
+                        'Nur verbundene Eltern aus deinem Familienkreis sehen das Event.',
+                    selected: _visibility == EventVisibility.familyCircle,
+                    onTap: () => setState(
+                      () => _visibility = EventVisibility.familyCircle,
+                    ),
                   ),
-                ),
                 _VisibilityOptionTile(
                   title: 'Nur eingeladen (individuelle Einladungen)',
                   subtitle:
@@ -465,26 +470,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   ),
                   const SizedBox(height: 8),
                   if (_familyContacts.isEmpty)
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Noch keine Kontakte im Familienkreis. Bitte zuerst Kontakte verbinden.',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const FamilyCircleScreen(),
-                              ),
-                            ).then((_) => _loadFamilyContacts());
-                          },
-                          child: const Text('Öffnen'),
-                        ),
-                      ],
+                    const Text(
+                      'Noch keine Kontakte verfügbar. Diese Funktion wird bald wieder freigeschaltet.',
                     )
                   else
                     ..._familyContacts.map(

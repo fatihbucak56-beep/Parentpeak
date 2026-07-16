@@ -9,7 +9,6 @@ import 'package:parentpeak/logic/product_metrics_service.dart';
 import 'package:parentpeak/ui/calendar_screen.dart';
 import 'package:parentpeak/ui/events_activities_screen.dart';
 import 'package:parentpeak/ui/event_invitations_screen.dart';
-import 'package:parentpeak/ui/family_circle_screen.dart';
 import 'package:parentpeak/ui/organization_screen.dart';
 import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
 import 'package:parentpeak/ui/parent_matching_screen.dart';
@@ -371,13 +370,6 @@ class _HomeScreenState extends State<HomeScreen>
         icon: Icons.celebration_rounded,
         color: const Color(0xFF8B5CF6),
         builder: (_) => const EventsActivitiesScreen(),
-      ),
-      _FeatureAction(
-        label: 'Familienkreis',
-        description: 'Vertrauenskontakte verwalten und Einladungen steuern',
-        icon: Icons.people_alt_rounded,
-        color: const Color(0xFF4F46E5),
-        builder: (_) => const FamilyCircleScreen(),
       ),
       _FeatureAction(
         label: l10n.t('treasureTileTitle', fallback: 'Verschenkmarkt'),

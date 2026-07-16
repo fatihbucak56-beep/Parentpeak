@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parentpeak/config/feature_flags.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/event_service.dart';
 import 'package:parentpeak/models/meetup_event.dart';
@@ -28,6 +29,10 @@ class _MeetupScreenState extends State<MeetupScreen> {
   @override
   void initState() {
     super.initState();
+    if (!FeatureFlags.enableFamilyCircle &&
+        _visibilityFilter == FeedVisibilityFilter.familyCircle) {
+      _visibilityFilter = FeedVisibilityFilter.all;
+    }
     _loadEvents();
   }
 
@@ -196,14 +201,17 @@ class _MeetupScreenState extends State<MeetupScreen> {
                           onTap: () => setState(
                               () => _visibilityFilter = FeedVisibilityFilter.publicOnly),
                         ),
-                        const SizedBox(width: 8),
-                        _buildVisibilityChip(
-                          label: 'Familienkreis',
-                          selected:
-                              _visibilityFilter == FeedVisibilityFilter.familyCircle,
-                          onTap: () => setState(
-                              () => _visibilityFilter = FeedVisibilityFilter.familyCircle),
-                        ),
+                        if (FeatureFlags.enableFamilyCircle) ...[
+                          const SizedBox(width: 8),
+                          _buildVisibilityChip(
+                            label: 'Familienkreis',
+                            selected:
+                                _visibilityFilter == FeedVisibilityFilter.familyCircle,
+                            onTap: () => setState(() =>
+                                _visibilityFilter =
+                                    FeedVisibilityFilter.familyCircle),
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         _buildVisibilityChip(
                           label: 'Eingeladen',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:parentpeak/config/api_config.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/models/food_share_post.dart';
@@ -38,6 +39,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   late WeekPlan _weekPlan;
   bool _isLoadingRecipes = false;
   _RecipeFeedMode _recipeFeedMode = _RecipeFeedMode.forYou;
+  Set<String> _savedRecipeIds = <String>{};
+
+  static const String _savedRecipeStoragePrefix =
+      'gemeinsam_satt.saved_recipes.v1';
 
   String get _myUserId =>
       AuthService.instance.currentUser?.uid.trim().isNotEmpty == true
@@ -59,6 +64,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     _posts = _buildDemoPosts();
     _recipes = [];
     _weekPlan = _buildDemoWeekPlan();
+    _loadSavedRecipes();
 
     // Load recipes from backend
     _loadRecipes();
@@ -102,6 +108,8 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
 
       final recipes = backendRecipes
           .map(_convertBackendRecipeToUI)
+          .map((recipe) =>
+            recipe.copyWith(isSavedByMe: _savedRecipeIds.contains(recipe.id)))
           .map((recipe) => recipe.copyWith(relevanceScore: _scoreForCurrentParent(recipe)))
           .toList();
 
@@ -115,6 +123,8 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       if (!mounted) return;
       setState(() {
         _recipes = _buildDemoRecipes()
+          .map((recipe) =>
+            recipe.copyWith(isSavedByMe: _savedRecipeIds.contains(recipe.id)))
             .map((recipe) =>
                 recipe.copyWith(relevanceScore: _scoreForCurrentParent(recipe)))
             .toList();
@@ -206,6 +216,27 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         (0.15 * freshness) +
         (0.10 * interest);
   }
+
+  Future<void> _loadSavedRecipes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_savedRecipeStorageKey) ?? const <String>[];
+    if (!mounted) return;
+    setState(() {
+      _savedRecipeIds = saved.toSet();
+      _recipes = _recipes
+          .map((recipe) =>
+              recipe.copyWith(isSavedByMe: saved.contains(recipe.id)))
+          .toList();
+    });
+  }
+
+  Future<void> _persistSavedRecipes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_savedRecipeStorageKey, _savedRecipeIds.toList());
+  }
+
+  String get _savedRecipeStorageKey =>
+      '$_savedRecipeStoragePrefix.$_myUserId';
 
   RecipeDifficulty _parseDifficulty(dynamic value) {
     final val = value?.toString().toLowerCase() ?? '';
@@ -600,15 +631,19 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 100),
-            itemCount: recipes.length,
-            itemBuilder: (context, i) => _RecipeCard(
-              recipe: recipes[i],
-              myUserId: _myUserId,
-              onLike: () => _toggleRecipeLike(recipes[i]),
-              onSave: () => _toggleSave(recipes[i].id),
-              onTap: () => _showRecipeDetail(recipes[i]),
+          child: RefreshIndicator(
+            onRefresh: _loadRecipes,
+            color: _brand,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 100),
+              itemCount: recipes.length,
+              itemBuilder: (context, i) => _RecipeCard(
+                recipe: recipes[i],
+                myUserId: _myUserId,
+                onLike: () => _toggleRecipeLike(recipes[i]),
+                onSave: () => _toggleSave(recipes[i].id),
+                onTap: () => _showRecipeDetail(recipes[i]),
+              ),
             ),
           ),
         ),
@@ -674,24 +709,49 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     _showSnack('Danke! Deine Empfehlung hilft anderen Eltern.');
   }
 
-  void _toggleSave(String recipeId) {
+  Future<void> _toggleSave(String recipeId) async {
     setState(() {
       final idx = _recipes.indexWhere((r) => r.id == recipeId);
       if (idx == -1) return;
+      if (_savedRecipeIds.contains(recipeId)) {
+        _savedRecipeIds.remove(recipeId);
+      } else {
+        _savedRecipeIds.add(recipeId);
+      }
       _recipes[idx] = _recipes[idx].copyWith(
         isSavedByMe: !_recipes[idx].isSavedByMe,
       );
     });
+    await _persistSavedRecipes();
     final saved = _recipes.firstWhere((r) => r.id == recipeId).isSavedByMe;
     _showSnack(saved ? 'Rezept gespeichert ✅' : 'Rezept entfernt');
   }
 
-  void _showRecipeDetail(SharedRecipe recipe) {
+  Future<void> _showRecipeDetail(SharedRecipe recipe) async {
+    SharedRecipe detail = recipe;
+    final backendDetail = await _service.getRecipe(recipe.id);
+    if (backendDetail != null) {
+      final mapped = _convertBackendRecipeToUI(backendDetail);
+      detail = mapped.copyWith(
+        isSavedByMe: _savedRecipeIds.contains(mapped.id),
+        relevanceScore: _scoreForCurrentParent(mapped),
+      );
+      if (mounted) {
+        setState(() {
+          final idx = _recipes.indexWhere((r) => r.id == detail.id);
+          if (idx != -1) {
+            _recipes[idx] = detail;
+          }
+        });
+      }
+    }
+
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _RecipeDetailSheet(recipe: recipe),
+      builder: (_) => _RecipeDetailSheet(recipe: detail),
     );
   }
 
@@ -726,6 +786,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
             _recipes.insert(
               0,
               mappedRecipe.copyWith(
+                isSavedByMe: _savedRecipeIds.contains(mappedRecipe.id),
                 relevanceScore: _scoreForCurrentParent(mappedRecipe),
               ),
             );

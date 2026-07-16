@@ -112,6 +112,9 @@ const internalModeratorDomains = (process.env.INTERNAL_MODERATOR_DOMAINS || 'par
   .split(',')
   .map(item => item.trim().toLowerCase())
   .filter(Boolean);
+const allowDemoBootstrap =
+  process.env.NODE_ENV !== 'production' &&
+  (process.env.ALLOW_DEMO_BOOTSTRAP || '1') === '1';
 
 const writeRateWindowMs = Number.parseInt(
   process.env.WRITE_RATE_LIMIT_WINDOW_MS || `${15 * 60 * 1000}`,
@@ -216,6 +219,10 @@ function storeVerifiedExpertRecord(record) {
 }
 
 function buildWeeklyImpulseSeedPosts(schema, impulseId) {
+  if (!allowDemoBootstrap) {
+    return [];
+  }
+
   return [
     {
       id: `${impulseId}_parent_seed`,
@@ -1437,6 +1444,14 @@ function generateId(prefix) {
 async function ensureDemoFamilyContext(familyId) {
   const targetFamilyId = (familyId || DEMO_FAMILY_ID).toString().trim() || DEMO_FAMILY_ID;
 
+  if (!allowDemoBootstrap) {
+    const existingFamily = await prisma.family.findUnique({ where: { id: targetFamilyId } });
+    if (!existingFamily) {
+      throw new Error('Familie nicht gefunden');
+    }
+    return targetFamilyId;
+  }
+
   await prisma.user.upsert({
     where: { id: DEMO_USER_ID },
     update: {},
@@ -1526,6 +1541,14 @@ function buildLocalEmail(identifier) {
 async function ensureBackendUser(userId, displayName) {
   const trimmedUserId = (userId || DEMO_USER_ID).toString().trim() || DEMO_USER_ID;
   const [firstName, ...restName] = (displayName || trimmedUserId).toString().split(' ');
+
+  if (!allowDemoBootstrap) {
+    const existingUser = await prisma.user.findUnique({ where: { id: trimmedUserId } });
+    if (!existingUser) {
+      throw new Error('Benutzer nicht gefunden');
+    }
+    return trimmedUserId;
+  }
 
   await prisma.user.upsert({
     where: { id: trimmedUserId },
@@ -1703,16 +1726,36 @@ async function buildParticipantCountMap(eventIds) {
 }
 
 async function ensureEventContext(eventId, hosterId) {
-  const safeHosterId = await ensureBackendUser(hosterId || DEMO_USER_ID, hosterId || 'Demo Host');
-  const source = getInMemoryEventById(eventId);
-  const safeEventId = (eventId || generateId('event')).toString();
+  const safeEventId = (eventId || '').toString().trim();
+  const safeHosterId = (hosterId || '').toString().trim();
+
+  if (!safeEventId || !safeHosterId) {
+    throw new Error('eventId und hosterId sind erforderlich');
+  }
+
+  if (!allowDemoBootstrap) {
+    const existingEvent = await prisma.event.findUnique({ where: { id: safeEventId } });
+    if (!existingEvent) {
+      throw new Error('Event nicht gefunden');
+    }
+
+    const existingHoster = await prisma.user.findUnique({ where: { id: safeHosterId } });
+    if (!existingHoster) {
+      throw new Error('Hoster nicht gefunden');
+    }
+
+    return existingEvent;
+  }
+
+  const resolvedHosterId = await ensureBackendUser(safeHosterId, safeHosterId || 'Demo Host');
+  const source = getInMemoryEventById(safeEventId);
 
   const record = await prisma.event.upsert({
     where: { id: safeEventId },
     update: {},
     create: {
       id: safeEventId,
-      hosterId: safeHosterId,
+      hosterId: resolvedHosterId,
       title: source?.title || `Event ${safeEventId}`,
       description: source?.description || '',
       startDate: source?.eventDate ? new Date(source.eventDate) : new Date(),

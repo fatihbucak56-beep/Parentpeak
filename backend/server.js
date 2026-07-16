@@ -73,6 +73,9 @@ const backendApiToken = (process.env.BACKEND_API_TOKEN || '').trim();
 const requireAuthForWrites =
   (process.env.REQUIRE_AUTH_FOR_WRITES ||
     (process.env.NODE_ENV === 'production' ? '1' : '0')) === '1';
+const disableInMemoryFallbacks =
+  (process.env.DISABLE_IN_MEMORY_FALLBACKS ||
+    (process.env.NODE_ENV === 'production' ? '1' : '0')) === '1';
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
@@ -131,6 +134,19 @@ function getClientIp(req) {
     return xff.split(',')[0].trim();
   }
   return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function respondWithStrictPersistenceError(res, routeLabel, error) {
+  console.error(`${routeLabel} fallback (in-memory):`, error?.message || error);
+  if (!disableInMemoryFallbacks) {
+    return false;
+  }
+
+  res.status(503).json({
+    error: 'Persistenzfehler: In-Memory-Fallback ist deaktiviert.',
+    route: routeLabel,
+  });
+  return true;
 }
 
 function getWeeklyImpulseCommunityEntry(impulseId) {
@@ -2250,7 +2266,9 @@ app.post('/account/delete-data', async (req, res) => {
       mode: 'prisma',
     });
   } catch (error) {
-    console.error('POST /account/delete-data fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /account/delete-data', error)) {
+      return;
+    }
     const removedEntries = dryRun
       ? countAccountDataByUserIdInMemory(userId)
       : deleteAccountDataByUserIdInMemory(userId);
@@ -2852,7 +2870,9 @@ app.get('/todos', async (req, res) => {
     });
     return res.json({ items: items.map(mapTodoRecordToApiItem) });
   } catch (error) {
-    console.error('GET /todos fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /todos', error)) {
+      return;
+    }
     return res.json({ items: todos });
   }
 });
@@ -2875,7 +2895,9 @@ app.post('/todos', async (req, res) => {
     });
     return res.status(201).json({ item: mapTodoRecordToApiItem(item) });
   } catch (error) {
-    console.error('POST /todos fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /todos', error)) {
+      return;
+    }
     const item = {
       id: generateId('todo'),
       familyId: req.body.familyId || DEMO_FAMILY_ID,
@@ -2912,7 +2934,9 @@ app.put('/todos/:id', async (req, res) => {
     });
     return res.json({ item: mapTodoRecordToApiItem(item) });
   } catch (error) {
-    console.error('PUT /todos fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'PUT /todos/:id', error)) {
+      return;
+    }
     const index = todos.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Todo nicht gefunden' });
@@ -2935,7 +2959,9 @@ app.delete('/todos/:id', async (req, res) => {
       return res.status(404).json({ error: 'Todo nicht gefunden' });
     }
 
-    console.error('DELETE /todos fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'DELETE /todos/:id', error)) {
+      return;
+    }
     const index = todos.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Todo nicht gefunden' });
@@ -2955,7 +2981,9 @@ app.get('/shopping', async (req, res) => {
     });
     return res.json({ items: items.map(mapShoppingRecordToApiItem) });
   } catch (error) {
-    console.error('GET /shopping fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /shopping', error)) {
+      return;
+    }
     return res.json({ items: shoppingItems });
   }
 });
@@ -2975,7 +3003,9 @@ app.post('/shopping', async (req, res) => {
     });
     return res.status(201).json({ item: mapShoppingRecordToApiItem(item) });
   } catch (error) {
-    console.error('POST /shopping fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /shopping', error)) {
+      return;
+    }
     const item = {
       id: generateId('shop'),
       familyId: req.body.familyId || DEMO_FAMILY_ID,
@@ -3005,7 +3035,9 @@ app.put('/shopping/:id', async (req, res) => {
       return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
     }
 
-    console.error('PUT /shopping fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'PUT /shopping/:id', error)) {
+      return;
+    }
     const index = shoppingItems.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
@@ -3029,7 +3061,9 @@ app.delete('/shopping/:id', async (req, res) => {
       return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
     }
 
-    console.error('DELETE /shopping fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'DELETE /shopping/:id', error)) {
+      return;
+    }
     const index = shoppingItems.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Shopping-Item nicht gefunden' });
@@ -3499,7 +3533,9 @@ app.get('/family/requests', async (req, res) => {
     });
     return res.json({ requests });
   } catch (error) {
-    console.error('GET /family/requests fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /family/requests', error)) {
+      return;
+    }
     const requests = familyRequests.filter(item => {
       if (toUserId && item.toUserId !== toUserId) return false;
       if (fromUserId && item.fromUserId !== fromUserId) return false;
@@ -3572,7 +3608,9 @@ app.post('/family/requests', async (req, res) => {
 
     return res.status(201).json({ item });
   } catch (error) {
-    console.error('POST /family/requests fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /family/requests', error)) {
+      return;
+    }
 
     const existing = familyRequests
       .filter(
@@ -3653,7 +3691,9 @@ app.put('/family/requests/:id', async (req, res) => {
       return res.status(404).json({ error: 'Anfrage nicht gefunden' });
     }
 
-    console.error('PUT /family/requests/:id fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'PUT /family/requests/:id', error)) {
+      return;
+    }
     const index = familyRequests.findIndex(entry => entry.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Anfrage nicht gefunden' });
@@ -3707,7 +3747,9 @@ app.delete('/family/requests/:id', async (req, res) => {
       return res.status(404).json({ error: 'Anfrage nicht gefunden' });
     }
 
-    console.error('DELETE /family/requests/:id fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'DELETE /family/requests/:id', error)) {
+      return;
+    }
     const idx = familyRequests.findIndex(item => item.id === req.params.id);
     if (idx === -1) {
       return res.status(404).json({ error: 'Anfrage nicht gefunden' });
@@ -3753,7 +3795,9 @@ app.get('/events', async (req, res) => {
 
     return res.json({ items, limit, offset, hasMore: items.length === limit });
   } catch (error) {
-    console.error('GET /events fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events', error)) {
+      return;
+    }
     let items = [...events];
     if (req.query.status) {
       items = items.filter(event => event.status === req.query.status);
@@ -3861,7 +3905,9 @@ app.get('/events/discover', async (req, res) => {
     const page = items.slice(offset, offset + limit);
     return res.json({ items: page, limit, offset, hasMore: page.length === limit });
   } catch (error) {
-    console.error('GET /events/discover fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/discover', error)) {
+      return;
+    }
     let items = events.filter(event => canViewerSeeEvent(event, viewerUserId));
     if (req.query.ageGroups) {
       const requested = req.query.ageGroups
@@ -3939,7 +3985,9 @@ app.put('/events/item/:id', async (req, res) => {
     if (error?.code === 'P2025') {
       return res.status(404).json({ error: 'Event nicht gefunden' });
     }
-    console.error('PUT /events/item/:id fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'PUT /events/item/:id', error)) {
+      return;
+    }
     const idx = events.findIndex(ev => ev.id === req.params.id);
     if (idx === -1) {
       return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -3980,7 +4028,9 @@ app.get('/events/item/:id', async (req, res) => {
     const inviteCodeExpiresAt = eventInviteExpiresAt[item.id] || item.inviteCodeExpiresAt || null;
     return res.json({ item: { ...item, inviteCode, inviteCodeExpiresAt } });
   } catch (error) {
-    console.error('GET /events/item/:id fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/item/:id', error)) {
+      return;
+    }
     const item = events.find(event => event.id === req.params.id);
     if (!item) {
       return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -4088,7 +4138,9 @@ app.post('/events', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('POST /events fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /events', error)) {
+      return;
+    }
     events.push(item);
 
     if (item.visibility === 'inviteOnly') {
@@ -4149,7 +4201,9 @@ app.delete('/events/item/:id', async (req, res) => {
       return res.status(404).json({ error: 'Event nicht gefunden' });
     }
 
-    console.error('DELETE /events/item/:id fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'DELETE /events/item/:id', error)) {
+      return;
+    }
     const index = events.findIndex(event => event.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -4198,7 +4252,9 @@ app.get('/events/invitations', async (req, res) => {
 
     return res.json({ items: invitationItems });
   } catch (error) {
-    console.error('GET /events/invitations fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/invitations', error)) {
+      return;
+    }
     let items = [...eventInvitations];
     if (req.query.userId) {
       items = items.filter(invitation => invitation.invitedUserId === req.query.userId);
@@ -4229,7 +4285,9 @@ app.put('/events/invitations/:id/respond', async (req, res) => {
 
     return res.json({ item: mapInvitationRecordToApiItem(updated) });
   } catch (error) {
-    console.error('PUT /events/invitations/:id/respond fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'PUT /events/invitations/:id/respond', error)) {
+      return;
+    }
     const index = eventInvitations.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Einladung nicht gefunden' });
@@ -4290,7 +4348,9 @@ app.post('/events/invitations/join', async (req, res) => {
 
     return res.status(201).json({ item: mapInvitationRecordToApiItem(invitation) });
   } catch (error) {
-    console.error('POST /events/invitations/join fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /events/invitations/join', error)) {
+      return;
+    }
     const eventId = Object.keys(eventInviteCodes).find(
       id => (eventInviteCodes[id] || '').toUpperCase() === codeInput,
     );
@@ -4346,7 +4406,9 @@ app.get('/events/hosted-invite-only', async (req, res) => {
       );
     return res.json({ items });
   } catch (error) {
-    console.error('GET /events/hosted-invite-only fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/hosted-invite-only', error)) {
+      return;
+    }
     const items = events.filter(
       event =>
         event.visibility === 'inviteOnly' &&
@@ -4365,7 +4427,9 @@ app.get('/events/:id/invitations/accepted', async (req, res) => {
     });
     return res.json({ items: items.map(mapInvitationRecordToApiItem) });
   } catch (error) {
-    console.error('GET /events/:id/invitations/accepted fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/:id/invitations/accepted', error)) {
+      return;
+    }
     const items = eventInvitations.filter(
       item => item.eventId === req.params.id && item.status === 'accepted',
     );
@@ -4385,7 +4449,9 @@ app.get('/events/participations', async (req, res) => {
     });
     return res.json({ items: items.map(mapParticipationRecordToApiItem) });
   } catch (error) {
-    console.error('GET /events/participations fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/participations', error)) {
+      return;
+    }
     let items = [...eventParticipations];
     if (req.query.userId) {
       items = items.filter(item => item.userId === req.query.userId);
@@ -4415,7 +4481,9 @@ app.get('/events/participations/pending', async (req, res) => {
     });
     return res.json({ items: items.map(mapParticipationRecordToApiItem) });
   } catch (error) {
-    console.error('GET /events/participations/pending fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/participations/pending', error)) {
+      return;
+    }
     const hostEventIds = events
       .filter(event => !hostUserId || event.hosterId === hostUserId)
       .map(event => event.id);
@@ -4459,7 +4527,9 @@ app.post('/events/participations', async (req, res) => {
     });
     return res.status(201).json({ item: mapParticipationRecordToApiItem(item) });
   } catch (error) {
-    console.error('POST /events/participations fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /events/participations', error)) {
+      return;
+    }
     const event = events.find(item => item.id === eventId);
     if (!event) {
       return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -4503,7 +4573,9 @@ app.put('/events/participations/:id/respond', async (req, res) => {
     });
     return res.json({ item: mapParticipationRecordToApiItem(updated) });
   } catch (error) {
-    console.error('PUT /events/participations/:id/respond fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'PUT /events/participations/:id/respond', error)) {
+      return;
+    }
     const index = eventParticipations.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Teilnahme nicht gefunden' });
@@ -4540,7 +4612,9 @@ app.get('/events/:id/participations/approved', async (req, res) => {
     });
     return res.json({ items: items.map(mapParticipationRecordToApiItem) });
   } catch (error) {
-    console.error('GET /events/:id/participations/approved fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/:id/participations/approved', error)) {
+      return;
+    }
     const items = eventParticipations.filter(
       item => item.eventId === req.params.id && item.status === 'approved',
     );
@@ -4579,7 +4653,9 @@ app.get('/events/:id/chat/messages', async (req, res) => {
 
     return res.json({ items });
   } catch (error) {
-    console.error('GET /events/:id/chat/messages fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'GET /events/:id/chat/messages', error)) {
+      return;
+    }
     const items = eventChatMessages[req.params.id] || [];
     return res.json({ items });
   }
@@ -4625,7 +4701,9 @@ app.post('/events/:id/chat/messages', async (req, res) => {
 
     return res.status(201).json({ item });
   } catch (error) {
-    console.error('POST /events/:id/chat/messages fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /events/:id/chat/messages', error)) {
+      return;
+    }
     const event = events.find(item => item.id === eventId);
     if (!event) {
       return res.status(404).json({ error: 'Event nicht gefunden' });

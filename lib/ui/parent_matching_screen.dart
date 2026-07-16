@@ -9,7 +9,12 @@ import 'package:trusted_circle_demo/logic/parent_matching_backend_service.dart';
 import 'package:trusted_circle_demo/ui/match_conversation_screen.dart';
 
 class ParentMatchingScreen extends StatefulWidget {
-  const ParentMatchingScreen({super.key});
+  const ParentMatchingScreen({
+    super.key,
+    this.openNewConnectionsOnOpen = false,
+  });
+
+  final bool openNewConnectionsOnOpen;
 
   @override
   State<ParentMatchingScreen> createState() => _ParentMatchingScreenState();
@@ -80,7 +85,16 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   Future<void> _bootstrap() async {
     await _loadProfiles();
     await _restoreState();
-    await _refreshConnectionsFromBackend();
+    await _refreshConnectionsFromBackend(
+      announce: !widget.openNewConnectionsOnOpen,
+    );
+
+    if (widget.openNewConnectionsOnOpen && _newConfirmedSinceLastVisit > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _openNewConnectionsSheet();
+      });
+    }
   }
 
   Future<void> _loadProfiles() async {

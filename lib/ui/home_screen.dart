@@ -240,6 +240,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openParentMatchFromHint() async {
+    await _storeRecentTileTap('Eltern Match');
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            const ParentMatchingScreen(openNewConnectionsOnOpen: true),
+      ),
+    );
+    if (!mounted) return;
+    await _restoreParentMatchStatusHint();
+  }
+
   Future<void> _restoreParentMatchStatusHint() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_parentMatchStorageKey);
@@ -499,6 +513,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           title: action.label,
                           subtitle: action.description,
                           statusHint: action.statusHint,
+                          quickActionLabel: action.label == 'Eltern Match' &&
+                                  _newParentMatchesCount > 0
+                              ? 'Neue Verbindungen öffnen'
+                              : null,
+                          onQuickAction: action.label == 'Eltern Match' &&
+                                  _newParentMatchesCount > 0
+                              ? _openParentMatchFromHint
+                              : null,
                           icon: action.icon,
                           color: action.color,
                           compact: true,
@@ -819,11 +841,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required String subtitle,
     String? statusHint,
+    String? quickActionLabel,
     required Color color,
     required IconData icon,
     bool compact = false,
     VoidCallback? onTap,
     VoidCallback? onLongPress,
+    VoidCallback? onQuickAction,
   }) {
     final theme = Theme.of(context);
     return Card(
@@ -912,6 +936,49 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                  if (quickActionLabel != null &&
+                      quickActionLabel.trim().isNotEmpty &&
+                      onQuickAction != null) ...[
+                    SizedBox(height: compactTile ? 4 : 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: InkWell(
+                        onTap: onQuickAction,
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: color.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.open_in_new_rounded,
+                                size: 12,
+                                color: color,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                quickActionLabel,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: color,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],

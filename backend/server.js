@@ -5326,12 +5326,88 @@ app.post('/admin/migrate-db', async (req, res) => {
   }
 
   try {
-    // Drop foreign key constraint if it exists
+    // Drop foreign key constraint for Event if it exists
     await prisma.$executeRawUnsafe(`
       ALTER TABLE "Event" DROP CONSTRAINT IF EXISTS "Event_hosterId_fkey";
     `);
+
+    // Create TreasureItem table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "TreasureItem" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "userId" TEXT NOT NULL,
+        "familyId" TEXT,
+        "title" TEXT NOT NULL,
+        "description" TEXT,
+        "category" TEXT NOT NULL DEFAULT 'other',
+        "subcategory" TEXT,
+        "condition" TEXT NOT NULL DEFAULT 'good',
+        "location" TEXT,
+        "latitude" DOUBLE PRECISION,
+        "longitude" DOUBLE PRECISION,
+        "visibility" TEXT NOT NULL DEFAULT 'nearby',
+        "shareRadiusKm" DOUBLE PRECISION NOT NULL DEFAULT 10,
+        "isFree" BOOLEAN NOT NULL DEFAULT true,
+        "price" DECIMAL(10,2),
+        "currency" TEXT NOT NULL DEFAULT 'EUR',
+        "photoUrl" TEXT,
+        "photoUrls" TEXT[] DEFAULT ARRAY[]::TEXT[],
+        "availableForPickup" BOOLEAN NOT NULL DEFAULT true,
+        "pickupLocation" TEXT,
+        "pickupSlots" TEXT[] DEFAULT ARRAY[]::TEXT[],
+        "status" TEXT NOT NULL DEFAULT 'available',
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "expiresAt" TIMESTAMP(3),
+        "updatedAt" TIMESTAMP(3) NOT NULL,
+        "views" INTEGER NOT NULL DEFAULT 0,
+        "rating" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "ratingCount" INTEGER NOT NULL DEFAULT 0,
+        CONSTRAINT "TreasureItem_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE,
+        CONSTRAINT "TreasureItem_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "Family" ("id") ON DELETE SET NULL
+      );
+    `);
+
+    // Create TreasureRating table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "TreasureRating" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "treasureId" TEXT NOT NULL,
+        "fromUserId" TEXT NOT NULL,
+        "rating" INTEGER NOT NULL,
+        "comment" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "TreasureRating_treasureId_fkey" FOREIGN KEY ("treasureId") REFERENCES "TreasureItem" ("id") ON DELETE CASCADE,
+        CONSTRAINT "TreasureRating_fromUserId_fkey" FOREIGN KEY ("fromUserId") REFERENCES "User" ("id") ON DELETE CASCADE
+      );
+    `);
+
+    // Create TreasureHandover table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "TreasureHandover" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "treasureId" TEXT NOT NULL,
+        "requesterId" TEXT NOT NULL,
+        "status" TEXT NOT NULL DEFAULT 'pending',
+        "scheduledTime" TIMESTAMP(3),
+        "location" TEXT,
+        "notes" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL,
+        CONSTRAINT "TreasureHandover_treasureId_fkey" FOREIGN KEY ("treasureId") REFERENCES "TreasureItem" ("id") ON DELETE CASCADE,
+        CONSTRAINT "TreasureHandover_requesterId_fkey" FOREIGN KEY ("requesterId") REFERENCES "User" ("id") ON DELETE CASCADE
+      );
+    `);
+
+    // Create indexes if they don't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "TreasureItem_userId_idx" ON "TreasureItem"("userId");
+      CREATE INDEX IF NOT EXISTS "TreasureItem_status_idx" ON "TreasureItem"("status");
+      CREATE INDEX IF NOT EXISTS "TreasureItem_visibility_idx" ON "TreasureItem"("visibility");
+      CREATE INDEX IF NOT EXISTS "TreasureItem_createdAt_idx" ON "TreasureItem"("createdAt");
+      CREATE INDEX IF NOT EXISTS "TreasureItem_category_idx" ON "TreasureItem"("category");
+    `);
     
-    res.json({ success: true, message: 'Database migrated successfully' });
+    res.json({ success: true, message: 'Database migrated successfully (Events + Treasures)' });
   } catch (err) {
     console.error('Migration error:', err.message);
     res.status(500).json({ error: `Migration failed: ${err.message}` });
@@ -6439,6 +6515,271 @@ app.delete('/api/events/:id', async (req, res) => {
   } catch (err) {
     console.error('❌ Event delete error:', err.message);
     res.status(500).json({ error: `Failed to delete event: ${err.message}` });
+  }
+});
+
+// ============================================================================
+// TREASURE ITEMS API (Verschenkmarkt)
+// ============================================================================
+
+/**
+ * POST /api/treasures
+ * Create a new treasure item
+ */
+app.post('/api/treasures', async (req, res) => {
+  const {
+    userId, title, description, location, latitude, longitude,
+    category, condition, isFree, price, visibility, shareRadiusKm, photoUrl
+  } = req.body;
+
+  // Validate required fields
+  if (!userId || !title || !location || latitude === undefined || longitude === undefined) {
+    return res.status(400).json({
+      error: 'userId, title, location, latitude, longitude erforderlich'
+    });
+  }
+
+  // Validate coordinates
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'Ungültige Koordinaten' });
+  }
+
+  // Validate title length
+  if (String(title).length < 3 || String(title).length > 200) {
+    return res.status(400).json({ error: 'Titel muss 3-200 Zeichen lang sein' });
+  }
+
+  try {
+    // Calculate expiry: 30 days from now
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const treasure = await prisma.treasureItem.create({
+      data: {
+        userId: String(userId).slice(0, 100),
+        title: String(title).slice(0, 200),
+        description: description ? String(description).slice(0, 2000) : null,
+        location: String(location).slice(0, 200),
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        category: category ? String(category).slice(0, 50) : 'other',
+        condition: condition ? String(condition).slice(0, 50) : 'good',
+        isFree: isFree !== false,
+        price: isFree === false && price ? parseFloat(price) : null,
+        visibility: visibility ? String(visibility).slice(0, 50) : 'nearby',
+        shareRadiusKm: shareRadiusKm ? parseFloat(shareRadiusKm) : 10,
+        photoUrl: photoUrl ? String(photoUrl).slice(0, 500) : null,
+        expiresAt: expiresAt,
+        status: 'available',
+      },
+      include: { ratings: true, handovers: true }
+    });
+
+    res.status(201).json({ treasure });
+  } catch (err) {
+    console.error('❌ Treasure creation error:', err.message, err);
+    res.status(500).json({ error: `Treasure creation failed: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/treasures
+ * List/discover treasures with filtering and pagination
+ */
+app.get('/api/treasures', async (req, res) => {
+  const {
+    status = 'available',
+    visibility = 'nearby',
+    category,
+    condition,
+    maxResults = 50,
+    offset = 0,
+    latitude,
+    longitude,
+    radiusKm = 10
+  } = req.query;
+
+  try {
+    let treasures = await prisma.treasureItem.findMany({
+      where: {
+        status: status,
+        visibility: visibility,
+        ...(category && { category: String(category) }),
+        ...(condition && { condition: String(condition) })
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(parseInt(maxResults, 10) || 50, 100),
+      skip: parseInt(offset, 10) || 0,
+      include: { ratings: true, handovers: true }
+    });
+
+    // Filter by geographic proximity if coordinates provided
+    if (latitude !== undefined && longitude !== undefined) {
+      const viewerLat = parseFloat(latitude);
+      const viewerLon = parseFloat(longitude);
+      const maxDistance = parseFloat(radiusKm) || 10;
+
+      treasures = treasures.filter(treasure => {
+        if (!treasure.latitude || !treasure.longitude) return false;
+        const distance = haversineDistance(viewerLat, viewerLon, treasure.latitude, treasure.longitude);
+        return distance <= maxDistance;
+      }).sort((a, b) => {
+        const distA = haversineDistance(viewerLat, viewerLon, a.latitude, a.longitude);
+        const distB = haversineDistance(viewerLat, viewerLon, b.latitude, b.longitude);
+        return distA - distB; // Closest first
+      });
+    }
+
+    const formattedTreasures = treasures.map(t => ({
+      id: t.id,
+      userId: t.userId,
+      title: t.title,
+      description: t.description,
+      location: t.location,
+      latitude: t.latitude,
+      longitude: t.longitude,
+      category: t.category,
+      condition: t.condition,
+      visibility: t.visibility,
+      shareRadiusKm: t.shareRadiusKm,
+      isFree: t.isFree,
+      price: t.price,
+      photoUrl: t.photoUrl,
+      status: t.status,
+      rating: t.rating,
+      ratingCount: t.ratingCount,
+      createdAt: t.createdAt,
+      expiresAt: t.expiresAt,
+    }));
+
+    res.json({ treasures: formattedTreasures, total: formattedTreasures.length });
+  } catch (err) {
+    console.error('❌ Treasures list error:', err.message);
+    res.status(500).json({ error: `Failed to list treasures: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/treasures/:id
+ * Get single treasure details
+ */
+app.get('/api/treasures/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const treasure = await prisma.treasureItem.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+        ratings: { include: { fromUser: { select: { id: true, firstName: true, lastName: true, avatar: true } } } },
+        handovers: true
+      }
+    });
+
+    if (!treasure) {
+      return res.status(404).json({ error: 'Treasure nicht gefunden' });
+    }
+
+    // Increment view count
+    await prisma.treasureItem.update({
+      where: { id },
+      data: { views: { increment: 1 } }
+    });
+
+    const formattedTreasure = {
+      ...treasure,
+      availableHandovers: treasure.handovers.filter(h => h.status === 'pending').length,
+      claimedCount: treasure.handovers.filter(h => h.status === 'confirmed' || h.status === 'completed').length
+    };
+
+    res.json({ treasure: formattedTreasure });
+  } catch (err) {
+    console.error('❌ Treasure detail error:', err.message);
+    res.status(500).json({ error: `Failed to get treasure: ${err.message}` });
+  }
+});
+
+/**
+ * PUT /api/treasures/:id
+ * Update treasure (owner only)
+ */
+app.put('/api/treasures/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId, title, description, location, latitude, longitude, condition, status } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId erforderlich' });
+  }
+
+  try {
+    // Verify ownership
+    const treasure = await prisma.treasureItem.findUnique({ where: { id } });
+    if (!treasure) {
+      return res.status(404).json({ error: 'Treasure nicht gefunden' });
+    }
+
+    if (treasure.userId !== String(userId)) {
+      return res.status(403).json({ error: 'Nur der Ersteller kann das Treasure bearbeiten' });
+    }
+
+    // Validate coordinates if provided
+    if (latitude !== undefined && longitude !== undefined) {
+      if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        return res.status(400).json({ error: 'Ungültige Koordinaten' });
+      }
+    }
+
+    const updatedTreasure = await prisma.treasureItem.update({
+      where: { id },
+      data: {
+        ...(title && { title: String(title).slice(0, 200) }),
+        ...(description !== undefined && { description: description ? String(description).slice(0, 2000) : null }),
+        ...(location && { location: String(location).slice(0, 200) }),
+        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
+        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
+        ...(condition && { condition: String(condition).slice(0, 50) }),
+        ...(status && { status: String(status).slice(0, 50) }),
+        updatedAt: new Date()
+      },
+      include: { ratings: true, handovers: true }
+    });
+
+    res.json({ treasure: updatedTreasure });
+  } catch (err) {
+    console.error('❌ Treasure update error:', err.message);
+    res.status(500).json({ error: `Failed to update treasure: ${err.message}` });
+  }
+});
+
+/**
+ * DELETE /api/treasures/:id
+ * Delete treasure (owner only)
+ * Query param: userId
+ */
+app.delete('/api/treasures/:id', async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId erforderlich' });
+  }
+
+  try {
+    // Verify ownership
+    const treasure = await prisma.treasureItem.findUnique({ where: { id } });
+    if (!treasure) {
+      return res.status(404).json({ error: 'Treasure nicht gefunden' });
+    }
+
+    if (treasure.userId !== String(userId)) {
+      return res.status(403).json({ error: 'Nur der Ersteller kann das Treasure löschen' });
+    }
+
+    await prisma.treasureItem.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Treasure delete error:', err.message);
+    res.status(500).json({ error: `Failed to delete treasure: ${err.message}` });
   }
 });
 

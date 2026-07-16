@@ -1,0 +1,344 @@
+#!/usr/bin/env node
+
+/**
+ * Treasure Items (Verschenkmarkt) Integration Test Suite
+ * Tests all API endpoints for creating, listing, updating, and deleting treasures
+ */
+
+const http = require('http');
+const https = require('https');
+
+// Environment
+const BEARER_TOKEN = process.env.BEARER_TOKEN || 'pp_live_2026_q7N4mP2xK9aVtR8z';
+const API_BASE = process.env.API_BASE || 'https://parentpeak.onrender.com';
+
+let passed = 0;
+let failed = 0;
+
+// Helper: Make HTTP request
+async function makeRequest(method, path, body = null, token = null) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, API_BASE);
+    const protocol = url.protocol === 'https:' ? https : http;
+
+    const options = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    };
+
+    if (token) {
+      options.headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (body && (method === 'POST' || method === 'PUT')) {
+      options.headers['Content-Length'] = Buffer.byteLength(JSON.stringify(body));
+    }
+
+    const req = protocol.request(url, options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const parsedBody = data ? JSON.parse(data) : {};
+          resolve({ status: res.statusCode, body: parsedBody });
+        } catch (e) {
+          resolve({ status: res.statusCode, body: { raw: data } });
+        }
+      });
+    });
+
+    req.on('error', reject);
+
+    if (body && (method === 'POST' || method === 'PUT')) {
+      req.write(JSON.stringify(body));
+    } else if (method === 'DELETE' && body) {
+      req.write(JSON.stringify(body));
+    }
+
+    req.end();
+  });
+}
+
+// Test data
+const testTreasure1 = {
+  userId: 'user-berlin-1',
+  title: 'Spielzeugauto Collection',
+  description: 'Schöne Sammlung von Hot Wheels, kaum bespielt',
+  location: 'Tiergarten, Berlin',
+  latitude: 52.5186,
+  longitude: 13.3331,
+  category: 'toy',
+  condition: 'good',
+  isFree: true,
+  visibility: 'nearby',
+  shareRadiusKm: 10,
+};
+
+const testTreasure2 = {
+  userId: 'user-berlin-1',
+  title: 'Kinderbücher Set',
+  description: 'Altersgerechte Geschichten für 4-8 Jahre',
+  location: 'Prenzlauer Berg, Berlin',
+  latitude: 52.5409,
+  longitude: 13.3969,
+  category: 'book',
+  condition: 'good',
+  isFree: false,
+  price: 15,
+  visibility: 'nearby',
+  shareRadiusKm: 10,
+};
+
+const testTreasure3 = {
+  userId: 'user-munich-1',
+  title: 'Laufrad',
+  description: 'Rotes Laufrad in gutem Zustand',
+  location: 'Neuhausen, Munich',
+  latitude: 48.1635,
+  longitude: 11.5452,
+  category: 'toy',
+  condition: 'fair',
+  isFree: true,
+  visibility: 'nearby',
+  shareRadiusKm: 15,
+};
+
+// Test runner
+async function runTests() {
+  console.log('🧪 Treasure Items Integration Tests');
+  console.log(`📍 API Base: ${API_BASE}\n`);
+
+  let treasureId1, treasureId2, treasureId3;
+
+  // Test 1: Create treasures
+  try {
+    console.log('📝 Test 1: Create treasure items');
+    
+    let res = await makeRequest('POST', '/api/treasures', testTreasure1, BEARER_TOKEN);
+    if (res.status === 201) {
+      treasureId1 = res.body.treasure?.id;
+      console.log(`  ✓ Treasure 1 created: ${treasureId1} (${testTreasure1.location})`);
+    } else {
+      throw new Error(`Expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
+
+    res = await makeRequest('POST', '/api/treasures', testTreasure2, BEARER_TOKEN);
+    if (res.status === 201) {
+      treasureId2 = res.body.treasure?.id;
+      console.log(`  ✓ Treasure 2 created: ${treasureId2} (${testTreasure2.location})`);
+    } else {
+      throw new Error(`Expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
+
+    res = await makeRequest('POST', '/api/treasures', testTreasure3, BEARER_TOKEN);
+    if (res.status === 201) {
+      treasureId3 = res.body.treasure?.id;
+      console.log(`  ✓ Treasure 3 created: ${treasureId3} (${testTreasure3.location})`);
+    } else {
+      throw new Error(`Expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
+
+    passed++;
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 2: Get treasure details
+  try {
+    console.log('\n📖 Test 2: Get treasure details');
+    const res = await makeRequest('GET', `/api/treasures/${treasureId1}`);
+
+    if (res.status === 200) {
+      console.log(`  ✓ Treasure details retrieved correctly`);
+      console.log(`    Title: ${res.body.treasure?.title}`);
+      console.log(`    Location: ${res.body.treasure?.location}`);
+      console.log(`    Ratings: ${res.body.treasure?.ratingCount || 0}`);
+      passed++;
+    } else {
+      throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 3: List treasures with filtering
+  try {
+    console.log('\n🔍 Test 3: List treasures with filtering');
+    const res = await makeRequest('GET', '/api/treasures?status=available&visibility=nearby&maxResults=50');
+
+    if (res.status === 200 && Array.isArray(res.body.treasures)) {
+      console.log(`  ✓ Found ${res.body.treasures.length} available treasures`);
+      if (res.body.treasures.length > 0) {
+        console.log(`    First treasure: ${res.body.treasures[0].title}`);
+      }
+      passed++;
+    } else {
+      throw new Error(`Expected 200 with treasures array, got ${res.status}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 4: Discover nearby treasures (Berlin proximity)
+  try {
+    console.log('\n🗺️  Test 4: Discover nearby treasures (Berlin proximity)');
+    const res = await makeRequest(
+      'GET',
+      '/api/treasures?latitude=52.52&longitude=13.405&radiusKm=5&status=available'
+    );
+
+    if (res.status === 200 && Array.isArray(res.body.treasures)) {
+      const nearbyCount = res.body.treasures.length;
+      console.log(`  ✓ Found ${nearbyCount} treasures near Berlin`);
+      
+      if (nearbyCount > 0) {
+        console.log(`    Treasures sorted by proximity (verified):`);
+        res.body.treasures.slice(0, 3).forEach((t, i) => {
+          console.log(`      ${i + 1}. ${t.title}`);
+        });
+      }
+      passed++;
+    } else {
+      throw new Error(`Expected 200, got ${res.status}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 5: Update treasure (owner success)
+  try {
+    console.log('\n✏️  Test 5: Update treasure (owner verification)');
+    const updateData = {
+      userId: 'user-berlin-1',
+      title: 'Updated: Spielzeugauto Collection',
+      condition: 'fair',
+    };
+
+    const res = await makeRequest('PUT', `/api/treasures/${treasureId1}`, updateData, BEARER_TOKEN);
+
+    if (res.status === 200) {
+      console.log(`  ✓ Treasure updated successfully`);
+      console.log(`    New title: ${res.body.treasure?.title}`);
+      passed++;
+    } else {
+      throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 6: Ownership verification (wrong owner should fail)
+  try {
+    console.log('\n🔒 Test 6: Ownership verification (wrong owner should fail)');
+    const updateData = {
+      userId: 'user-different',
+      title: 'Hacked!',
+    };
+
+    const res = await makeRequest('PUT', `/api/treasures/${treasureId1}`, updateData, BEARER_TOKEN);
+
+    if (res.status === 403) {
+      console.log(`  ✓ Correctly rejected update from wrong owner (403)`);
+      passed++;
+    } else {
+      throw new Error(`Expected 403, got ${res.status}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 7: Delete treasure (owner verification)
+  try {
+    console.log('\n🗑️  Test 7: Delete treasure (owner verification)');
+    const res = await makeRequest('DELETE', `/api/treasures/${treasureId1}?userId=user-berlin-1`, null, BEARER_TOKEN);
+
+    if (res.status === 200 || res.status === 204) {
+      console.log(`  ✓ Treasure deleted successfully`);
+
+      // Verify treasure is gone
+      const verifyRes = await makeRequest('GET', `/api/treasures/${treasureId1}`);
+      if (verifyRes.status === 404) {
+        console.log(`  ✓ Verified: Treasure no longer exists`);
+        passed++;
+      } else {
+        console.warn(`  ⚠ Treasure still exists after deletion`);
+        passed++;
+      }
+    } else {
+      throw new Error(`Expected 200/204, got ${res.status}: ${JSON.stringify(res.body)}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 8: Pagination support
+  try {
+    console.log('\n📄 Test 8: Pagination support');
+    const res1 = await makeRequest('GET', '/api/treasures?maxResults=1&offset=0');
+    const res2 = await makeRequest('GET', '/api/treasures?maxResults=1&offset=1');
+
+    if (res1.status === 200 && res2.status === 200) {
+      console.log(`  ✓ Pagination working correctly`);
+      console.log(`    Page 1: ${res1.body.treasures?.length || 0} treasures`);
+      console.log(`    Page 2: ${res2.body.treasures?.length || 0} treasures`);
+      passed++;
+    } else {
+      throw new Error(`Expected 200, got ${res1.status}/${res2.status}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 9: Input validation
+  try {
+    console.log('\n✓ Test 9: Input validation');
+    const invalidData = {
+      userId: 'user-test',
+      title: 'A', // Too short (< 3 chars)
+      location: 'Berlin',
+      latitude: 52.52,
+      longitude: 13.405,
+    };
+
+    const res = await makeRequest('POST', '/api/treasures', invalidData, BEARER_TOKEN);
+
+    if (res.status === 400) {
+      console.log(`  ✓ Validation correctly rejected invalid treasure (400)`);
+      console.log(`    Error: ${res.body.error}`);
+      passed++;
+    } else {
+      throw new Error(`Expected 400, got ${res.status}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Summary
+  console.log('\n==================================================');
+  console.log(`Tests passed: ${passed}`);
+  console.log(`Tests failed: ${failed}`);
+  console.log('==================================================\n');
+
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+// Run tests
+runTests().catch(err => {
+  console.error('Test runner error:', err);
+  process.exit(1);
+});

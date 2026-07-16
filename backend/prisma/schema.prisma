@@ -36,6 +36,9 @@ model User {
   paymentTransactions   PaymentTransaction[]
   messages              Message[]
   chatReports           ChatReport[]
+  treasureCreated       TreasureItem[]  @relation("TreasureCreator")
+  treasureRatingsGiven  TreasureRating[]  @relation("TreasureRatingFrom")
+  handoverRequests      TreasureHandover[]  @relation("TreasureHandoverRequester")
   
   @@index([email])
   @@index([createdAt])
@@ -62,6 +65,7 @@ model Family {
   events                Event[]
   todos                 Todo[]
   shoppingItems         ShoppingItem[]
+  treasureItems         TreasureItem[]
   
   @@index([createdById])
 }
@@ -211,6 +215,112 @@ model ChatReport {
   
   @@index([messageId])
   @@index([reportedById])
+  @@index([status])
+}
+
+// ============================================================================
+// TREASURE ITEMS (VERSCHENKMARKT)
+// ============================================================================
+
+model TreasureItem {
+  id                    String   @id @default(cuid())
+  
+  // Creator/Owner
+  userId                String
+  user                  User     @relation("TreasureCreator", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Family context (optional)
+  familyId              String?
+  family                Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  
+  // Item Details
+  title                 String
+  description           String?
+  category              String   // toy, book, clothing, furniture, other
+  subcategory           String?
+  condition             String   @default("good") // new, good, fair, worn
+  
+  // Location & Visibility
+  location              String?
+  latitude              Float?
+  longitude             Float?
+  visibility            String   @default("nearby") // nearby, familyCircle, privateOnly
+  shareRadiusKm         Float    @default(10) // How far to show this
+  
+  // Pricing (free or for sale)
+  isFree                Boolean  @default(true)
+  price                 Decimal? @db.Decimal(10, 2)
+  currency              String   @default("EUR")
+  
+  // Media
+  photoUrl              String?
+  photoUrls             String[] @default([]) // Multiple photos
+  
+  // Handover Details
+  availableForPickup    Boolean  @default(true)
+  pickupLocation        String?  // Where to get it
+  pickupSlots           String[] @default([]) // JSON serialized times
+  
+  // Status & Lifecycle
+  status                String   @default("available") // available, claimed, expired, archived
+  createdAt             DateTime @default(now())
+  expiresAt             DateTime? // Auto-archive after 30 days
+  updatedAt             DateTime @updatedAt
+  
+  // Metadata
+  views                 Int      @default(0)
+  rating                Float    @default(0) // Average rating (0-5)
+  ratingCount           Int      @default(0)
+  
+  // Relations
+  ratings               TreasureRating[]
+  handovers             TreasureHandover[]
+  
+  @@index([userId])
+  @@index([familyId])
+  @@index([status])
+  @@index([visibility])
+  @@index([createdAt])
+  @@index([category])
+}
+
+model TreasureRating {
+  id                    String   @id @default(cuid())
+  
+  treasureId            String
+  treasure              TreasureItem @relation(fields: [treasureId], references: [id], onDelete: Cascade)
+  
+  fromUserId            String
+  fromUser              User     @relation("TreasureRatingFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  
+  rating                Int      // 1-5 stars
+  comment               String?
+  createdAt             DateTime @default(now())
+  
+  @@unique([treasureId, fromUserId])
+  @@index([treasureId])
+  @@index([fromUserId])
+}
+
+model TreasureHandover {
+  id                    String   @id @default(cuid())
+  
+  treasureId            String
+  treasure              TreasureItem @relation(fields: [treasureId], references: [id], onDelete: Cascade)
+  
+  requesterId           String
+  requester             User     @relation("TreasureHandoverRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  
+  status                String   @default("pending") // pending, confirmed, completed, cancelled
+  scheduledTime         DateTime?
+  location              String?
+  notes                 String?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([treasureId])
+  @@index([requesterId])
   @@index([status])
 }
 

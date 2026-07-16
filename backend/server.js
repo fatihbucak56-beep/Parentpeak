@@ -4682,7 +4682,7 @@ app.get('/api/meal-plans/:familyId', async (req, res) => {
     const targetDate = new Date(date);
     targetDate.setUTCHours(0, 0, 0, 0);
 
-    const mealPlan = await prisma.MealPlan.findUnique({
+    const mealPlan = await prisma.mealPlan.findUnique({
       where: {
         familyId_date: {
           familyId,
@@ -4762,7 +4762,7 @@ app.post('/api/meal-plans/:familyId', async (req, res) => {
     targetDate.setUTCHours(0, 0, 0, 0);
 
     // Lösche existierende Meals für diesen Tag
-    await prisma.Meal.deleteMany({
+    await prisma.meal.deleteMany({
       where: {
         mealPlan: {
           familyId,
@@ -4772,7 +4772,7 @@ app.post('/api/meal-plans/:familyId', async (req, res) => {
     });
 
     // Erstelle oder update MealPlan
-    const mealPlan = await prisma.MealPlan.upsert({
+    const mealPlan = await prisma.mealPlan.upsert({
       where: {
         familyId_date: {
           familyId,
@@ -4789,7 +4789,7 @@ app.post('/api/meal-plans/:familyId', async (req, res) => {
     // Erstelle neue Meals
     if (meals && meals.length > 0) {
       for (const meal of meals) {
-        await prisma.Meal.create({
+        await prisma.meal.create({
           data: {
             mealPlanId: mealPlan.id,
             title: meal.title,
@@ -4801,7 +4801,7 @@ app.post('/api/meal-plans/:familyId', async (req, res) => {
       }
     }
 
-    const updated = await prisma.MealPlan.findUnique({
+    const updated = await prisma.mealPlan.findUnique({
       where: { id: mealPlan.id },
       include: {
         meals: {
@@ -4830,7 +4830,7 @@ app.post('/api/meals/:mealPlanId', async (req, res) => {
   }
 
   try {
-    const meal = await prisma.Meal.create({
+    const meal = await prisma.meal.create({
       data: {
         mealPlanId,
         title,
@@ -4860,7 +4860,7 @@ app.put('/api/meals/:mealId', async (req, res) => {
   }
 
   try {
-    const meal = await prisma.Meal.update({
+    const meal = await prisma.meal.update({
       where: { id: mealId },
       data: {
         title,
@@ -4890,7 +4890,7 @@ app.delete('/api/meals/:mealId', async (req, res) => {
   }
 
   try {
-    await prisma.Meal.delete({
+    await prisma.meal.delete({
       where: { id: mealId },
     });
 

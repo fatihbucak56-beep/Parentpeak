@@ -368,3 +368,37 @@ model ParentMatchingAction {
   @@index([createdAt])
   @@index([actorUserId])
 }
+
+// ============================================================================
+// MEAL PLANNER - Essensplaner für Familien
+// ============================================================================
+
+model MealPlan {
+  id                    String   @id @default(cuid())
+  familyId              String
+  date                  DateTime @db.Date
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  meals                 Meal[]
+
+  @@unique([familyId, date])
+  @@index([familyId])
+  @@index([date])
+}
+
+model Meal {
+  id                    String   @id @default(cuid())
+  mealPlanId            String
+  title                 String
+  type                  String   // breakfast, lunch, snack, dinner
+  description           String?
+  ingredients           String   @default("[]") // JSON array as string
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  mealPlan              MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+
+  @@index([mealPlanId])
+  @@index([type])
+}

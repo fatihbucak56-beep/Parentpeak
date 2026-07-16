@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
 
 class PedagogicalChatBackend {
@@ -25,6 +26,8 @@ class PedagogicalChatBackend {
     'wie bestrafe ich',
     'wie kann ich meinem kind wehtun',
     'ich will meinem kind wehtun',
+    'ich will meinem kind etwas antun',
+    'ich will meinem kind schaden',
     'ich will es verletzen',
     'ich will ihn verletzen',
     'ich will sie verletzen',
@@ -60,15 +63,14 @@ class PedagogicalChatBackend {
     'deeskalation',
   ];
 
-  static const List<String> _crisisKeywords = [
+  static const List<String> _acuteSafetyKeywords = [
     'suizid',
     'selbstmord',
-    'ich kann nicht mehr',
-    'ich halte es nicht mehr aus',
     'ich will sterben',
     'ich will verschwinden',
     'ich koennte meinem kind etwas antun',
     'ich könnte meinem kind etwas antun',
+    'ich will meinem kind etwas antun',
     'ich habe angst die kontrolle zu verlieren',
     'mein partner schlaegt das kind',
     'mein partner schlägt das kind',
@@ -82,6 +84,18 @@ class PedagogicalChatBackend {
     'selbstverletzung',
     'fremdgefaehrdung',
     'fremdgefährdung',
+  ];
+
+  static const List<String> _emotionalOverloadKeywords = [
+    'ich kann nicht mehr',
+    'ich halte es nicht mehr aus',
+    'ich bin ueberfordert',
+    'ich bin überfordert',
+    'ich bin erschoepft',
+    'ich bin erschöpft',
+    'ich bin am ende',
+    'ich fuehle mich leer',
+    'ich fühle mich leer',
   ];
 
   static const List<String> _diagnosisIntentKeywords = [
@@ -158,21 +172,6 @@ class PedagogicalChatBackend {
     ],
   };
 
-  static const List<String> _forbiddenResponseMarkers = [
-    'schrei',
-    'anschreien',
-    'droh',
-    'drohen',
-    'bescham',
-    'beschäm',
-    'bloßstell',
-    'strafe',
-    'bestrafe',
-    'demuetig',
-    'demütig',
-    'ignorier dein kind',
-  ];
-
   Stream<String> streamReply({
     required List<Map<String, dynamic>> history,
     required String userMessage,
@@ -184,8 +183,13 @@ class PedagogicalChatBackend {
 
     final lower = message.toLowerCase();
 
-    if (_containsAny(lower, _crisisKeywords)) {
+    if (_containsAny(lower, _acuteSafetyKeywords)) {
       yield _crisisResponse();
+      return;
+    }
+
+    if (_containsAny(lower, _emotionalOverloadKeywords)) {
+      yield _emotionalSupportResponse(message);
       return;
     }
 
@@ -210,24 +214,58 @@ class PedagogicalChatBackend {
     }
 
     if (_geminiService == null) {
-      yield _providerUnavailableResponse();
+      yield _providerUnavailableResponse(
+        rawError: 'Gemini service not initialized',
+      );
       return;
     }
 
     final topicMode = _classifyTopicMode(lower);
+    final contextAnchors = _extractContextAnchors(message);
     final preparedHistory = _prepareHistory(history);
+    final historyAnchors = _extractHistoryAnchors(preparedHistory);
     final needsFollowUpQuestion = _shouldAskSingleFollowUpQuestion(message);
     final coachingPrompt = _buildCoachingPrompt(
       userMessage: message,
       topicMode: topicMode,
       needsFollowUpQuestion: needsFollowUpQuestion,
+      contextAnchors: contextAnchors,
+      historyAnchors: historyAnchors,
     );
     preparedHistory.add({'role': 'user', 'content': coachingPrompt});
 
     var response = await _geminiService!.chatWithHistory(preparedHistory);
     if (_looksLikeProviderError(response)) {
-      yield _providerUnavailableResponse();
+      yield _providerUnavailableResponse(rawError: response);
       return;
+    }
+
+    if (_looksLikeDefensiveBoundaryResponse(response)) {
+      final retryHistory = List<Map<String, String>>.from(preparedHistory)
+        ..add({'role': 'assistant', 'content': response})
+        ..add({
+          'role': 'user',
+          'content':
+              'Bitte antworte nicht mit einer allgemeinen Grenzformel. '
+              'Antworte stattdessen konkret, empathisch und loesungsorientiert fuer Eltern im Alltag.',
+        });
+      final retryResponse = await _geminiService!.chatWithHistory(retryHistory);
+      if (!_looksLikeProviderError(retryResponse) && retryResponse.trim().isNotEmpty) {
+        response = retryResponse;
+      }
+    }
+
+    if (!_preservesCriticalContext(response, contextAnchors)) {
+      final retryHistory = List<Map<String, String>>.from(preparedHistory)
+        ..add({'role': 'assistant', 'content': response})
+        ..add({
+          'role': 'user',
+          'content': _contextRetentionRetryInstruction(contextAnchors),
+        });
+      final retryResponse = await _geminiService!.chatWithHistory(retryHistory);
+      if (!_looksLikeProviderError(retryResponse) && retryResponse.trim().isNotEmpty) {
+        response = retryResponse;
+      }
     }
 
     if (_needsQualityRetry(response)) {
@@ -254,7 +292,28 @@ class PedagogicalChatBackend {
     }
 
     if (_violatesCorePedagogicalValues(response.toLowerCase())) {
-      yield _coreValuesBoundaryResponse();
+      final repaired = await _repairToPedagogicalResponse(
+        preparedHistory: preparedHistory,
+        originalResponse: response,
+        topicMode: topicMode,
+      );
+
+      if (_looksLikeProviderError(repaired)) {
+        yield _providerUnavailableResponse(rawError: repaired);
+        return;
+      }
+
+      if (_violatesCorePedagogicalValues(repaired.toLowerCase())) {
+        yield _pedagogicalFallbackResponse(topicMode);
+        return;
+      }
+
+      if (_looksLikeDefensiveBoundaryResponse(repaired)) {
+        yield _pedagogicalFallbackResponse(topicMode);
+        return;
+      }
+
+      yield repaired;
       return;
     }
 
@@ -294,11 +353,16 @@ class PedagogicalChatBackend {
     required String userMessage,
     required String topicMode,
     required bool needsFollowUpQuestion,
+    required List<String> contextAnchors,
+    required List<String> historyAnchors,
   }) {
     final modeHint = _modeSpecificHint(topicMode);
     final followUpRule = needsFollowUpQuestion
         ? 'Stelle am Ende genau EINE kurze Rueckfrage, die den naechsten hilfreichen Schritt absichert.'
         : 'Stelle keine Rueckfrage, wenn die Lage fuer konkrete Schritte ausreicht.';
+    final continuationRule = historyAnchors.isEmpty
+        ? 'Wenn kein Verlaufskontext vorliegt, starte ohne Rueckblick und bleibe beim aktuellen Anliegen.'
+        : 'Nutze den Verlauf aktiv und knuepfe natuerlich an fruehere Themen an (z. B. Name, Alter, Muster). Wenn es nach laengerer Pause klingt, frage sanft nach dem aktuellen Stand.';
 
     return '''
 Themenmodus: $topicMode
@@ -306,12 +370,16 @@ Themenmodus: $topicMode
 Nutzeranliegen:
 $userMessage
 
-Antworte als paedagogischer GFK-Experte mit diesem Pflichtformat:
-1) Kurze, entlastende Spiegelung der Lage.
-2) GFK-Einordnung (Beobachtung, Gefuehl, Beduerfnis).
-3) 2 bis 4 konkrete naechste Schritte fuer die naechsten 24 Stunden.
-4) Zwei wortwoertliche Beispielsatz-Formulierungen fuer Eltern.
-5) $followUpRule
+  Du bist ein hochgradig empathischer, paedagogischer KI-Begleiter fuer Eltern nach GfK (Rosenberg).
+  Haltung: warm, wertfrei, entlastend, auf Augenhoehe.
+
+Pflichtformat mit klaren Ueberschriften:
+  1) Immer zuerst Empathie in 1-2 Saetzen.
+     Gefuehle/Beduerfnisse nur als Vermutung oder Frage formulieren, nie als absolute Behauptung.
+  2) Danach genau EIN GfK-Schritt im Fokus (Beobachtung ODER Gefuehl ODER Beduerfnis ODER Bitte).
+  3) Gib 1-2 kleine alltagstaugliche Optionen in Kann-Form, nicht in Muss-Form.
+  4) Stelle genau EINE offene, behutsame Frage, passend zum gewaehlten GfK-Schritt.
+  5) $followUpRule
 
 Modus-Hinweis:
 $modeHint
@@ -321,7 +389,145 @@ Wichtig:
 - Keine leeren Floskeln.
 - Kein abstrakter Theorieblock.
 - Klar, waermend, handlungsfaehig.
+- Kein Satz wie: "Ich bleibe bei ... ich gebe keine Ratschlaege ...".
+- Schreibe so, dass Eltern sich verstanden, beruhigt und handlungsfaehig fuehlen.
+- Keine Formulierung mit "Du musst".
+- Keine vorschnellen Erziehungsurteile.
+  - Keine Sternchen, keine dekorativen Zeichen und kein Markdown (kein * oder **).
+- Ruhiger, professioneller Sprachstil fuer Eltern.
+  - Antwort kurz und verdaulich: keine Textwand, kurze Absaetze (max. 3-4 Saetze pro Absatz).
+  - Emojis nur dezent und sparsam (0-2 pro Antwort).
+- Uebernimm die wichtigsten Kontextinfos aus der Elternnachricht sichtbar in der Antwort.
+- Wenn konkrete Details genannt wurden (z. B. Alter, Tageszeit, Situation), muessen sie in der Antwort auftauchen.
+  - Wenn Eltern in "Wolfssprache" schreiben (Selbstvorwurf/Urteil), uebersetze empathisch in Gefuehl und Beduerfnis statt zu belehren.
+- Vermute Gefuehle/Beduerfnisse immer als Frage oder vorsichtige Spiegelung, nie als Fakt.
+- Empathie kommt immer vor Strategie.
+- Ein GfK-Schritt pro Antwort, nicht alle vier gleichzeitig.
+- Bullet Points sind erlaubt, wenn sie die Lesbarkeit auf dem Handy verbessern.
+- $continuationRule
+
+Kontextanker (nicht verlieren): ${contextAnchors.isEmpty ? 'keine' : contextAnchors.join(', ')}
+Verlaufskontext (falls vorhanden): ${historyAnchors.isEmpty ? 'keiner' : historyAnchors.join(', ')}
 ''';
+  }
+
+  List<String> _extractHistoryAnchors(List<Map<String, String>> history) {
+    if (history.isEmpty) {
+      return const [];
+    }
+
+    final anchors = <String>[];
+    final recent = history.reversed.take(16).toList();
+    final userTexts = recent
+        .where((entry) => entry['role'] == 'user')
+        .map((entry) => entry['content'] ?? '')
+        .where((text) => text.trim().isNotEmpty)
+        .toList();
+
+    final joinedOriginal = userTexts.join(' \n ');
+    final joinedLower = joinedOriginal.toLowerCase();
+
+    final ageMatches = RegExp(r'\b\d{1,2}\s*(jahre?|jahr|monate?|monat)\b')
+        .allMatches(joinedLower)
+        .map((m) => m.group(0))
+        .whereType<String>()
+        .toList();
+    if (ageMatches.isNotEmpty) {
+      anchors.add(ageMatches.last);
+    }
+
+    final nameMatch = RegExp(
+      r'(?:mein|unser)\s+(?:sohn|tochter|kind)\s+([A-ZÄÖÜ][a-zäöüß]{1,20})',
+    ).firstMatch(joinedOriginal);
+    if (nameMatch != null) {
+      anchors.add(nameMatch.group(1)!);
+    }
+
+    const carryOverPatterns = [
+      'einschlafen',
+      'durchschlafen',
+      'wutanfall',
+      'autonomiephase',
+      'geschwister',
+      'kita',
+      'schule',
+      'grenze',
+      'morgenroutine',
+      'abendroutine',
+    ];
+    for (final pattern in carryOverPatterns) {
+      if (joinedLower.contains(pattern)) {
+        anchors.add(pattern);
+      }
+    }
+
+    return anchors.toSet().take(5).toList();
+  }
+
+  List<String> _extractContextAnchors(String message) {
+    final lower = message.toLowerCase();
+    final anchors = <String>[];
+
+    final ageMatch = RegExp(r'\b\d{1,2}\s*(jahre?|jahr|monate?|monat)\b')
+        .firstMatch(lower);
+    if (ageMatch != null) {
+      anchors.add(ageMatch.group(0)!);
+    }
+
+    const relationPatterns = [
+      'mein kind',
+      'mein sohn',
+      'meine tochter',
+      'unser kind',
+    ];
+    for (final pattern in relationPatterns) {
+      if (lower.contains(pattern)) {
+        anchors.add(pattern);
+        break;
+      }
+    }
+
+    const situationPatterns = [
+      'abends',
+      'nachts',
+      'morgens',
+      'einschlafen',
+      'durchschlafen',
+      'wutanfall',
+      'konflikt',
+      'streit',
+      'kita',
+      'schule',
+    ];
+    for (final pattern in situationPatterns) {
+      if (lower.contains(pattern)) {
+        anchors.add(pattern);
+      }
+    }
+
+    return anchors.toSet().take(4).toList();
+  }
+
+  bool _preservesCriticalContext(String response, List<String> anchors) {
+    if (anchors.isEmpty) {
+      return true;
+    }
+    final lower = response.toLowerCase();
+    var matches = 0;
+    for (final anchor in anchors) {
+      if (lower.contains(anchor.toLowerCase())) {
+        matches++;
+      }
+    }
+    final minMatches = anchors.length >= 3 ? 2 : 1;
+    return matches >= minMatches;
+  }
+
+  String _contextRetentionRetryInstruction(List<String> anchors) {
+    final anchorText = anchors.isEmpty ? 'keine' : anchors.join(', ');
+    return 'Bitte antworte neu und verliere keine wichtigen Angaben der Eltern. '
+        'Greife die genannten Kontextinfos sichtbar auf: $anchorText. '
+        'Bleibe authentisch, empathisch und alltagsnah.';
   }
 
   String _modeSpecificHint(String topicMode) {
@@ -343,7 +549,10 @@ Wichtig:
 
   bool _needsQualityRetry(String response) {
     final lower = response.toLowerCase();
-    if (response.trim().length < 180) {
+    if (response.trim().length < 140) {
+      return true;
+    }
+    if (response.trim().length > 1400) {
       return true;
     }
     const genericMarkers = [
@@ -351,14 +560,48 @@ Wichtig:
       'ich kann dir leider nur',
       'es kommt darauf an',
       'das ist individuell',
+      'ich bleibe bei gewaltfreier',
+      'ich gebe daher keine ratschlaege',
+      'ich gebe daher keine ratschläge',
+      'keine ratschlaege zu',
+      'keine ratschläge zu',
     ];
-    return _containsAny(lower, genericMarkers);
+    final hasGeneric = _containsAny(lower, genericMarkers);
+    final hasEmpathySignal = lower.contains('kann es sein') ||
+        lower.contains('ich hoere heraus') ||
+        lower.contains('das klingt');
+    final questionCount = RegExp(r'\?').allMatches(response).length;
+    final tooManyQuestions = questionCount > 2;
+    final paragraphs = response
+        .split(RegExp(r'\n\s*\n'))
+        .where((p) => p.trim().isNotEmpty)
+        .toList();
+    final hasOverlongParagraph = paragraphs.any((p) {
+      final sentenceCount = RegExp(r'[.!?]+').allMatches(p).length;
+      return sentenceCount > 4;
+    });
+    return hasGeneric || !hasEmpathySignal || tooManyQuestions || hasOverlongParagraph;
   }
 
   String _qualityRetryInstruction(String topicMode) {
-    return 'Bitte antworte jetzt deutlich konkreter fuer den Modus "$topicMode": '
-      'maximal 4 kurze Abschnitte, alltagsnahe Schritte, zwei direkte Beispielsaetze, '
-        'keine Allgemeinplaetze.';
+    return 'Bitte antworte jetzt deutlich konkreter und authentischer fuer den Modus "$topicMode": '
+      '1) Empathie zuerst, 2) genau ein GfK-Schritt im Fokus, 3) 1-2 Optionen in Kann-Form, 4) genau eine offene Frage. '
+      'Kurze mobile Lesbarkeit: max. 3-4 Saetze pro Absatz. '
+      'Gefuehle/Beduerfnisse als Vermutung formulieren. '
+      'Keine Textwand, keine Grenzfloskeln, kein "Du musst".';
+  }
+
+  bool _looksLikeDefensiveBoundaryResponse(String input) {
+    final lower = input.toLowerCase();
+    const markers = [
+      'ich bleibe bei gewaltfreier',
+      'ich gebe daher keine ratschlaege',
+      'ich gebe daher keine ratschläge',
+      'keine ratschlaege zu beschaemung',
+      'keine ratschläge zu beschämung',
+      'wenn du magst, formuliere ich dir stattdessen',
+    ];
+    return _containsAny(lower, markers);
   }
 
   bool _containsAny(String input, List<String> keywords) {
@@ -374,6 +617,7 @@ Wichtig:
     final lower = input.toLowerCase();
     const markers = [
       'fehler:',
+      'not found for api version',
       'quota exceeded',
       'exceeded your current quota',
       'rate-limit',
@@ -382,6 +626,15 @@ Wichtig:
       'generate_content_free_tier',
       'billing details',
       'api key',
+      'permission_denied',
+      'unauthenticated',
+      'failed host lookup',
+      'socketexception',
+      'network is unreachable',
+      'deadline exceeded',
+      'timed out',
+      '403',
+      '401',
       '429',
     ];
     for (final marker in markers) {
@@ -404,24 +657,66 @@ Wichtig:
   }
 
   bool _violatesCorePedagogicalValues(String responseLower) {
-    if (!_containsAny(responseLower, _forbiddenResponseMarkers)) {
-      return false;
-    }
-    return _containsDirectiveLanguage(responseLower);
+    const hardHarmfulPatterns = [
+      'schrei dein kind an',
+      'schrei ihn an',
+      'schrei sie an',
+      'droh ihm',
+      'droh ihr',
+      'mach ihm angst',
+      'mach ihr angst',
+      'bestrafe dein kind',
+      'ignoriere dein kind',
+      'demuetige',
+      'demütige',
+      'bloßstell',
+      'blo\u00dfstell',
+    ];
+    return _containsAny(responseLower, hardHarmfulPatterns);
   }
 
-  bool _containsDirectiveLanguage(String input) {
-    const directiveMarkers = [
-      'du solltest',
-      'du musst',
-      'mach ',
-      'mache ',
-      'sag ihm',
-      'sag ihr',
-      'tu so',
-      'ignoriere',
-    ];
-    return _containsAny(input, directiveMarkers);
+  Future<String> _repairToPedagogicalResponse({
+    required List<Map<String, String>> preparedHistory,
+    required String originalResponse,
+    required String topicMode,
+  }) async {
+    final retryHistory = List<Map<String, String>>.from(preparedHistory)
+      ..add({'role': 'assistant', 'content': originalResponse})
+      ..add({
+        'role': 'user',
+        'content':
+            'Bitte formuliere die Antwort neu: rein gewaltfrei, bindungsorientiert und nach GfK. '
+                'Kein Schimpfen, keine Drohung, keine Strafe. '
+                'Gib stattdessen 3 konkrete alltagstaugliche Schritte plus 2 direkte Beispielsätze für Eltern. '
+                'Themenmodus: $topicMode.',
+      });
+
+    return _geminiService!.chatWithHistory(retryHistory);
+  }
+
+  String _pedagogicalFallbackResponse(String topicMode) {
+    switch (topicMode) {
+      case 'Schlaf':
+        return 'Das klingt sehr kraeftezehrend, besonders wenn es abends haeufig eskaliert. '
+            'Du koenntest heute drei kleine Dinge testen: '
+            '1) 20 Minuten vor dem Schlafen Reize senken, '
+            '2) eine klare Wahl anbieten (Buch oder Lied), '
+            '3) eine ruhige Abschluss-Formulierung wiederholen. '
+            'Moegliche Saetze: "Du willst noch wach bleiben, ich sehe das. Jetzt begleiten wir den Koerper in die Ruhe." '
+            'und "Du darfst traurig sein, ich bleibe ruhig bei dir und halte die Grenze." '
+            'Welche Szene ist bei euch am schwierigsten: der Uebergang ins Bett oder das Liegenbleiben?';
+      case 'Trotz und Wut':
+        return 'Das ist eine intensive Situation, und deine Erschoepfung ist gut nachvollziehbar. '
+            'Du koenntest jetzt zuerst Sicherheit herstellen, dann Gefuehle spiegeln und erst danach eine Alternative anbieten. '
+            'Moegliche Saetze: "Ich sehe deine Wut, ich lasse nicht zu, dass jemand verletzt wird." '
+            'und "Du kannst stampfen oder ins Kissen druecken, ich bleibe bei dir." '
+            'Was ist bei euch der haeufigste Ausloeser direkt vor dem Wutanfall?';
+      default:
+        return 'Danke fürs Teilen - du bist damit nicht allein. '
+            'Wir koennen gemeinsam eine gewaltfreie, paedagogisch passende Loesung erarbeiten. '
+            'Wenn du magst, nenne Alter des Kindes, typische Situation und was du in dem Moment fuehlst. '
+            'Dann formuliere ich mit dir die GFK-Schritte Beobachtung, Gefuehl, Beduerfnis und Bitte konkret fuer euren Alltag.';
+    }
   }
 
   List<Map<String, String>> _prepareHistory(
@@ -474,15 +769,69 @@ Wichtig:
         'bei medizinischer Dringlichkeit 116117 und bei Kindeswohlgefaehrdung das zustaendige Jugendamt.';
   }
 
-  String _providerUnavailableResponse() {
-    return 'Die KI-Beratung ist aktuell nicht verfuegbar. '
-        'Bitte versuche es spaeter erneut oder kontaktiere den Support, falls das Problem bestehen bleibt.';
+  String _emotionalSupportResponse(String message) {
+    return 'Das klingt gerade richtig schwer. Du musst da nicht stark sein und du bist damit nicht allein. 🫶\n\n'
+      'Wenn du magst, machen wir es ganz klein: einmal ausatmen, ein Glas Wasser, dann nur den naechsten schwierigen Moment anschauen.\n\n'
+      'Was war direkt davor los - nur der Ablauf, ohne Bewertung?\n\n'
+      'Hinweis: Ich bin eine unterstuetzende KI und kein Ersatz fuer therapeutische Beratung. Wenn du menschliche Hilfe moechtest, nenne ich dir gern passende Anlaufstellen.';
   }
 
-  String _coreValuesBoundaryResponse() {
-    return 'Ich bleibe bei gewaltfreier, kinderechtsorientierter und bindungsorientierter Begleitung. '
-        'Ich gebe daher keine Ratschlaege zu Beschaemung, Drohungen oder Strafe. '
-        'Wenn du magst, formuliere ich dir stattdessen eine konkrete Alternative nach GFK: '
-        '1) Beobachtung, 2) Gefuehl, 3) Beduerfnis, 4) Bitte.';
+  String _providerUnavailableResponse({String? rawError}) {
+    final reason = _providerIssueReason(rawError);
+    const base = 'Die KI-Beratung ist aktuell nicht verfuegbar. '
+        'Bitte versuche es gleich erneut.';
+
+    final withReason = reason == null ? base : '$base\n\nMoeglicher Grund: $reason';
+
+    if (kDebugMode && rawError != null && rawError.trim().isNotEmpty) {
+      final compact = rawError.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final shortened = compact.length > 240
+          ? '${compact.substring(0, 240)}...'
+          : compact;
+      return '$withReason\n\nDebug: $shortened';
+    }
+
+    return withReason;
   }
+
+  String? _providerIssueReason(String? rawError) {
+    if (rawError == null || rawError.trim().isEmpty) {
+      return null;
+    }
+
+    final lower = rawError.toLowerCase();
+
+    if (lower.contains('api key') ||
+        lower.contains('unauthenticated') ||
+        lower.contains('401')) {
+      return 'API-Schluessel ungueltig oder nicht autorisiert.';
+    }
+
+    if (lower.contains('quota exceeded') ||
+        lower.contains('resource has been exhausted') ||
+        lower.contains('429') ||
+        lower.contains('rate limit')) {
+      return 'Kontingent/Rate-Limit erreicht.';
+    }
+
+    if (lower.contains('permission_denied') || lower.contains('403')) {
+      return 'Berechtigung fuer dieses Modell fehlt.';
+    }
+
+    if (lower.contains('not found for api version') ||
+        lower.contains('model') && lower.contains('not found')) {
+      return 'Konfiguriertes Modell ist nicht verfuegbar.';
+    }
+
+    if (lower.contains('failed host lookup') ||
+        lower.contains('socketexception') ||
+        lower.contains('network is unreachable') ||
+        lower.contains('timed out') ||
+        lower.contains('deadline exceeded')) {
+      return 'Netzwerkproblem oder Timeout.';
+    }
+
+    return 'Externer Dienst antwortet aktuell nicht stabil.';
+  }
+
 }

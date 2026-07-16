@@ -5,6 +5,7 @@ import 'package:parentpeak/models/food_share_post.dart';
 import 'package:parentpeak/models/shared_recipe.dart';
 import 'package:parentpeak/models/meal_plan.dart';
 import 'package:parentpeak/services/meal_planner_service.dart';
+import 'package:parentpeak/logic/gemeinsam_satt_backend_service.dart' as backend_service;
 
 // ============================================================
 // GEMEINSAM SATT — Eltern-Essenssolidarität
@@ -27,6 +28,8 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   static const String _myUserId = 'mama_fatih';
   late final TabController _tabController;
   final TextEditingController _commentController = TextEditingController();
+  final backend_service.GemeinsamSattBackendService _service = 
+      backend_service.GemeinsamSattBackendService();
 
   late List<FoodSharePost> _posts;
   late List<SharedRecipe> _recipes;
@@ -37,9 +40,11 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _posts = _buildDemoPosts();
-    _recipes = _buildDemoRecipes();
+    _recipes = [];
     _weekPlan = _buildDemoWeekPlan();
     
+    // Load recipes from backend
+    _loadRecipes();
     // Load meal plan from API
     _loadWeekMealPlan();
   }
@@ -61,6 +66,125 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       debugPrint('GemeinsamSattScreen._loadWeekMealPlan(): failed: $e');
       // Keep using demo data
     }
+  }
+
+  Future<void> _loadRecipes() async {
+    try {
+      // Fetch recipes from backend with pagination
+      final result = await _service.fetchRecipes(
+        skip: 0,
+        take: 20,
+      );
+      
+      if (result.containsKey('recipes') && result['recipes'] is List) {
+        final recipes = (result['recipes'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(_convertBackendRecipeToUI)
+            .toList();
+        
+        if (mounted) {
+          setState(() {
+            _recipes = recipes;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('GemeinsamSattScreen._loadRecipes(): failed: $e');
+      // Fallback to demo recipes
+      if (mounted) {
+        setState(() {
+          _recipes = _buildDemoRecipes();
+        });
+      }
+    }
+  }
+
+  // Convert backend recipe format to UI model
+  SharedRecipe _convertBackendRecipeToUI(Map<String, dynamic> data) {
+    final title = (data['title'] ?? '').toString();
+    final category = (data['category'] ?? 'Allgemein').toString();
+    
+    return SharedRecipe(
+      id: (data['id'] ?? '').toString(),
+      authorId: (data['creatorUserId'] ?? '').toString(),
+      authorName: _getUserDisplayName(data['creatorUserId']),
+      authorInitials: _getInitials((data['creatorUserId'] ?? '').toString()),
+      authorColor: _getColorForAuthor((data['creatorUserId'] ?? '').toString()),
+      title: title,
+      description: (data['description'] ?? '').toString(),
+      imageEmoji: _getEmojiForCategory(category),
+      durationMinutes: (data['prepTimeMinutes'] as num?)?.toInt() ?? 30,
+      difficulty: _parseDifficulty(data['difficulty']),
+      tags: (data['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      likedByUserIds: [], // TODO: fetch from ratings
+      ingredients: (data['ingredients'] as List?)?.map((e) {
+        if (e is Map) {
+          return '${e['amount'] ?? ''} ${e['unit'] ?? ''} ${e['name'] ?? ''}'.trim();
+        }
+        return e.toString();
+      }).toList() ?? [],
+      steps: (data['instructions'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      createdAt: data['createdAt'] is String
+          ? DateTime.tryParse(data['createdAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  RecipeDifficulty _parseDifficulty(dynamic value) {
+    final val = value?.toString().toLowerCase() ?? '';
+    switch (val) {
+      case 'einfach':
+      case 'easy':
+        return RecipeDifficulty.einfach;
+      case 'mittel':
+      case 'medium':
+        return RecipeDifficulty.mittel;
+      case 'fortgeschritten':
+      case 'schwierig':
+      case 'hard':
+      case 'advanced':
+        return RecipeDifficulty.fortgeschritten;
+      default:
+        return RecipeDifficulty.einfach;
+    }
+  }
+
+  String _getUserDisplayName(String? userId) {
+    final names = {
+      'mueller': 'Familie Müller',
+      'kaya': 'Familie Kaya',
+      'nguyen': 'Familie Nguyen',
+      'mama_fatih': 'Familie Fatih',
+    };
+    return names[userId] ?? 'Unbekannt';
+  }
+
+  String _getInitials(String userId) {
+    final firstName = userId.split('_').first;
+    return firstName.isNotEmpty ? firstName[0].toUpperCase() : '?';
+  }
+
+  Color _getColorForAuthor(String userId) {
+    const colors = [
+      Color(0xFF2563EB), // blue
+      Color(0xFF16A34A), // green
+      Color(0xFF8B5CF6), // purple
+      Color(0xFFDC2626), // red
+    ];
+    return colors[userId.hashCode % colors.length];
+  }
+
+  String _getEmojiForCategory(String category) {
+    final emojis = {
+      'Suppe': '🍲',
+      'Pasta': '🍝',
+      'Salat': '🥗',
+      'Fleisch': '🍖',
+      'Fisch': '🐟',
+      'Dessert': '🍰',
+      'Frühstück': '🍳',
+    };
+    return emojis[category] ?? '🍽️';
   }
 
   @override

@@ -134,14 +134,52 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   }
 
   Future<void> _loadProfiles() async {
-    final rawProfiles = await _service.fetchProfiles(userId: _effectiveUserId);
-    final parsed = rawProfiles.map(_profileFromMap).toList();
-    if (!mounted) return;
-    setState(() {
-      _allProfiles
-        ..clear()
-        ..addAll(parsed);
-    });
+    try {
+      // Use new smart matching algorithm
+      final matchResults = await _service.findMatches(userId: _effectiveUserId);
+      
+      // Convert MatchResult objects to internal _ParentProfile format
+      final profiles = matchResults.map((result) {
+        final profile = result.profile;
+        // Convert breakdown map values to doubles
+        final breakdownAsDoubles = result.breakdown.map(
+          (key, value) => MapEntry(key, (value is num) ? value.toDouble() : 0.0),
+        );
+        final age = profile.age;
+        final familyForm = profile.familyForm;
+        return _ParentProfile(
+          id: profile.id,
+          name: profile.name ?? 'Unbekannt',
+          age: (age != null) ? age : 30,
+          city: profile.city,
+          bio: 'Matching-Score: ${result.score.toStringAsFixed(0)}%',
+          interests: profile.interests,
+          languages: profile.languages,
+          valuesFocus: profile.valuesFocus,
+          familyForm: (familyForm != null) ? familyForm : 'Familie',
+          childAges: profile.childAges,
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+          score: result.score as double?,
+          breakdown: breakdownAsDoubles,
+        );
+      }).toList();
+      
+      if (!mounted) return;
+      setState(() {
+        _allProfiles
+          ..clear()
+          ..addAll(profiles);
+      });
+    } catch (e) {
+      // Fallback for errors
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Smart Matching konnte nicht geladen werden: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Future<void> _restoreState() async {
@@ -282,35 +320,103 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   }
 
   Future<void> _refreshConnectionsFromBackend({bool announce = true}) async {
-    final connectedIds =
-        await _service.fetchConnectedProfileIds(userId: _effectiveUserId);
-    final newlyConfirmedIds = connectedIds.difference(_seenMatchedProfileIds);
+    try {
+      // Fetch latest matches using smart algorithm
+      final matchResults = await _service.findMatches(userId: _effectiveUserId);
+      
+      // Get connected profile IDs from backend
+      final connectedIds = await _service.fetchConnectedProfileIds(userId: _effectiveUserId);
+      final newlyConfirmedIds = connectedIds.difference(_seenMatchedProfileIds);
 
-    if (!mounted) return;
-    setState(() {
-      _matchedProfiles
-        ..clear()
-        ..addAll(_allProfiles.where((p) => connectedIds.contains(p.id)));
-      _newlyConfirmedProfileIds
-        ..clear()
-        ..addAll(newlyConfirmedIds);
-      _newConfirmedSinceLastVisit = _newlyConfirmedProfileIds.length;
-    });
+      if (!mounted) return;
+      
+      // Update both all profiles and matched profiles
+      final profiles = matchResults.map((result) {
+        final profile = result.profile;
+        // Convert breakdown map values to doubles
+        final breakdownAsDoubles = result.breakdown.map(
+          (key, value) => MapEntry(key, (value is num) ? value.toDouble() : 0.0),
+        );
+        final age = profile.age;
+        final familyForm = profile.familyForm;
+        return _ParentProfile(
+          id: profile.id,
+          name: profile.name ?? 'Unbekannt',
+          age: (age != null) ? age : 30,
+          city: profile.city,
+          bio: 'Matching-Score: ${result.score.toStringAsFixed(0)}%',
+          interests: profile.interests,
+          languages: profile.languages,
+          valuesFocus: profile.valuesFocus,
+          familyForm: (familyForm != null) ? familyForm : 'Familie',
+          childAges: profile.childAges,
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+          score: result.score as double?,
+          breakdown: breakdownAsDoubles,
+        );
+      }).toList();
 
-    if (announce && newlyConfirmedIds.isNotEmpty) {
-      final count = newlyConfirmedIds.length;
-      final text = count == 1
-          ? 'Neue bestätigte Verbindung verfügbar.'
-          : '$count neue bestätigte Verbindungen verfügbar.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(text),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      setState(() {
+        _allProfiles
+          ..clear()
+          ..addAll(profiles);
+        
+        _matchedProfiles
+          ..clear()
+          ..addAll(_allProfiles.where((p) => connectedIds.contains(p.id)));
+        _newlyConfirmedProfileIds
+          ..clear()
+          ..addAll(newlyConfirmedIds);
+        _newConfirmedSinceLastVisit = _newlyConfirmedProfileIds.length;
+      });
+
+      if (announce && newlyConfirmedIds.isNotEmpty) {
+        final count = newlyConfirmedIds.length;
+        final text = count == 1
+            ? 'Neue bestätigte Verbindung verfügbar.'
+            : '$count neue bestätigte Verbindungen verfügbar.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(text),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      _persistState();
+    } catch (e) {
+      // Fallback - try the old method
+      final connectedIds =
+          await _service.fetchConnectedProfileIds(userId: _effectiveUserId);
+      final newlyConfirmedIds = connectedIds.difference(_seenMatchedProfileIds);
+
+      if (!mounted) return;
+      setState(() {
+        _matchedProfiles
+          ..clear()
+          ..addAll(_allProfiles.where((p) => connectedIds.contains(p.id)));
+        _newlyConfirmedProfileIds
+          ..clear()
+          ..addAll(newlyConfirmedIds);
+        _newConfirmedSinceLastVisit = _newlyConfirmedProfileIds.length;
+      });
+
+      if (announce && newlyConfirmedIds.isNotEmpty) {
+        final count = newlyConfirmedIds.length;
+        final text = count == 1
+            ? 'Neue bestätigte Verbindung verfügbar.'
+            : '$count neue bestätigte Verbindungen verfügbar.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(text),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      _persistState();
     }
-
-    _persistState();
   }
 
   Future<void> _acknowledgeNewConnections() async {
@@ -650,22 +756,24 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     }
 
     setState(() => _isSavingProfile = true);
-    final saved = await _service.upsertMyProfile(
+    
+    // Get city coordinates
+    final cityCenter = _cityCenters[_homeCity] ?? _cityCenters['Berlin']!;
+    
+    final saved = await _service.createProfile(
       userId: _effectiveUserId,
-      profile: {
-        'name': name,
-        'age': _profileAge,
-        'city': _homeCity,
-        'familyForm': _profileFamilyForm,
-        'bio':
-            'Ich suche Familien für freundlichen Austausch und passende Playdates.',
-        'interests': _myInterests.toList(),
-        'languages': _myLanguages.toList(),
-        'valuesFocus': _myValues.toList(),
-        'childAges': _childAgeFilter.isNotEmpty
-            ? _childAgeFilter.toList()
-            : const ['3-5', '6-9'],
-      },
+      name: name,
+      age: _profileAge,
+      city: _homeCity,
+      latitude: cityCenter.$1,
+      longitude: cityCenter.$2,
+      interests: _myInterests.toList(),
+      languages: _myLanguages.toList(),
+      valuesFocus: _myValues.toList(),
+      childAges: _childAgeFilter.isNotEmpty
+          ? _childAgeFilter.toList()
+          : const ['3-5', '6-9'],
+      familyForm: _profileFamilyForm,
     );
     if (!mounted) return;
 
@@ -1740,6 +1848,8 @@ class _ParentProfile {
     this.latitude,
     this.longitude,
     this.verificationLevel = _VerificationLevel.basic,
+    this.score,
+    this.breakdown,
   });
 
   final String id;
@@ -1755,14 +1865,8 @@ class _ParentProfile {
   final double? latitude;
   final double? longitude;
   final _VerificationLevel verificationLevel;
-}
-
-String _safeProfileName(dynamic value) {
-  final parsed = (value ?? '').toString().trim();
-  if (parsed.isEmpty) {
-    return 'Unbekannt';
-  }
-  return parsed;
+  final double? score;
+  final Map<String, double>? breakdown;
 }
 
 String _safeInitial(String name) {
@@ -1771,14 +1875,6 @@ String _safeInitial(String name) {
     return '?';
   }
   return trimmed.substring(0, 1).toUpperCase();
-}
-
-String _safeTextValue(dynamic value, String fallback) {
-  final parsed = (value ?? '').toString().trim();
-  if (parsed.isEmpty) {
-    return fallback;
-  }
-  return parsed;
 }
 
 enum _VerificationLevel { basic, checked, recommended }
@@ -1817,48 +1913,3 @@ class _VerificationBadge extends StatelessWidget {
   }
 }
 
-_ParentProfile _profileFromMap(Map<String, dynamic> raw) {
-  _VerificationLevel parseVerificationLevel(String? value) {
-    switch (value?.toLowerCase().trim()) {
-      case 'checked':
-        return _VerificationLevel.checked;
-      case 'recommended':
-        return _VerificationLevel.recommended;
-      default:
-        return _VerificationLevel.basic;
-    }
-  }
-
-  List<String> toStringList(dynamic value) {
-    if (value is List) {
-      return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
-    }
-    return const [];
-  }
-
-  return _ParentProfile(
-    id: _safeTextValue(
-      raw['id'],
-      DateTime.now().microsecondsSinceEpoch.toString(),
-    ),
-    name: _safeProfileName(raw['name']),
-    age: (raw['age'] is num)
-        ? (raw['age'] as num).toInt()
-        : int.tryParse('${raw['age']}') ?? 30,
-    city: _safeTextValue(raw['city'], 'Unbekannt'),
-    bio: (raw['bio'] ?? '').toString(),
-    interests: toStringList(raw['interests']),
-    languages: toStringList(raw['languages']),
-    valuesFocus: toStringList(raw['valuesFocus']),
-    childAges: toStringList(raw['childAges']),
-    familyForm: _safeTextValue(raw['familyForm'], 'Kernfamilie'),
-    latitude: (raw['latitude'] is num)
-        ? (raw['latitude'] as num).toDouble()
-        : double.tryParse('${raw['latitude']}'),
-    longitude: (raw['longitude'] is num)
-        ? (raw['longitude'] as num).toDouble()
-        : double.tryParse('${raw['longitude']}'),
-    verificationLevel:
-        parseVerificationLevel(raw['verificationLevel']?.toString()),
-  );
-}

@@ -259,7 +259,7 @@ async function runTests() {
     failed++;
   }
 
-  // Test 7: Delete treasure (owner verification)
+  // Test 7: Report flow (create, list, resolve)
   try {
     console.log('\n🚩 Test 7: Report flow (create, list, resolve)');
 
@@ -319,9 +319,77 @@ async function runTests() {
     failed++;
   }
 
-  // Test 8: Delete treasure (owner verification)
+  // Test 8: Auto moderation (threshold + duplicate guard)
   try {
-    console.log('\n🗑️  Test 8: Delete treasure (owner verification)');
+    console.log('\n🤖 Test 8: Auto moderation (threshold + duplicate guard)');
+
+    const report1 = await makeRequest(
+      'POST',
+      `/api/treasures/${treasureId3}/report`,
+      {
+        reporterUserId: 'user-report-a',
+        reason: 'Falsche Angaben',
+      },
+      BEARER_TOKEN,
+    );
+    if (report1.status !== 201 || report1.body.autoModeration?.action !== 'none') {
+      throw new Error(`Expected first report action=none, got ${report1.status}: ${JSON.stringify(report1.body)}`);
+    }
+
+    const duplicate = await makeRequest(
+      'POST',
+      `/api/treasures/${treasureId3}/report`,
+      {
+        reporterUserId: 'user-report-a',
+        reason: 'Falsche Angaben',
+      },
+      BEARER_TOKEN,
+    );
+    if (duplicate.status !== 409) {
+      throw new Error(`Expected 409 on duplicate reporter, got ${duplicate.status}`);
+    }
+
+    const report2 = await makeRequest(
+      'POST',
+      `/api/treasures/${treasureId3}/report`,
+      {
+        reporterUserId: 'user-report-b',
+        reason: 'Unpassender Inhalt',
+      },
+      BEARER_TOKEN,
+    );
+    if (report2.status !== 201 || report2.body.autoModeration?.action !== 'none') {
+      throw new Error(`Expected second report action=none, got ${report2.status}: ${JSON.stringify(report2.body)}`);
+    }
+
+    const report3 = await makeRequest(
+      'POST',
+      `/api/treasures/${treasureId3}/report`,
+      {
+        reporterUserId: 'user-report-c',
+        reason: 'Unpassender Inhalt',
+      },
+      BEARER_TOKEN,
+    );
+    if (report3.status !== 201 || report3.body.autoModeration?.action !== 'archived_threshold') {
+      throw new Error(`Expected third report action=archived_threshold, got ${report3.status}: ${JSON.stringify(report3.body)}`);
+    }
+
+    const archivedDetail = await makeRequest('GET', `/api/treasures/${treasureId3}`);
+    if (archivedDetail.status !== 200 || archivedDetail.body.treasure?.status !== 'archived') {
+      throw new Error(`Expected archived treasure status, got ${archivedDetail.status}: ${JSON.stringify(archivedDetail.body)}`);
+    }
+
+    console.log('  ✓ Auto moderation archived listing after threshold and blocks duplicate reporter');
+    passed++;
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 9: Delete treasure (owner verification)
+  try {
+    console.log('\n🗑️  Test 9: Delete treasure (owner verification)');
     const res = await makeRequest('DELETE', `/api/treasures/${treasureId1}?userId=user-berlin-1`, null, BEARER_TOKEN);
 
     if (res.status === 200 || res.status === 204) {
@@ -344,9 +412,9 @@ async function runTests() {
     failed++;
   }
 
-  // Test 9: Pagination support
+  // Test 10: Pagination support
   try {
-    console.log('\n📄 Test 9: Pagination support');
+    console.log('\n📄 Test 10: Pagination support');
     const res1 = await makeRequest('GET', '/api/treasures?maxResults=1&offset=0');
     const res2 = await makeRequest('GET', '/api/treasures?maxResults=1&offset=1');
 
@@ -363,9 +431,9 @@ async function runTests() {
     failed++;
   }
 
-  // Test 10: Input validation
+  // Test 11: Input validation
   try {
-    console.log('\n✓ Test 10: Input validation');
+    console.log('\n✓ Test 11: Input validation');
     const invalidData = {
       userId: 'user-test',
       title: 'A', // Too short (< 3 chars)

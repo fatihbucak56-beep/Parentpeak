@@ -6691,6 +6691,36 @@ function isAdminTokenAuthorized(req) {
   return authHeader === `Bearer ${backendApiToken}`;
 }
 
+function normalizeTreasureReportReason(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .slice(0, 120);
+}
+
+function isTreasureReportSevere({ reason, note }) {
+  const reasonText = normalizeTreasureReportReason(reason);
+  const noteText = String(note || '').toLowerCase();
+  const text = `${reasonText} ${noteText}`;
+  const severeKeywords = [
+    'gewalt',
+    'hass',
+    'sex',
+    'nackt',
+    'missbrauch',
+    'betrug',
+    'scam',
+    'drohung',
+  ];
+  return severeKeywords.some(keyword => text.includes(keyword));
+}
+
+function shouldAutoArchiveTreasure({ severe, recentReportCount }) {
+  if (severe) return true;
+  return recentReportCount >= 3;
+}
+
 /**
  * POST /api/treasures/:id/report
  * Report a treasure listing for moderation
@@ -6714,6 +6744,19 @@ app.post('/api/treasures/:id/report', async (req, res) => {
       return res.status(404).json({ error: 'Treasure nicht gefunden' });
     }
 
+    // Avoid duplicate report spam from the same reporter for the same listing.
+    const duplicate = await prisma.treasureReport.findFirst({
+      where: {
+        treasureId: id,
+        reporterUserId: String(reporterUserId),
+        status: { in: ['pending', 'resolved'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (duplicate) {
+      return res.status(409).json({ error: 'Dieses Angebot wurde von dir bereits gemeldet' });
+    }
+
     const report = await prisma.treasureReport.create({
       data: {
         treasureId: id,
@@ -6724,7 +6767,53 @@ app.post('/api/treasures/:id/report', async (req, res) => {
       },
     });
 
-    res.status(201).json({ report });
+    const recentReportCount = await prisma.treasureReport.count({
+      where: {
+        treasureId: id,
+        createdAt: {
+          gte: new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)),
+        },
+      },
+    });
+
+    const severe = isTreasureReportSevere({ reason: normalizedReason, note });
+    let autoAction = 'none';
+
+    if (shouldAutoArchiveTreasure({ severe, recentReportCount })) {
+      autoAction = severe ? 'archived_severe' : 'archived_threshold';
+      await prisma.$transaction([
+        prisma.treasureItem.update({
+          where: { id },
+          data: {
+            status: 'archived',
+            updatedAt: new Date(),
+          },
+        }),
+        prisma.treasureReport.updateMany({
+          where: {
+            treasureId: id,
+            status: 'pending',
+          },
+          data: {
+            status: 'resolved',
+            moderatorId: 'system-auto',
+            moderatorNote: severe
+              ? 'Auto-resolved: severe reason triggered immediate archive.'
+              : 'Auto-resolved: report threshold reached, listing archived.',
+            resolvedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        }),
+      ]);
+    }
+
+    res.status(201).json({
+      report,
+      autoModeration: {
+        action: autoAction,
+        recentReportCount,
+      },
+    });
   } catch (err) {
     console.error('❌ Treasure report create error:', err.message);
     res.status(500).json({ error: `Failed to create treasure report: ${err.message}` });

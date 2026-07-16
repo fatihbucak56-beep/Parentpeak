@@ -240,14 +240,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openParentMatchFromHint() async {
+  Future<void> _openParentMatchQuickAction({
+    required bool openNewConnections,
+  }) async {
     await _storeRecentTileTap('Eltern Match');
     if (!mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            const ParentMatchingScreen(openNewConnectionsOnOpen: true),
+        builder: (_) => ParentMatchingScreen(
+          openNewConnectionsOnOpen: openNewConnections,
+        ),
       ),
     );
     if (!mounted) return;
@@ -508,18 +511,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final action = visibleGridActions[index];
+                        final isParentMatchTile =
+                            action.label == 'Eltern Match';
                         return _buildFeatureTile(
                           context,
                           title: action.label,
                           subtitle: action.description,
                           statusHint: action.statusHint,
-                          quickActionLabel: action.label == 'Eltern Match' &&
-                                  _newParentMatchesCount > 0
-                              ? 'Neue Verbindungen öffnen'
+                          quickActionLabel: isParentMatchTile
+                              ? (_newParentMatchesCount > 0
+                                  ? 'Neue Verbindungen öffnen'
+                                  : 'Eltern Match öffnen')
                               : null,
-                          onQuickAction: action.label == 'Eltern Match' &&
-                                  _newParentMatchesCount > 0
-                              ? _openParentMatchFromHint
+                          quickActionHelperText:
+                              isParentMatchTile && _newParentMatchesCount == 0
+                                  ? 'Noch keine neuen Verbindungen'
+                                  : null,
+                          onQuickAction: isParentMatchTile
+                              ? () => _openParentMatchQuickAction(
+                                    openNewConnections:
+                                        _newParentMatchesCount > 0,
+                                  )
                               : null,
                           icon: action.icon,
                           color: action.color,
@@ -842,6 +854,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     String? statusHint,
     String? quickActionLabel,
+    String? quickActionHelperText,
     required Color color,
     required IconData icon,
     bool compact = false,
@@ -981,6 +994,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                    if (quickActionHelperText != null &&
+                        quickActionHelperText.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        quickActionHelperText,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                   if (!compactTile) ...[
                     const Spacer(),

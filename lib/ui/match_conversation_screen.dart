@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/parent_matching_backend_service.dart';
+import 'dart:async';
 
 class MatchConversationScreen extends StatefulWidget {
   const MatchConversationScreen({
@@ -23,6 +24,8 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
   final ParentMatchingBackendService _service =
       BackendServiceFactory.createParentMatchingService();
   final List<_Msg> _messages = [];
+  StreamSubscription<Map<String, dynamic>>? _streamSub;
+  bool _streamActive = false;
   bool _isLoading = true;
 
   String get _currentUserId {
@@ -45,6 +48,52 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
   void initState() {
     super.initState();
     _loadMessages();
+    _startLiveStream();
+  }
+
+  void _startLiveStream() {
+    _streamSub?.cancel();
+    _streamSub = _service
+        .streamMessages(profileId: widget.profileId, userId: _currentUserId)
+        .listen((event) {
+      final type = (event['type'] ?? '').toString();
+      if (type == 'ready' || type == 'ping') {
+        if (mounted && !_streamActive) {
+          setState(() => _streamActive = true);
+        }
+        return;
+      }
+
+      final item = event['item'];
+      if (item is! Map) return;
+      final content = (item['content'] ?? '').toString().trim();
+      if (content.isEmpty) return;
+
+      final id = (item['id'] ?? '').toString();
+      final authorUserId = (item['authorUserId'] ?? '').toString();
+      if (!mounted) return;
+
+      if (_messages.any((msg) => msg.id == id && id.isNotEmpty)) {
+        return;
+      }
+
+      setState(() {
+        _streamActive = true;
+        _messages.add(_Msg(
+          id: id,
+          text: content,
+          isMe: authorUserId == _currentUserId,
+        ));
+      });
+    }, onError: (_) {
+      if (mounted) {
+        setState(() => _streamActive = false);
+      }
+    }, onDone: () {
+      if (mounted) {
+        setState(() => _streamActive = false);
+      }
+    });
   }
 
   Future<void> _loadMessages() async {
@@ -58,8 +107,9 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
         ..clear()
         ..addAll(items.map((item) {
           final text = (item['content'] ?? '').toString();
+          final id = (item['id'] ?? '').toString();
           final authorUserId = (item['authorUserId'] ?? '').toString();
-          return _Msg(text: text, isMe: authorUserId == _currentUserId);
+          return _Msg(id: id, text: text, isMe: authorUserId == _currentUserId);
         }));
       _isLoading = false;
     });
@@ -67,6 +117,7 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
 
   @override
   void dispose() {
+    _streamSub?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -75,7 +126,7 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    final optimistic = _Msg(text: text, isMe: true);
+    final optimistic = _Msg(id: 'optimistic-${DateTime.now().microsecondsSinceEpoch}', text: text, isMe: true);
 
     setState(() {
       _messages.add(optimistic);
@@ -113,6 +164,12 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
       appBar: AppBar(
         title: Text('Chat mit ${widget.profileName}'),
         actions: [
+          if (!_streamActive)
+            IconButton(
+              tooltip: 'Live verbinden',
+              onPressed: _startLiveStream,
+              icon: const Icon(Icons.wifi_tethering_rounded),
+            ),
           IconButton(
             tooltip: 'Aktualisieren',
             onPressed: _loadMessages,
@@ -186,8 +243,9 @@ class _MatchConversationScreenState extends State<MatchConversationScreen> {
 }
 
 class _Msg {
-  const _Msg({required this.text, required this.isMe});
+  const _Msg({required this.id, required this.text, required this.isMe});
 
+  final String id;
   final String text;
   final bool isMe;
 }

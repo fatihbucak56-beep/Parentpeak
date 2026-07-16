@@ -331,9 +331,12 @@ model ShoppingItem {
 model ParentMatchingProfile {
   id                    String   @id @default(cuid())
   externalId            String?  @unique
+  ownerUserId           String?
   name                  String
   age                   Int
   city                  String
+  latitude              Float?
+  longitude             Float?
   bio                   String?
   interests             String[]
   languages             String[]
@@ -348,6 +351,7 @@ model ParentMatchingProfile {
   actions               ParentMatchingAction[]
 
   @@index([city])
+  @@index([ownerUserId])
   @@index([isActive])
   @@index([createdAt])
 }

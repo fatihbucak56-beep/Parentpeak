@@ -782,6 +782,7 @@ const parentProfiles = [
 const parentMatchingActions = [];
 const parentMatchingMessages = [];
 const parentMatchingAllowedActions = new Set(['like', 'report', 'block']);
+const parentMatchingMessageSubscribers = new Map();
 let parentMatchingSchemaEnsured = false;
 
 async function ensureParentMatchingSchemaReady() {
@@ -813,6 +814,24 @@ async function ensureParentMatchingSchemaReady() {
   `);
 
   await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ParentMatchingProfile"
+    ADD COLUMN IF NOT EXISTS "externalId" TEXT,
+    ADD COLUMN IF NOT EXISTS "ownerUserId" TEXT,
+    ADD COLUMN IF NOT EXISTS "bio" TEXT,
+    ADD COLUMN IF NOT EXISTS "interests" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    ADD COLUMN IF NOT EXISTS "languages" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    ADD COLUMN IF NOT EXISTS "valuesFocus" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    ADD COLUMN IF NOT EXISTS "childAges" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS "familyForm" TEXT,
+    ADD COLUMN IF NOT EXISTS "verificationLevel" TEXT DEFAULT 'basic',
+    ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true,
+    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+  `);
+
+  await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ParentMatchingAction" (
       "id" TEXT PRIMARY KEY,
       "familyId" TEXT NOT NULL,
@@ -821,6 +840,12 @@ async function ensureParentMatchingSchemaReady() {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "actorUserId" TEXT
     );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ParentMatchingAction"
+    ADD COLUMN IF NOT EXISTS "actorUserId" TEXT,
+    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
   `);
 
   await prisma.$executeRawUnsafe(`
@@ -833,6 +858,11 @@ async function ensureParentMatchingSchemaReady() {
       "content" TEXT NOT NULL,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ParentMatchingMessage"
+    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
   `);
 
   await prisma.$executeRawUnsafe(`
@@ -1049,6 +1079,34 @@ function latestActionByProfile(actions) {
   return latest;
 }
 
+function parentMatchingStreamKey(familyId, profileId) {
+  return `${familyId}::${profileId}`;
+}
+
+function publishParentMatchingMessage(item) {
+  const key = parentMatchingStreamKey(item.familyId, item.profileId);
+  const subscribers = parentMatchingMessageSubscribers.get(key);
+  if (!subscribers || subscribers.size === 0) {
+    return;
+  }
+
+  const payload = `data: ${JSON.stringify({ type: 'message', item })}\n\n`;
+  for (const response of subscribers) {
+    response.write(payload);
+  }
+}
+
+async function getMyParentMatchingProfile(userId) {
+  await ensureParentMatchingSchemaReady();
+  return prisma.parentMatchingProfile.findFirst({
+    where: {
+      ownerUserId: userId,
+      isActive: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 async function getMutualConnectionProfileIds(familyId, userId) {
   await ensureParentMatchingSchemaReady();
 
@@ -1089,7 +1147,7 @@ async function getMutualConnectionProfileIds(familyId, userId) {
   const targetOwnerIds = Array.from(new Set(
     likedProfiles
       .map(item => item.ownerUserId)
-      .filter(value => typeof value === 'string' && value.trim().isNotEmpty),
+      .filter(value => typeof value === 'string' && value.trim().length > 0),
   ));
 
   if (targetOwnerIds.length === 0) {
@@ -3017,15 +3075,125 @@ app.post('/photos', (req, res) => {
 });
 
 // 12. Parent matching
-app.get('/parent-matching/profiles', async (req, res) => {
+app.get('/parent-matching/my-profile', async (req, res) => {
   const userId = (req.query.userId || '').toString().trim();
+  if (!userId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
 
   try {
-    await ensureParentMatchingProfilesSeeded();
+    const profile = await getMyParentMatchingProfile(userId);
+    if (!profile) {
+      return res.status(404).json({ error: 'Matching-Profil nicht gefunden' });
+    }
+    return res.json({ item: mapParentMatchingProfileForClient(profile) });
+  } catch (error) {
+    console.error('GET /parent-matching/my-profile failed:', error?.message || error);
+    return res.status(500).json({ error: 'Matching-Profil konnte nicht geladen werden' });
+  }
+});
+
+app.post('/parent-matching/my-profile', async (req, res) => {
+  const userId = (req.body.userId || '').toString().trim();
+  if (!userId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
+
+  const name = (req.body.name || '').toString().trim();
+  if (!name) {
+    return res.status(400).json({ error: 'Name fehlt' });
+  }
+
+  const age = Number.parseInt((req.body.age || '').toString(), 10);
+  const city = (req.body.city || '').toString().trim();
+  const familyForm = (req.body.familyForm || '').toString().trim();
+  const bio = (req.body.bio || '').toString().trim();
+  const latitudeRaw = Number(req.body.latitude);
+  const longitudeRaw = Number(req.body.longitude);
+  const latitude = Number.isFinite(latitudeRaw) ? latitudeRaw : null;
+  const longitude = Number.isFinite(longitudeRaw) ? longitudeRaw : null;
+
+  const toList = value => Array.isArray(value)
+    ? value.map(item => item?.toString().trim()).filter(Boolean)
+    : [];
+
+  const interests = toList(req.body.interests);
+  const languages = toList(req.body.languages);
+  const valuesFocus = toList(req.body.valuesFocus || req.body.values);
+  const childAges = toList(req.body.childAges);
+
+  if (!Number.isInteger(age) || age < 16 || age > 99) {
+    return res.status(400).json({ error: 'Alter ist ungültig' });
+  }
+  if (!city) {
+    return res.status(400).json({ error: 'Stadt fehlt' });
+  }
+  if (!familyForm) {
+    return res.status(400).json({ error: 'Familienform fehlt' });
+  }
+
+  try {
+    await ensureParentMatchingSchemaReady();
+    const profile = await prisma.parentMatchingProfile.upsert({
+      where: { externalId: `self-${userId}` },
+      update: {
+        ownerUserId: userId,
+        name,
+        age,
+        city,
+        latitude,
+        longitude,
+        bio,
+        interests,
+        languages,
+        valuesFocus,
+        childAges,
+        familyForm,
+        verificationLevel: 'basic',
+        isActive: true,
+      },
+      create: {
+        externalId: `self-${userId}`,
+        ownerUserId: userId,
+        name,
+        age,
+        city,
+        latitude,
+        longitude,
+        bio,
+        interests,
+        languages,
+        valuesFocus,
+        childAges,
+        familyForm,
+        verificationLevel: 'basic',
+        isActive: true,
+      },
+    });
+
+    return res.status(201).json({ item: mapParentMatchingProfileForClient(profile) });
+  } catch (error) {
+    console.error('POST /parent-matching/my-profile failed:', error?.message || error);
+    return res.status(500).json({ error: 'Matching-Profil konnte nicht gespeichert werden' });
+  }
+});
+
+app.get('/parent-matching/profiles', async (req, res) => {
+  const userId = (req.query.userId || '').toString().trim();
+  if (!userId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
+
+  try {
+    const ownProfile = await getMyParentMatchingProfile(userId);
+    if (!ownProfile) {
+      return res.status(409).json({ error: 'Bitte zuerst eigenes Matching-Profil anlegen' });
+    }
+
     const profiles = await prisma.parentMatchingProfile.findMany({
       where: {
         isActive: true,
-        ...(userId ? { ownerUserId: { not: userId } } : {}),
+        ownerUserId: { not: userId },
       },
       orderBy: [{ verificationLevel: 'desc' }, { createdAt: 'desc' }],
     });
@@ -3034,10 +3202,8 @@ app.get('/parent-matching/profiles', async (req, res) => {
       profiles: profiles.map(mapParentMatchingProfileForClient),
     });
   } catch (error) {
-    console.error('GET /parent-matching/profiles fallback (in-memory):', error?.message || error);
-    return res.json({
-      profiles: parentProfiles.filter(item => !userId || item.ownerUserId !== userId),
-    });
+    console.error('GET /parent-matching/profiles failed:', error?.message || error);
+    return res.status(500).json({ error: 'Profile konnten nicht geladen werden' });
   }
 });
 
@@ -3050,13 +3216,17 @@ app.get('/parent-matching/connections', async (req, res) => {
   }
 
   try {
+    const ownProfile = await getMyParentMatchingProfile(userId);
+    if (!ownProfile) {
+      return res.status(409).json({ error: 'Bitte zuerst eigenes Matching-Profil anlegen' });
+    }
+
     const connectedProfileIds = await getMutualConnectionProfileIds(familyId, userId);
 
     return res.json({ profileIds: connectedProfileIds });
   } catch (error) {
-    console.error('GET /parent-matching/connections fallback (in-memory):', error?.message || error);
-    ensureParentMatchingProfileForUserInMemory(userId);
-    return res.json({ profileIds: getMutualConnectionProfileIdsInMemory(familyId, userId) });
+    console.error('GET /parent-matching/connections failed:', error?.message || error);
+    return res.status(500).json({ error: 'Verbindungen konnten nicht geladen werden' });
   }
 });
 
@@ -3070,6 +3240,9 @@ app.post('/parent-matching/actions', async (req, res) => {
   if (!profileIdInput) {
     return res.status(400).json({ error: 'profileId fehlt' });
   }
+  if (!actorUserId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
 
   if (!parentMatchingAllowedActions.has(actionValue)) {
     return res.status(400).json({ error: 'Ungültige Aktion' });
@@ -3077,7 +3250,10 @@ app.post('/parent-matching/actions', async (req, res) => {
 
   try {
     await ensureParentMatchingSchemaReady();
-    await ensureParentMatchingProfileForUser(actorUserId);
+    const ownProfile = await getMyParentMatchingProfile(actorUserId);
+    if (!ownProfile) {
+      return res.status(409).json({ error: 'Bitte zuerst eigenes Matching-Profil anlegen' });
+    }
 
     let targetProfile = await prisma.parentMatchingProfile.findUnique({
       where: { id: profileIdInput },
@@ -3117,27 +3293,66 @@ app.post('/parent-matching/actions', async (req, res) => {
         : (actionValue === 'like' ? 'pending' : 'none'),
     });
   } catch (error) {
-    console.error('POST /parent-matching/actions fallback (in-memory):', error?.message || error);
-    ensureParentMatchingProfileForUserInMemory(actorUserId);
-    const action = {
-      id: generateId('match-action'),
-      familyId,
-      profileId: profileIdInput,
-      action: actionValue,
-      createdAt: createdAtInput || new Date().toISOString(),
-      userId: actorUserId || null,
-    };
-    parentMatchingActions.unshift(action);
-    const connectedProfileIds = getMutualConnectionProfileIdsInMemory(familyId, actorUserId);
-    const connected = actionValue === 'like' && connectedProfileIds.includes(profileIdInput);
-    return res.status(201).json({
-      item: action,
-      connected,
-      matchState: connected
-        ? 'matched'
-        : (actionValue === 'like' ? 'pending' : 'none'),
-      source: 'in-memory-fallback',
+    console.error('POST /parent-matching/actions failed:', error?.message || error);
+    return res.status(500).json({ error: 'Matching-Aktion konnte nicht gespeichert werden' });
+  }
+});
+
+app.get('/parent-matching/messages/stream', async (req, res) => {
+  const familyId = (req.query.familyId || DEMO_FAMILY_ID).toString().trim();
+  const profileId = (req.query.profileId || '').toString().trim();
+  const userId = (req.query.userId || '').toString().trim();
+
+  if (!profileId) {
+    return res.status(400).json({ error: 'profileId fehlt' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
+
+  try {
+    const ownProfile = await getMyParentMatchingProfile(userId);
+    if (!ownProfile) {
+      return res.status(409).json({ error: 'Bitte zuerst eigenes Matching-Profil anlegen' });
+    }
+
+    const connectedProfileIds = await getMutualConnectionProfileIds(familyId, userId);
+    if (!connectedProfileIds.includes(profileId)) {
+      return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+    res.write('event: ready\ndata: {"type":"ready"}\n\n');
+
+    const key = parentMatchingStreamKey(familyId, profileId);
+    if (!parentMatchingMessageSubscribers.has(key)) {
+      parentMatchingMessageSubscribers.set(key, new Set());
+    }
+    const subscribers = parentMatchingMessageSubscribers.get(key);
+    subscribers.add(res);
+
+    const heartbeat = setInterval(() => {
+      res.write('event: ping\ndata: {"type":"ping"}\n\n');
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      const current = parentMatchingMessageSubscribers.get(key);
+      if (!current) return;
+      current.delete(res);
+      if (current.size === 0) {
+        parentMatchingMessageSubscribers.delete(key);
+      }
     });
+  } catch (error) {
+    console.error('GET /parent-matching/messages/stream failed:', error?.message || error);
+    return res.status(500).json({ error: 'Live-Stream konnte nicht gestartet werden' });
   }
 });
 
@@ -3154,6 +3369,11 @@ app.get('/parent-matching/messages', async (req, res) => {
   }
 
   try {
+    const ownProfile = await getMyParentMatchingProfile(userId);
+    if (!ownProfile) {
+      return res.status(409).json({ error: 'Bitte zuerst eigenes Matching-Profil anlegen' });
+    }
+
     const connectedProfileIds = await getMutualConnectionProfileIds(familyId, userId);
     if (!connectedProfileIds.includes(profileId)) {
       return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
@@ -3179,15 +3399,8 @@ app.get('/parent-matching/messages', async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('GET /parent-matching/messages fallback (in-memory):', error?.message || error);
-    const connectedProfileIds = getMutualConnectionProfileIdsInMemory(familyId, userId);
-    if (!connectedProfileIds.includes(profileId)) {
-      return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
-    }
-    const items = parentMatchingMessages
-      .filter(item => item.familyId === familyId && item.profileId === profileId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    return res.json({ items });
+    console.error('GET /parent-matching/messages failed:', error?.message || error);
+    return res.status(500).json({ error: 'Nachrichten konnten nicht geladen werden' });
   }
 });
 
@@ -3209,6 +3422,11 @@ app.post('/parent-matching/messages', async (req, res) => {
   }
 
   try {
+    const ownProfile = await getMyParentMatchingProfile(authorUserId);
+    if (!ownProfile) {
+      return res.status(409).json({ error: 'Bitte zuerst eigenes Matching-Profil anlegen' });
+    }
+
     const connectedProfileIds = await getMutualConnectionProfileIds(familyId, authorUserId);
     if (!connectedProfileIds.includes(profileId)) {
       return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
@@ -3224,25 +3442,8 @@ app.post('/parent-matching/messages', async (req, res) => {
       )
     `;
 
-    return res.status(201).json({
-      item: {
-        id,
-        familyId,
-        profileId,
-        authorUserId,
-        authorName,
-        content,
-        createdAt: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    console.error('POST /parent-matching/messages fallback (in-memory):', error?.message || error);
-    const connectedProfileIds = getMutualConnectionProfileIdsInMemory(familyId, authorUserId);
-    if (!connectedProfileIds.includes(profileId)) {
-      return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
-    }
     const item = {
-      id: generateId('pm-msg'),
+      id,
       familyId,
       profileId,
       authorUserId,
@@ -3250,8 +3451,11 @@ app.post('/parent-matching/messages', async (req, res) => {
       content,
       createdAt: new Date().toISOString(),
     };
-    parentMatchingMessages.push(item);
-    return res.status(201).json({ item, source: 'in-memory-fallback' });
+    publishParentMatchingMessage(item);
+    return res.status(201).json({ item });
+  } catch (error) {
+    console.error('POST /parent-matching/messages failed:', error?.message || error);
+    return res.status(500).json({ error: 'Nachricht konnte nicht gesendet werden' });
   }
 });
 

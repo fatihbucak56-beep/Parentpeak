@@ -69,6 +69,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
 
   int _currentIndex = 0;
   bool _isRestoring = true;
+  bool _requiresProfileSetup = false;
+  bool _isSavingProfile = false;
+  final TextEditingController _profileNameController = TextEditingController();
+  int _profileAge = 33;
+  String _profileFamilyForm = 'Kernfamilie';
 
   String? get _currentUserId {
     final value = AuthService.instance.currentUser?.uid.trim();
@@ -76,13 +81,24 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     return value;
   }
 
+  String get _effectiveUserId => _currentUserId ?? 'local-parent-user';
+
   @override
   void initState() {
     super.initState();
     _bootstrap();
   }
 
+  @override
+  void dispose() {
+    _profileNameController.dispose();
+    super.dispose();
+  }
+
   Future<void> _bootstrap() async {
+    final profileReady = await _ensureMyProfileExists();
+    if (!profileReady) return;
+
     await _loadProfiles();
     await _restoreState();
     await _refreshConnectionsFromBackend(
@@ -97,8 +113,28 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     }
   }
 
+  Future<bool> _ensureMyProfileExists() async {
+    final profile = await _service.fetchMyProfile(userId: _effectiveUserId);
+    if (profile != null) {
+      if (_profileNameController.text.trim().isEmpty) {
+        _profileNameController.text = (profile['name'] ?? '').toString();
+      }
+      return true;
+    }
+
+    if (!mounted) return false;
+    _profileNameController.text = AuthService.instance.currentUser?.displayName.trim().isNotEmpty == true
+        ? AuthService.instance.currentUser!.displayName.trim()
+        : 'Elternteil';
+    setState(() {
+      _requiresProfileSetup = true;
+      _isRestoring = false;
+    });
+    return false;
+  }
+
   Future<void> _loadProfiles() async {
-    final rawProfiles = await _service.fetchProfiles(userId: _currentUserId);
+    final rawProfiles = await _service.fetchProfiles(userId: _effectiveUserId);
     final parsed = rawProfiles.map(_profileFromMap).toList();
     if (!mounted) return;
     setState(() {
@@ -246,11 +282,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   }
 
   Future<void> _refreshConnectionsFromBackend({bool announce = true}) async {
-    final userId = _currentUserId;
-    if (userId == null || userId.isEmpty) return;
-
     final connectedIds =
-        await _service.fetchConnectedProfileIds(userId: userId);
+        await _service.fetchConnectedProfileIds(userId: _effectiveUserId);
     final newlyConfirmedIds = connectedIds.difference(_seenMatchedProfileIds);
 
     if (!mounted) return;
@@ -524,7 +557,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     final result = await _service.sendAction(
       profileId: profile.id,
       action: 'like',
-      userId: _currentUserId,
+      userId: _effectiveUserId,
     );
     await _refreshConnectionsFromBackend(announce: false);
     if (!mounted) return;
@@ -577,7 +610,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     _service.sendAction(
       profileId: profile.id,
       action: 'report',
-      userId: _currentUserId,
+      userId: _effectiveUserId,
     );
   }
 
@@ -603,7 +636,159 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     _service.sendAction(
       profileId: profile.id,
       action: 'block',
-      userId: _currentUserId,
+      userId: _effectiveUserId,
+    );
+  }
+
+  Future<void> _saveMyProfile() async {
+    final name = _profileNameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte gib einen Namen ein.')),
+      );
+      return;
+    }
+
+    setState(() => _isSavingProfile = true);
+    final saved = await _service.upsertMyProfile(
+      userId: _effectiveUserId,
+      profile: {
+        'name': name,
+        'age': _profileAge,
+        'city': _homeCity,
+        'familyForm': _profileFamilyForm,
+        'bio':
+            'Ich suche Familien für freundlichen Austausch und passende Playdates.',
+        'interests': _myInterests.toList(),
+        'languages': _myLanguages.toList(),
+        'valuesFocus': _myValues.toList(),
+        'childAges': _childAgeFilter.isNotEmpty
+            ? _childAgeFilter.toList()
+            : const ['3-5', '6-9'],
+      },
+    );
+    if (!mounted) return;
+
+    if (saved == null) {
+      setState(() => _isSavingProfile = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _service.lastSyncError ?? 'Matching-Profil konnte nicht gespeichert werden.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSavingProfile = false;
+      _requiresProfileSetup = false;
+      _isRestoring = true;
+    });
+    await _bootstrap();
+  }
+
+  Widget _buildProfileSetupRequired() {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Eltern-Matching einrichten')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListView(
+          children: [
+            const Text(
+              'Bitte richte zuerst dein Eltern-Matching-Profil ein, damit andere Familien dich finden können.',
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _profileNameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _homeCity,
+                    decoration: const InputDecoration(
+                      labelText: 'Stadt',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _cityCenters.keys
+                        .map((city) => DropdownMenuItem<String>(
+                              value: city,
+                              child: Text(city),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _homeCity = value);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: DropdownButtonFormField<int>(
+                    initialValue: _profileAge,
+                    decoration: const InputDecoration(
+                      labelText: 'Alter',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: List.generate(54, (i) => i + 18)
+                        .map((age) => DropdownMenuItem<int>(
+                              value: age,
+                              child: Text('$age'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _profileAge = value);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _profileFamilyForm,
+              decoration: const InputDecoration(
+                labelText: 'Familienform',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                'Alleinerziehend',
+                'Patchwork',
+                'Kernfamilie',
+                'Mehrgeneration',
+              ]
+                  .map((form) => DropdownMenuItem<String>(
+                        value: form,
+                        child: Text(form),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _profileFamilyForm = value);
+              },
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _isSavingProfile ? null : _saveMyProfile,
+              icon: _isSavingProfile
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded),
+              label: Text(_isSavingProfile ? 'Speichern...' : 'Profil speichern'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1009,6 +1194,10 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final profile = _currentProfile;
+
+    if (_requiresProfileSetup) {
+      return _buildProfileSetupRequired();
+    }
 
     if (_isRestoring) {
       return const Scaffold(

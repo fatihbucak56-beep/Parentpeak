@@ -279,6 +279,20 @@ class APIConfig {
     );
   }
 
+  static String getBackendParentMatchingMyProfilePath() {
+    return _getEnvOrDefault(
+      'BACKEND_PARENT_MATCHING_MY_PROFILE_PATH',
+      '/parent-matching/my-profile',
+    );
+  }
+
+  static String getBackendParentMatchingMessagesStreamPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PARENT_MATCHING_MESSAGES_STREAM_PATH',
+      '/parent-matching/messages/stream',
+    );
+  }
+
   static String getBackendFamilyContactsPath() {
     return _getEnvOrDefault('BACKEND_FAMILY_CONTACTS_PATH', '/family/contacts');
   }

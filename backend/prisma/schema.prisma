@@ -32,7 +32,6 @@ model User {
   // Relations - unique names for each relation
   createdFamilies       Family[]        @relation("FamilyCreator")
   familyMemberships     Family[]        @relation("FamilyMembers")
-  hostedEvents          Event[]         @relation("EventHost")
   eventParticipations   EventParticipation[]
   paymentTransactions   PaymentTransaction[]
   messages              Message[]
@@ -88,9 +87,8 @@ model Event {
   title                 String
   description           String?
   
-  // Host/Creator
+  // Host/Creator (can be any external user, not necessarily in User table)
   hosterId              String
-  hoster                User     @relation("EventHost", fields: [hosterId], references: [id], onDelete: Cascade)
   
   // Family context (optional)
   familyId              String?

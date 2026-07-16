@@ -125,7 +125,7 @@ class EventBackendService {
   Future<bool> deleteEvent(String id, {required String hosterId}) async {
     if (_apiClient == null) return false;
     try {
-      await _apiClient!.deleteJson('$_eventsPath/$id', {'hosterId': hosterId});
+      await _apiClient!.delete('$_eventsPath/$id?hosterId=$hosterId');
       return true;
     } catch (e) {
       lastSyncError = 'Event konnte nicht gelöscht werden: $e';

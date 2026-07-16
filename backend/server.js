@@ -6209,8 +6209,8 @@ app.post('/api/events', async (req, res) => {
 
     res.status(201).json({ event });
   } catch (err) {
-    console.error('❌ Event creation error:', err);
-    res.status(500).json({ error: 'Event konnte nicht erstellt werden' });
+    console.error('❌ Event creation error:', err.message, err);
+    res.status(500).json({ error: `Event creation failed: ${err.message}` });
   }
 });
 
@@ -6292,8 +6292,8 @@ app.get('/api/events', async (req, res) => {
 
     res.json({ events: formattedEvents, total: formattedEvents.length });
   } catch (err) {
-    console.error('❌ Events list error:', err);
-    res.status(500).json({ error: 'Events konnten nicht geladen werden' });
+    console.error('❌ Events list error:', err.message);
+    res.status(500).json({ error: `Failed to list events: ${err.message}` });
   }
 });
 
@@ -6333,8 +6333,8 @@ app.get('/api/events/:id', async (req, res) => {
 
     res.json({ event: formattedEvent });
   } catch (err) {
-    console.error('❌ Event detail error:', err);
-    res.status(500).json({ error: 'Event konnte nicht geladen werden' });
+    console.error('❌ Event detail error:', err.message);
+    res.status(500).json({ error: `Failed to get event: ${err.message}` });
   }
 });
 
@@ -6388,18 +6388,19 @@ app.put('/api/events/:id', async (req, res) => {
 
     res.json({ event: updatedEvent });
   } catch (err) {
-    console.error('❌ Event update error:', err);
-    res.status(500).json({ error: 'Event konnte nicht aktualisiert werden' });
+    console.error('❌ Event update error:', err.message);
+    res.status(500).json({ error: `Failed to update event: ${err.message}` });
   }
 });
 
 /**
  * DELETE /api/events/:id
  * Delete event (owner only)
+ * Query param: hosterId
  */
 app.delete('/api/events/:id', async (req, res) => {
   const { id } = req.params;
-  const { hosterId } = req.body;
+  const { hosterId } = req.query;
 
   if (!hosterId) {
     return res.status(400).json({ error: 'hosterId erforderlich' });
@@ -6419,8 +6420,8 @@ app.delete('/api/events/:id', async (req, res) => {
     await prisma.event.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
-    console.error('❌ Event delete error:', err);
-    res.status(500).json({ error: 'Event konnte nicht gelöscht werden' });
+    console.error('❌ Event delete error:', err.message);
+    res.status(500).json({ error: `Failed to delete event: ${err.message}` });
   }
 });
 

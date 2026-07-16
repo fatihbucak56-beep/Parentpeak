@@ -967,6 +967,258 @@ async function ensureParentMatchingProfilesSeeded() {
   );
 }
 
+function inferCityForUser(userId) {
+  const lower = (userId || '').toLowerCase();
+  if (lower.includes('koeln') || lower.includes('cologne')) return 'Köln';
+  if (lower.includes('hamburg')) return 'Hamburg';
+  if (lower.includes('muenchen') || lower.includes('munich')) return 'München';
+  if (lower.includes('frankfurt')) return 'Frankfurt';
+  return 'Berlin';
+}
+
+function inferCoordinatesForCity(city) {
+  switch ((city || '').toLowerCase()) {
+    case 'köln':
+    case 'koeln':
+      return { latitude: 50.937531, longitude: 6.960279 };
+    case 'hamburg':
+      return { latitude: 53.551086, longitude: 9.993682 };
+    case 'münchen':
+    case 'muenchen':
+      return { latitude: 48.137154, longitude: 11.576124 };
+    case 'frankfurt':
+      return { latitude: 50.110924, longitude: 8.682127 };
+    default:
+      return { latitude: 52.520008, longitude: 13.404954 };
+  }
+}
+
+async function ensureParentMatchingProfileForUser(userId) {
+  if (!userId) return;
+
+  await ensureParentMatchingSchemaReady();
+  const existing = await prisma.parentMatchingProfile.findFirst({
+    where: {
+      ownerUserId: userId,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return;
+  }
+
+  const city = inferCityForUser(userId);
+  const coords = inferCoordinatesForCity(city);
+  const shortUserId = userId.length > 10 ? userId.substring(0, 10) : userId;
+
+  await prisma.parentMatchingProfile.upsert({
+    where: { externalId: `self-${userId}` },
+    update: {
+      ownerUserId: userId,
+      isActive: true,
+    },
+    create: {
+      externalId: `self-${userId}`,
+      ownerUserId: userId,
+      name: `Elternteil ${shortUserId}`,
+      age: 33,
+      city,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      bio: 'Ich suche Familien für freundlichen Austausch und passende Playdates.',
+      interests: ['Familienzeit', 'Spielplatz'],
+      languages: ['Deutsch'],
+      valuesFocus: ['Respekt', 'Empathie'],
+      childAges: ['3-5', '6-9'],
+      familyForm: 'Kernfamilie',
+      verificationLevel: 'basic',
+      isActive: true,
+    },
+  });
+}
+
+function latestActionByProfile(actions) {
+  const latest = new Map();
+  for (const action of actions) {
+    if (!latest.has(action.profileId)) {
+      latest.set(action.profileId, action.action);
+    }
+  }
+  return latest;
+}
+
+async function getMutualConnectionProfileIds(familyId, userId) {
+  await ensureParentMatchingSchemaReady();
+
+  const myOwnedProfiles = await prisma.parentMatchingProfile.findMany({
+    where: {
+      ownerUserId: userId,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  const myOwnedProfileIds = myOwnedProfiles.map(item => item.id);
+  if (myOwnedProfileIds.length === 0) {
+    return [];
+  }
+
+  const myActions = await prisma.parentMatchingAction.findMany({
+    where: {
+      familyId,
+      actorUserId: userId,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const latestMine = latestActionByProfile(myActions);
+  const myLikedProfileIds = Array.from(latestMine.entries())
+    .filter(([, action]) => action === 'like')
+    .map(([profileId]) => profileId);
+
+  if (myLikedProfileIds.length === 0) {
+    return [];
+  }
+
+  const likedProfiles = await prisma.parentMatchingProfile.findMany({
+    where: { id: { in: myLikedProfileIds } },
+    select: { id: true, ownerUserId: true },
+  });
+
+  const targetOwnerIds = Array.from(new Set(
+    likedProfiles
+      .map(item => item.ownerUserId)
+      .filter(value => typeof value === 'string' && value.trim().isNotEmpty),
+  ));
+
+  if (targetOwnerIds.length === 0) {
+    return [];
+  }
+
+  const reverseActions = await prisma.parentMatchingAction.findMany({
+    where: {
+      familyId,
+      actorUserId: { in: targetOwnerIds },
+      profileId: { in: myOwnedProfileIds },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const reverseLatest = new Map();
+  for (const action of reverseActions) {
+    const key = `${action.actorUserId}::${action.profileId}`;
+    if (!reverseLatest.has(key)) {
+      reverseLatest.set(key, action.action);
+    }
+  }
+
+  const reverseLikeByOwner = new Map();
+  for (const ownerId of targetOwnerIds) {
+    reverseLikeByOwner.set(ownerId, false);
+  }
+  for (const [key, action] of reverseLatest.entries()) {
+    const ownerId = key.split('::')[0];
+    if (action === 'like') {
+      reverseLikeByOwner.set(ownerId, true);
+    }
+  }
+
+  return likedProfiles
+    .filter(item => reverseLikeByOwner.get(item.ownerUserId) === true)
+    .map(item => item.id);
+}
+
+function getMutualConnectionProfileIdsInMemory(familyId, userId) {
+  const myOwnedProfileIds = parentProfiles
+    .filter(item => item.ownerUserId === userId)
+    .map(item => item.id);
+
+  if (myOwnedProfileIds.length === 0) {
+    return [];
+  }
+
+  const myActions = parentMatchingActions
+    .filter(item => item.familyId === familyId && item.userId === userId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const latestMine = new Map();
+  for (const action of myActions) {
+    if (!latestMine.has(action.profileId)) {
+      latestMine.set(action.profileId, action.action);
+    }
+  }
+  const myLikedProfileIds = Array.from(latestMine.entries())
+    .filter(([, action]) => action === 'like')
+    .map(([profileId]) => profileId);
+
+  if (myLikedProfileIds.length === 0) {
+    return [];
+  }
+
+  const likedProfiles = parentProfiles.filter(item => myLikedProfileIds.includes(item.id));
+  const targetOwnerIds = Array.from(new Set(
+    likedProfiles
+      .map(item => item.ownerUserId)
+      .filter(value => typeof value === 'string' && value.trim().length > 0),
+  ));
+
+  const reverseActions = parentMatchingActions
+    .filter(item => item.familyId === familyId)
+    .filter(item => targetOwnerIds.includes(item.userId))
+    .filter(item => myOwnedProfileIds.includes(item.profileId))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const reverseLatest = new Map();
+  for (const action of reverseActions) {
+    const key = `${action.userId}::${action.profileId}`;
+    if (!reverseLatest.has(key)) {
+      reverseLatest.set(key, action.action);
+    }
+  }
+
+  const reverseLikeByOwner = new Map();
+  for (const ownerId of targetOwnerIds) {
+    reverseLikeByOwner.set(ownerId, false);
+  }
+  for (const [key, action] of reverseLatest.entries()) {
+    const ownerId = key.split('::')[0];
+    if (action === 'like') {
+      reverseLikeByOwner.set(ownerId, true);
+    }
+  }
+
+  return likedProfiles
+    .filter(item => reverseLikeByOwner.get(item.ownerUserId) === true)
+    .map(item => item.id);
+}
+
+function ensureParentMatchingProfileForUserInMemory(userId) {
+  if (!userId) return;
+  const exists = parentProfiles.some(item => item.ownerUserId === userId);
+  if (exists) return;
+
+  const city = inferCityForUser(userId);
+  const coords = inferCoordinatesForCity(city);
+  const shortUserId = userId.length > 10 ? userId.substring(0, 10) : userId;
+  parentProfiles.push({
+    id: `self-${userId}`,
+    ownerUserId: userId,
+    name: `Elternteil ${shortUserId}`,
+    age: 33,
+    city,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    bio: 'Ich suche Familien für freundlichen Austausch und passende Playdates.',
+    interests: ['Familienzeit', 'Spielplatz'],
+    languages: ['Deutsch'],
+    valuesFocus: ['Respekt', 'Empathie'],
+    childAges: ['3-5', '6-9'],
+    familyForm: 'Kernfamilie',
+    verificationLevel: 'basic',
+  });
+}
+
 const familyContacts = [
   {
     userId: 'host_001',
@@ -2798,34 +3050,13 @@ app.get('/parent-matching/connections', async (req, res) => {
   }
 
   try {
-    await ensureParentMatchingSchemaReady();
-    const actions = await prisma.parentMatchingAction.findMany({
-      where: {
-        familyId,
-        actorUserId: userId,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const latestByProfile = new Map();
-    for (const action of actions) {
-      if (!latestByProfile.has(action.profileId)) {
-        latestByProfile.set(action.profileId, action.action);
-      }
-    }
-
-    const connectedProfileIds = Array.from(latestByProfile.entries())
-      .filter(([, action]) => action === 'like')
-      .map(([profileId]) => profileId);
+    const connectedProfileIds = await getMutualConnectionProfileIds(familyId, userId);
 
     return res.json({ profileIds: connectedProfileIds });
   } catch (error) {
     console.error('GET /parent-matching/connections fallback (in-memory):', error?.message || error);
-    const profileIds = parentMatchingActions
-      .filter(item => item.familyId === familyId && item.userId === userId)
-      .filter(item => item.action === 'like')
-      .map(item => item.profileId);
-    return res.json({ profileIds: Array.from(new Set(profileIds)) });
+    ensureParentMatchingProfileForUserInMemory(userId);
+    return res.json({ profileIds: getMutualConnectionProfileIdsInMemory(familyId, userId) });
   }
 });
 
@@ -2846,16 +3077,17 @@ app.post('/parent-matching/actions', async (req, res) => {
 
   try {
     await ensureParentMatchingSchemaReady();
+    await ensureParentMatchingProfileForUser(actorUserId);
 
     let targetProfile = await prisma.parentMatchingProfile.findUnique({
       where: { id: profileIdInput },
-      select: { id: true },
+      select: { id: true, ownerUserId: true },
     });
 
     if (!targetProfile) {
       targetProfile = await prisma.parentMatchingProfile.findUnique({
         where: { externalId: profileIdInput },
-        select: { id: true },
+        select: { id: true, ownerUserId: true },
       });
     }
 
@@ -2874,12 +3106,19 @@ app.post('/parent-matching/actions', async (req, res) => {
       },
     });
 
+    const mutualProfileIds = await getMutualConnectionProfileIds(familyId, actorUserId);
+    const connected = actionValue === 'like' && mutualProfileIds.includes(targetProfile.id);
+
     return res.status(201).json({
       item: createdAction,
-      connected: actionValue === 'like',
+      connected,
+      matchState: connected
+        ? 'matched'
+        : (actionValue === 'like' ? 'pending' : 'none'),
     });
   } catch (error) {
     console.error('POST /parent-matching/actions fallback (in-memory):', error?.message || error);
+    ensureParentMatchingProfileForUserInMemory(actorUserId);
     const action = {
       id: generateId('match-action'),
       familyId,
@@ -2889,9 +3128,14 @@ app.post('/parent-matching/actions', async (req, res) => {
       userId: actorUserId || null,
     };
     parentMatchingActions.unshift(action);
+    const connectedProfileIds = getMutualConnectionProfileIdsInMemory(familyId, actorUserId);
+    const connected = actionValue === 'like' && connectedProfileIds.includes(profileIdInput);
     return res.status(201).json({
       item: action,
-      connected: actionValue === 'like',
+      connected,
+      matchState: connected
+        ? 'matched'
+        : (actionValue === 'like' ? 'pending' : 'none'),
       source: 'in-memory-fallback',
     });
   }
@@ -2900,13 +3144,21 @@ app.post('/parent-matching/actions', async (req, res) => {
 app.get('/parent-matching/messages', async (req, res) => {
   const familyId = (req.query.familyId || DEMO_FAMILY_ID).toString().trim();
   const profileId = (req.query.profileId || '').toString().trim();
+  const userId = (req.query.userId || '').toString().trim();
 
   if (!profileId) {
     return res.status(400).json({ error: 'profileId fehlt' });
   }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
 
   try {
-    await ensureParentMatchingSchemaReady();
+    const connectedProfileIds = await getMutualConnectionProfileIds(familyId, userId);
+    if (!connectedProfileIds.includes(profileId)) {
+      return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
+    }
+
     const rows = await prisma.$queryRaw`
       SELECT "id", "familyId", "profileId", "authorUserId", "authorName", "content", "createdAt"
       FROM "ParentMatchingMessage"
@@ -2928,6 +3180,10 @@ app.get('/parent-matching/messages', async (req, res) => {
     });
   } catch (error) {
     console.error('GET /parent-matching/messages fallback (in-memory):', error?.message || error);
+    const connectedProfileIds = getMutualConnectionProfileIdsInMemory(familyId, userId);
+    if (!connectedProfileIds.includes(profileId)) {
+      return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
+    }
     const items = parentMatchingMessages
       .filter(item => item.familyId === familyId && item.profileId === profileId)
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -2953,6 +3209,11 @@ app.post('/parent-matching/messages', async (req, res) => {
   }
 
   try {
+    const connectedProfileIds = await getMutualConnectionProfileIds(familyId, authorUserId);
+    if (!connectedProfileIds.includes(profileId)) {
+      return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
+    }
+
     await ensureParentMatchingSchemaReady();
     const id = generateId('pm-msg');
     await prisma.$executeRaw`
@@ -2976,6 +3237,10 @@ app.post('/parent-matching/messages', async (req, res) => {
     });
   } catch (error) {
     console.error('POST /parent-matching/messages fallback (in-memory):', error?.message || error);
+    const connectedProfileIds = getMutualConnectionProfileIdsInMemory(familyId, authorUserId);
+    if (!connectedProfileIds.includes(profileId)) {
+      return res.status(403).json({ error: 'Chat erst nach beidseitigem Match verfügbar' });
+    }
     const item = {
       id: generateId('pm-msg'),
       familyId,

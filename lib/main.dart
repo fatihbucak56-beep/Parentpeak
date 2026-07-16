@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
@@ -86,6 +85,7 @@ void main() {
 Future<void> _startApp() async {
   final startupInviteInput = _extractStartupInviteInput();
   final hasDotEnv = await _loadOptionalDotEnv();
+  debugPrint('Gemini runtime model: ${APIConfig.getGeminiModelName()}');
 
   final missingSecrets = APIConfig.getMissingRequiredSecrets();
   final releaseConfigIssues = APIConfig.getReleaseConfigIssues();
@@ -156,21 +156,21 @@ Future<void> _startApp() async {
 Future<bool> _loadOptionalDotEnv() async {
   // Web deployments (e.g. GitHub Pages) do not ship a root .env asset.
   if (kIsWeb) {
+    debugPrint('dotenv: skipped on web');
     return false;
   }
 
   try {
-    await rootBundle.loadString('.env');
-  } on FlutterError {
-    return false;
-  }
-
-  try {
-    await dotenv.load(fileName: '.env');
-    return true;
+    await dotenv.load(fileName: '.env', isOptional: true);
+    final hasGemini = (dotenv.env['GEMINI_API_KEY'] ?? '').trim().isNotEmpty;
+    final hasAny = dotenv.env.isNotEmpty;
+    debugPrint(
+      'dotenv: loaded=$hasAny, geminiKeyPresent=$hasGemini, keyCount=${dotenv.env.length}',
+    );
+    return hasAny;
   } catch (e) {
     debugPrint('Warnung: .env konnte nicht geladen werden: $e');
-    return true;
+    return false;
   }
 }
 

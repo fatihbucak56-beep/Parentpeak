@@ -3,8 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/config/api_config.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/gemini_ai_service.dart';
 import 'package:trusted_circle_demo/logic/pedagogical_chat_backend.dart';
+import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
+import 'package:trusted_circle_demo/ui/calendar_screen.dart';
+import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -16,12 +20,15 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   static const String _insightsStorageKey = 'ki_chat.topic_counts.v1';
   static const Map<String, List<String>> _topicKeywords = {
-    'Trotzphase': ['trotz', 'wutanfall', 'grenze', 'nein'],
-    'Schlaf': ['schlaf', 'einschlafen', 'durchschlafen', 'nacht'],
-    'Konflikte': ['streit', 'konflikt', 'hauen', 'beissen', 'beißen'],
-    'Schule/Kita': ['kita', 'schule', 'lehrer', 'lehrerin', 'hausaufgaben'],
-    'Medien': ['handy', 'tablet', 'medien', 'bildschirm', 'youtube'],
-    'Krise': ['ich kann nicht mehr', 'notfall', 'gewalt', 'kontrolle verlieren']
+    'Autonomiephase': ['trotz', 'wutanfall', 'grenze', 'nein', 'auto nomi', 'rebellion', 'eigensinn'],
+    'Schlaf': ['schlaf', 'einschlafen', 'durchschlafen', 'nacht', 'muede', 'müde'],
+    'Konflikte': ['streit', 'konflikt', 'hauen', 'beissen', 'beißen', 'schlag', 'aggression'],
+    'Schule/Kita': ['kita', 'schule', 'lehrer', 'lehrerin', 'hausaufgaben', 'lernblockade'],
+    'Medien': ['handy', 'tablet', 'medien', 'bildschirm', 'youtube', 'handy sucht'],
+    'Bindung & Gefühle': ['bindung', 'angst', 'trauer', 'wut', 'frustration', 'emotion', 'gefühl'],
+    'Geschwister': ['geschwister', 'eifersucht', 'bruder', 'schwester', 'baby'],
+    'Ernährung': ['essen', 'essstörung', 'picky', 'appetit', 'übergewicht'],
+    'Krise': ['ich kann nicht mehr', 'notfall', 'gewalt', 'kontrolle verlieren', 'suizid', 'depressiv']
   };
 
   GeminiAIService? _geminiService;
@@ -242,6 +249,68 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  bool _isProviderUnavailableMessage(String content) {
+    final lower = content.toLowerCase();
+    return lower.contains('ki-beratung ist aktuell nicht verfuegbar') ||
+        lower.contains('moeglicher grund:') ||
+        lower.contains('debug:');
+  }
+
+  String? _findPreviousUserMessage(int assistantIndex) {
+    for (var i = assistantIndex - 1; i >= 0; i--) {
+      final msg = _messages[i];
+      if (msg['role'] == 'user') {
+        final content = msg['content']?.toString();
+        if (content != null && content.trim().isNotEmpty) {
+          return content.trim();
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> _retryAssistantFailure(int assistantIndex) async {
+    if (_isStreaming) {
+      return;
+    }
+    final previousQuestion = _findPreviousUserMessage(assistantIndex);
+    if (previousQuestion == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Keine vorherige Frage für erneuten Versuch gefunden.'),
+        ),
+      );
+      return;
+    }
+    await _sendMessage(previousQuestion);
+  }
+
+  Future<void> _openDevelopmentFallback() async {
+    await ProductMetricsService.instance.recordChatFallbackRouteTap(
+      from: 'chat',
+      to: 'development',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+      ),
+    );
+  }
+
+  Future<void> _openCalendarFallback() async {
+    await ProductMetricsService.instance.recordChatFallbackRouteTap(
+      from: 'chat',
+      to: 'calendar',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CalendarScreen()),
+    );
+  }
+
   void _showTopicInsights() {
     final sorted = _topicCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -301,41 +370,46 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildSafetyBanner() {
-    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.35),
+        color: const Color(0xFFFFF1EE),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.secondary.withValues(alpha: 0.35),
+          color: const Color(0xFFE8543A).withValues(alpha: 0.2),
+          width: 1,
         ),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline_rounded,
-                  size: 18, color: theme.colorScheme.secondary),
-              const SizedBox(width: 8),
+              Icon(Icons.verified_user_rounded,
+                  size: 18, color: Color(0xFFE8543A)),
+              SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'KI-Transparenz und Sicherheit',
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  'Sicher & transparent',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Color(0xFF1A2A3A),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
-            'Dies ist eine KI-gestuetzte Orientierung und ersetzt keine professionelle Beratung. '
-            'Keine Diagnosen, keine Therapie und keine medizinische Beratung. '
-            'Es werden nur datensparsame Themenzaehler fuer Produktverbesserung gespeichert.',
-            style: theme.textTheme.bodySmall,
+            'Keine Diagnosen, keine Therapie. Nur GfK-orientierte Orientierung nach Rosenberg. Deine Fragen bleiben privat.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF516072),
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -344,16 +418,33 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildAssistantFeedbackRow(int index) {
     final selected = _assistantFeedbackByIndex[index];
+    final content = _messages[index]['content']?.toString() ?? '';
+    final showRetry = _isProviderUnavailableMessage(content);
     Widget chip(String label, IconData icon) {
       final isSelected = selected == label;
       return ChoiceChip(
         selected: isSelected,
+        selectedColor: const Color(0xFF0284C7).withValues(alpha: 0.16),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: const Color(0xFFB8C4D6).withValues(alpha: 0.9),
+            width: 1.1,
+          ),
+        ),
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 14),
             const SizedBox(width: 4),
-            Text(label),
+            Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.1,
+              ),
+            ),
           ],
         ),
         onSelected: (_) => _setFeedback(index, label),
@@ -366,6 +457,24 @@ class _ChatScreenState extends State<ChatScreen> {
         spacing: 8,
         runSpacing: 8,
         children: [
+          if (showRetry)
+            OutlinedButton.icon(
+              onPressed: _isStreaming ? null : () => _retryAssistantFailure(index),
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Erneut versuchen'),
+            ),
+          if (showRetry)
+            OutlinedButton.icon(
+              onPressed: _isStreaming ? null : _openDevelopmentFallback,
+              icon: const Icon(Icons.insights_rounded, size: 16),
+              label: const Text('Zu Entwicklung'),
+            ),
+          if (showRetry)
+            OutlinedButton.icon(
+              onPressed: _isStreaming ? null : _openCalendarFallback,
+              icon: const Icon(Icons.calendar_month_rounded, size: 16),
+              label: const Text('Zum Kalender'),
+            ),
           chip('hilfreich', Icons.thumb_up_alt_outlined),
           chip('nicht hilfreich', Icons.thumb_down_alt_outlined),
           chip('gefaehrlich', Icons.report_gmailerrorred_rounded),
@@ -384,71 +493,107 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             const SizedBox(height: 40),
             Container(
-              width: 120,
-              height: 120,
+              width: 100,
+              height: 100,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                    Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                    const Color(0xFF0284C7).withValues(alpha: 0.2),
+                    const Color(0xFF0284C7).withValues(alpha: 0.05),
                   ],
                 ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.psychology,
-                size: 60,
-                color: Theme.of(context).primaryColor,
+              child: const Icon(
+                Icons.psychology_alt_rounded,
+                size: 50,
+                color: Color(0xFF0284C7),
               ),
             ),
             const SizedBox(height: 32),
-            Text(
-              'Willkommen! 👋',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+            const Text(
+              'Verlaessliche Hilfe fuer Eltern.',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.1,
+                color: Color(0xFF1A2A3A),
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            Text(
-              'Ich bin dein KI-Beratungschat fur Elternfragen. Ich antworte padagogisch und gewaltfrei nach Rosenberg.',
-              style: Theme.of(context).textTheme.bodyMedium,
+            const Text(
+              'Hier bekommst du konkrete, paedagogisch fundierte Hilfe bei Erziehungsfragen nach Gewaltfreier Kommunikation: klar, empathisch und alltagstauglich.',
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.45,
+                letterSpacing: 0.08,
+                color: Color(0xFF516072),
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Dies ist eine KI-gestuetzte Orientierung und ersetzt keine professionelle Beratung.',
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1EE),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFE8543A).withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, 
+                    color: Color(0xFFE8543A), 
+                    size: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'KI-gestützte Orientierung. Ersetzt keine professionelle Beratung oder Therapie.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF516072),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 32),
-            Text(
-              'Probiere padagogische Themen:',
-              style: Theme.of(context).textTheme.labelLarge,
+            const Text(
+              'Häufige Themen:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A2A3A),
+              ),
             ),
             const SizedBox(height: 16),
             Wrap(
-              spacing: 12,
-              runSpacing: 12,
+              spacing: 10,
+              runSpacing: 10,
               alignment: WrapAlignment.center,
               children: [
-                _buildSuggestionChip('Trotzphase Tipps'),
-                _buildSuggestionChip('Konflikt gewaltfrei losen'),
+                _buildSuggestionChip('Autonomiephase Tipps'),
+                _buildSuggestionChip('Konflikt gewaltfrei lösen'),
                 _buildSuggestionChip('Schlaftipps'),
                 _buildSuggestionChip(
-                    'Ich habe Angst die Kontrolle zu verlieren'),
+                    'Ich bin überfordert'),
               ],
             ),
             const SizedBox(height: 32),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                color: const Color(0xFFEFF5FB),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                  color: const Color(0xFFBFD3E6),
                 ),
               ),
               child: Column(
@@ -464,15 +609,21 @@ class _ChatScreenState extends State<ChatScreen> {
                       Expanded(
                         child: Text(
                           'Pädagogik-KI mit Rosenberg-Fokus',
-                          style: Theme.of(context).textTheme.labelMedium,
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1A2A3A),
+                              ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Nur padagogische und respektvolle Antworten fur Eltern',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    'Nur paedagogische, respektvolle und konkrete Antworten fuer Eltern.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF516072),
+                          height: 1.4,
+                        ),
                   ),
                 ],
               ),
@@ -485,10 +636,32 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildSuggestionChip(String label) {
-    return InputChip(
-      onPressed: () => _handleSuggestion(label),
-      label: Text(label),
-      backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _handleSuggestion(label),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F7FD),
+            border: Border.all(
+              color: const Color(0xFFB8CDE0),
+              width: 1.2,
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              letterSpacing: 0.1,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1F4E79),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -503,43 +676,68 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+            const CircleAvatar(
+              radius: 18,
+              backgroundColor: Color(0xFF0284C7),
               child: Icon(
-                Icons.psychology,
-                size: 18,
-                color: Theme.of(context).primaryColor,
+                Icons.psychology_alt_rounded,
+                size: 20,
+                color: Colors.white,
               ),
             ),
             const SizedBox(width: 8),
           ],
           Flexible(
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: isUser
-                    ? Theme.of(context).primaryColor
-                    : Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+                    ? const Color(0xFF0284C7)
+                    : const Color(0xFFF0F7FF),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(22),
+                  topRight: const Radius.circular(22),
+                  bottomLeft: Radius.circular(isUser ? 22 : 8),
+                  bottomRight: Radius.circular(isUser ? 8 : 22),
+                ),
+                border: !isUser
+                    ? Border.all(
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                        width: 1,
+                      )
+                    : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: (isUser
+                            ? const Color(0xFF0284C7)
+                            : const Color(0xFF1A2A3A))
+                        .withValues(alpha: 0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Text(
                 message['content'] as String,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isUser ? Colors.white : null,
-                    ),
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.45,
+                  letterSpacing: 0.15,
+                  color: isUser ? Colors.white : const Color(0xFF1A2A3A),
+                  fontWeight: isUser ? FontWeight.w600 : FontWeight.w500,
+                ),
               ),
             ),
           ),
           if (isUser) ...[
             const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Theme.of(context).primaryColor,
-              child: const Icon(
-                Icons.person,
-                size: 18,
+            const CircleAvatar(
+              radius: 18,
+              backgroundColor: Color(0xFFE8543A),
+              child: Icon(
+                Icons.person_rounded,
+                size: 20,
                 color: Colors.white,
               ),
             ),
@@ -571,23 +769,50 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 48,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _initError!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
                   color: Theme.of(context).colorScheme.error,
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Text(
+                  _initError!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Du kannst trotzdem ohne Druck weitermachen:',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _openDevelopmentFallback,
+                      icon: const Icon(Icons.insights_rounded),
+                      label: const Text('Zu Entwicklung'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _openCalendarFallback,
+                      icon: const Icon(Icons.calendar_month_rounded),
+                      label: const Text('Zum Kalender'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -595,17 +820,35 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color(0xFF0284C7),
+        foregroundColor: Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('KI Elternberatung'),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.psychology_alt_rounded, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'KI Elternberatung',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(
-              'Powered by ${APIConfig.getGeminiModelName()}',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontSize: 11,
-                  ),
+              'Immer für dich da • GfK-orientiert',
+              style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 0.2,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
             ),
           ],
         ),
@@ -618,19 +861,30 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.analytics_outlined),
           ),
           IconButton(
-            tooltip: 'Chat loeschen',
+            tooltip: 'Chat löschen',
             onPressed: _messages.isEmpty ? null : _confirmClearChat,
             icon: const Icon(Icons.delete_outline_rounded),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSafetyBanner(),
-          Expanded(
-            child: _messages.isEmpty && !_isStreaming
-                ? _buildEmptyState()
-                : ListView.builder(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFF6FBFF),
+              Color(0xFFF8FAFD),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            _buildSafetyBanner(),
+            Expanded(
+              child: _messages.isEmpty && !_isStreaming
+                  ? _buildEmptyState()
+                  : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
                     itemCount: _messages.length + (_isStreaming ? 1 : 0),
@@ -691,21 +945,22 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
                     },
                   ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
+            ),
+            Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
               border: Border(
                 top: BorderSide(
-                  color: Theme.of(context).dividerColor,
+                  color: Color(0xFFE0E6ED),
+                  width: 1,
                 ),
               ),
             ),
             padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 12,
-              bottom: 12 + MediaQuery.of(context).viewInsets.bottom,
+              left: 12,
+              right: 12,
+              top: 10,
+              bottom: 10 + MediaQuery.of(context).viewInsets.bottom,
             ),
             child: Row(
               children: [
@@ -714,15 +969,59 @@ class _ChatScreenState extends State<ChatScreen> {
                     controller: _controller,
                     enabled: !_isStreaming && _chatBackend != null,
                     decoration: InputDecoration(
-                      hintText: 'Deine Frage...',
-                      prefixIcon: const Icon(Icons.edit),
+                      hintText: 'Erzähle mir, was dich bewegt...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF8A9AB0),
+                        fontSize: 15,
+                        letterSpacing: 0.2,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.only(left: 12),
+                        child: Icon(
+                          Icons.edit_rounded,
+                          color: Color(0xFF0284C7),
+                          size: 20,
+                        ),
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 0,
+                        minHeight: 0,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE0E6ED),
+                          width: 1.5,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE0E6ED),
+                          width: 1.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF0284C7),
+                          width: 2,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+                        horizontal: 12,
+                        vertical: 13,
                       ),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFD),
+                    ),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.35,
+                      letterSpacing: 0.15,
+                      color: Color(0xFF1A2A3A),
+                      fontWeight: FontWeight.w500,
                     ),
                     onSubmitted: (value) {
                       _sendMessage(value);
@@ -732,26 +1031,33 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(width: 8),
                 FloatingActionButton.small(
+                  backgroundColor: _isStreaming || _controller.text.isEmpty
+                      ? const Color(0xFFE0E6ED)
+                      : const Color(0xFF0284C7),
+                  foregroundColor: _isStreaming || _controller.text.isEmpty
+                      ? const Color(0xFF8A9AB0)
+                      : Colors.white,
                   onPressed: _isStreaming || _controller.text.isEmpty
                       ? null
                       : () => _sendMessage(_controller.text),
                   child: _isStreaming
                       ? const SizedBox(
-                          width: 20,
-                          height: 20,
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+                              Color(0xFF0284C7),
                             ),
                           ),
                         )
-                      : const Icon(Icons.send),
+                      : const Icon(Icons.send_rounded, size: 18),
                 ),
               ],
             ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

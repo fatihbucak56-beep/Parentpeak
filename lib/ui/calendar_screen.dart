@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
 import 'package:trusted_circle_demo/logic/calendar_backend_service.dart';
 import 'package:trusted_circle_demo/logic/notification_service.dart';
+import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
+import 'package:trusted_circle_demo/ui/chat_screen.dart';
+import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 import 'package:trusted_circle_demo/widgets/language_change_mixin.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -380,6 +384,32 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
+  Future<void> _openDevelopmentFallback() async {
+    await ProductMetricsService.instance.recordCalendarFallbackRouteTap(
+      from: 'calendar',
+      to: 'development',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+      ),
+    );
+  }
+
+  Future<void> _openChatFallback() async {
+    await ProductMetricsService.instance.recordCalendarFallbackRouteTap(
+      from: 'calendar',
+      to: 'chat',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ChatScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -428,13 +458,52 @@ class _CalendarScreenState extends State<CalendarScreen>
                         child: Material(
                           color: Colors.amber[100],
                           borderRadius: BorderRadius.circular(12),
-                          child: ListTile(
-                            leading: const Icon(Icons.cloud_off_rounded),
-                            title: const Text('Server-Sync fehlgeschlagen'),
-                            subtitle: Text(_syncError!),
-                            trailing: TextButton(
-                              onPressed: _loadEvents,
-                              child: const Text('Retry'),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.cloud_off_rounded),
+                                    const SizedBox(width: 8),
+                                    const Expanded(
+                                      child: Text(
+                                        'Server-Sync fehlgeschlagen',
+                                        style: TextStyle(fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: _loadEvents,
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(_syncError!),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Du kannst ohne Wartezeit weitermachen:',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: _openDevelopmentFallback,
+                                      icon: const Icon(Icons.insights_rounded),
+                                      label: const Text('Zu Entwicklung'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: _openChatFallback,
+                                      icon: const Icon(Icons.tips_and_updates_rounded),
+                                      label: const Text('Zur KI-Beratung'),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ),

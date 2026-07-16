@@ -25,7 +25,10 @@ class PhotoBackendService {
           return albums;
         }
       } catch (e) {
-        lastSyncError = 'Server-Sync fehlgeschlagen: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Server-Sync fehlgeschlagen',
+          error: e,
+        );
       }
     }
 
@@ -67,11 +70,38 @@ class PhotoBackendService {
           item['id'] = normalized['id'];
         }
       } catch (e) {
-        lastSyncError = 'Foto-Album konnte nicht auf dem Server gespeichert werden: $e';
+        lastSyncError = _friendlySyncError(
+          action: 'Foto-Album konnte nicht auf dem Server gespeichert werden',
+          error: e,
+        );
       }
     }
 
     return item;
+  }
+
+  String _friendlySyncError({
+    required String action,
+    required Object error,
+  }) {
+    final raw = error.toString().toLowerCase();
+
+    if (raw.contains('handshakeexception') ||
+        raw.contains('tls') ||
+        raw.contains('ssl') ||
+        raw.contains('certificate')) {
+      return 'Server-Verbindung aktuell nicht sicher verfuegbar. Daten bleiben lokal gespeichert.';
+    }
+
+    if (raw.contains('socketexception') ||
+        raw.contains('failed host lookup') ||
+        raw.contains('connection refused') ||
+        raw.contains('timed out') ||
+        raw.contains('timeout')) {
+      return 'Keine Verbindung zum Server. Daten bleiben lokal gespeichert.';
+    }
+
+    return '$action: $error';
   }
 
   Future<List<Map<String, dynamic>>> _readLocal() async {

@@ -8,6 +8,193 @@ import 'package:trusted_circle_demo/models_and_widgets/weekly_impulse_feature.da
 
 import 'backend_api_client.dart';
 
+class WeeklyImpulseModerationReport {
+  final String id;
+  final String postId;
+  final String postTitle;
+  final String postAuthorName;
+  final String postRole;
+  final String reason;
+  final String reporterName;
+  final String reporterUserId;
+  final DateTime createdAt;
+  final DateTime? resolvedAt;
+  final String resolvedBy;
+  final String moderatorNote;
+  final String lastAction;
+  final DateTime? lastActionAt;
+  final bool hiddenByModeration;
+  final DateTime? hiddenAt;
+  final String hiddenBy;
+
+  const WeeklyImpulseModerationReport({
+    required this.id,
+    required this.postId,
+    required this.postTitle,
+    required this.postAuthorName,
+    required this.postRole,
+    required this.reason,
+    required this.reporterName,
+    required this.reporterUserId,
+    required this.createdAt,
+    this.resolvedAt,
+    this.resolvedBy = '',
+    this.moderatorNote = '',
+    this.lastAction = '',
+    this.lastActionAt,
+    this.hiddenByModeration = false,
+    this.hiddenAt,
+    this.hiddenBy = '',
+  });
+
+  bool get isResolved => resolvedAt != null;
+
+  factory WeeklyImpulseModerationReport.fromJson(Map<String, dynamic> json) {
+    return WeeklyImpulseModerationReport(
+      id: json['id'] as String? ?? '',
+      postId: json['postId'] as String? ?? '',
+      postTitle: json['postTitle'] as String? ?? '',
+      postAuthorName: json['postAuthorName'] as String? ?? '',
+      postRole: json['postRole'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      reporterName: json['reporterName'] as String? ?? '',
+      reporterUserId: json['reporterUserId'] as String? ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      resolvedAt: DateTime.tryParse(json['resolvedAt'] as String? ?? ''),
+      resolvedBy: json['resolvedBy'] as String? ?? '',
+        moderatorNote: json['moderatorNote'] as String? ?? '',
+        lastAction: json['lastAction'] as String? ?? '',
+        lastActionAt: DateTime.tryParse(json['lastActionAt'] as String? ?? ''),
+      hiddenByModeration: json['hiddenByModeration'] as bool? ?? false,
+      hiddenAt: DateTime.tryParse(json['hiddenAt'] as String? ?? ''),
+      hiddenBy: json['hiddenBy'] as String? ?? '',
+    );
+  }
+}
+
+class WeeklyImpulseVerificationStatus {
+  final bool verified;
+  final bool pendingRequest;
+  final String verificationLabel;
+  final DateTime? verifiedAt;
+  final WeeklyImpulseVerifiedProfile? verifiedProfile;
+  final WeeklyImpulseVerificationRequest? latestRequest;
+
+  const WeeklyImpulseVerificationStatus({
+    required this.verified,
+    required this.pendingRequest,
+    required this.verificationLabel,
+    this.verifiedAt,
+    this.verifiedProfile,
+    this.latestRequest,
+  });
+
+  factory WeeklyImpulseVerificationStatus.fromJson(Map<String, dynamic> json) {
+    return WeeklyImpulseVerificationStatus(
+      verified: json['verified'] as bool? ?? false,
+      pendingRequest: json['pendingRequest'] as bool? ?? false,
+      verificationLabel: json['verificationLabel'] as String? ?? '',
+      verifiedAt: DateTime.tryParse(json['verifiedAt'] as String? ?? ''),
+      verifiedProfile: json['verifiedProfile'] is Map<String, dynamic>
+          ? WeeklyImpulseVerifiedProfile.fromJson(
+              json['verifiedProfile'] as Map<String, dynamic>,
+            )
+          : null,
+      latestRequest: json['latestRequest'] is Map<String, dynamic>
+          ? WeeklyImpulseVerificationRequest.fromJson(
+              json['latestRequest'] as Map<String, dynamic>,
+            )
+          : null,
+    );
+  }
+}
+
+class WeeklyImpulseVerifiedProfile {
+  final String displayName;
+  final String roleTitle;
+  final String organization;
+  final String verificationLabel;
+  final DateTime? verifiedAt;
+  final String reviewedBy;
+  final String reviewNote;
+
+  const WeeklyImpulseVerifiedProfile({
+    required this.displayName,
+    required this.roleTitle,
+    required this.organization,
+    required this.verificationLabel,
+    this.verifiedAt,
+    this.reviewedBy = '',
+    this.reviewNote = '',
+  });
+
+  factory WeeklyImpulseVerifiedProfile.fromJson(Map<String, dynamic> json) {
+    return WeeklyImpulseVerifiedProfile(
+      displayName: json['displayName'] as String? ?? '',
+      roleTitle: json['roleTitle'] as String? ?? '',
+      organization: json['organization'] as String? ?? '',
+      verificationLabel: json['verificationLabel'] as String? ?? '',
+      verifiedAt: DateTime.tryParse(json['verifiedAt'] as String? ?? ''),
+      reviewedBy: json['reviewedBy'] as String? ?? '',
+      reviewNote: json['reviewNote'] as String? ?? '',
+    );
+  }
+}
+
+class WeeklyImpulseVerificationRequest {
+  final String id;
+  final String userId;
+  final String email;
+  final String displayName;
+  final String roleTitle;
+  final String organization;
+  final String note;
+  final String status;
+  final String verificationLabel;
+  final DateTime createdAt;
+  final DateTime? reviewedAt;
+  final String reviewedBy;
+  final String reviewNote;
+
+  const WeeklyImpulseVerificationRequest({
+    required this.id,
+    required this.userId,
+    required this.email,
+    required this.displayName,
+    required this.roleTitle,
+    required this.organization,
+    required this.note,
+    required this.status,
+    required this.verificationLabel,
+    required this.createdAt,
+    this.reviewedAt,
+    this.reviewedBy = '',
+    this.reviewNote = '',
+  });
+
+  bool get isPending => status == 'pending';
+
+  factory WeeklyImpulseVerificationRequest.fromJson(Map<String, dynamic> json) {
+    return WeeklyImpulseVerificationRequest(
+      id: json['id'] as String? ?? '',
+      userId: json['userId'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      roleTitle: json['roleTitle'] as String? ?? '',
+      organization: json['organization'] as String? ?? '',
+      note: json['note'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      verificationLabel: json['verificationLabel'] as String? ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      reviewedAt: DateTime.tryParse(json['reviewedAt'] as String? ?? ''),
+      reviewedBy: json['reviewedBy'] as String? ?? '',
+      reviewNote: json['reviewNote'] as String? ?? '',
+    );
+  }
+}
+
 class WeeklyImpulseService {
   const WeeklyImpulseService({required this.apiClient});
 
@@ -22,11 +209,11 @@ class WeeklyImpulseService {
     'publish_date',
   ];
 
-  Future<WeeklyImpulse> fetchWeeklyImpulse() async {
+  Future<WeeklyImpulse> fetchWeeklyImpulse({String? viewerUserId}) async {
+    final path = _weeklyImpulsePath(viewerUserId: viewerUserId);
     if (apiClient != null) {
       try {
-        final decoded =
-            await apiClient!.getJson(APIConfig.getBackendWeeklyImpulsePath());
+        final decoded = await apiClient!.getJson(path);
         final impulse = _parseIfValid(decoded);
         if (impulse != null) {
           await _saveCache(decoded as Map<String, dynamic>);
@@ -44,6 +231,283 @@ class WeeklyImpulseService {
     }
 
     throw StateError('Weekly impulse unavailable: no backend data and no cache');
+  }
+
+  Future<void> createCommunityPost({
+    required String impulseId,
+    required String title,
+    required String body,
+    required String authorName,
+    required String authorUserId,
+    required String authorEmail,
+    required String role,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/posts',
+      <String, dynamic>{
+        'impulseId': impulseId,
+        'title': title,
+        'body': body,
+        'authorName': authorName,
+        'authorUserId': authorUserId,
+        'authorEmail': authorEmail,
+        'role': role,
+      },
+    );
+  }
+
+  Future<void> setCommunityLike({
+    required String impulseId,
+    required String postId,
+    required String userId,
+    required bool isLiked,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/posts/$postId/like',
+      <String, dynamic>{
+        'impulseId': impulseId,
+        'userId': userId,
+        'isLiked': isLiked,
+      },
+    );
+  }
+
+  Future<void> addCommunityComment({
+    required String impulseId,
+    required String postId,
+    required String authorName,
+    required String role,
+    required String comment,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/posts/$postId/comments',
+      <String, dynamic>{
+        'impulseId': impulseId,
+        'authorName': authorName,
+        'role': role,
+        'comment': comment,
+      },
+    );
+  }
+
+  Future<void> reportCommunityPost({
+    required String impulseId,
+    required String postId,
+    required String reporterUserId,
+    required String reporterName,
+    required String reason,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/posts/$postId/report',
+      <String, dynamic>{
+        'impulseId': impulseId,
+        'reporterUserId': reporterUserId,
+        'reporterName': reporterName,
+        'reason': reason,
+      },
+    );
+  }
+
+  Future<WeeklyImpulseVerificationStatus> fetchVerificationStatus({
+    required String userId,
+    required String email,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    final path =
+        '${APIConfig.getBackendWeeklyImpulsePath()}/community/verification-status?userId=${Uri.encodeQueryComponent(userId)}&email=${Uri.encodeQueryComponent(email)}';
+    final decoded = await client.getJson(path);
+    if (decoded is! Map<String, dynamic>) {
+      return const WeeklyImpulseVerificationStatus(
+        verified: false,
+        pendingRequest: false,
+        verificationLabel: '',
+      );
+    }
+    return WeeklyImpulseVerificationStatus.fromJson(decoded);
+  }
+
+  Future<void> createVerificationRequest({
+    required String userId,
+    required String email,
+    required String displayName,
+    required String roleTitle,
+    required String organization,
+    required String note,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/verification-requests',
+      <String, dynamic>{
+        'userId': userId,
+        'email': email,
+        'displayName': displayName,
+        'roleTitle': roleTitle,
+        'organization': organization,
+        'note': note,
+      },
+    );
+  }
+
+  Future<List<WeeklyImpulseVerificationRequest>> fetchVerificationRequests({
+    String status = '',
+    required String reviewerEmail,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    final statusQuery = status.trim().isEmpty
+        ? ''
+        : 'status=${Uri.encodeQueryComponent(status.trim().toLowerCase())}&';
+    final decoded = await client.getJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/verification-requests?${statusQuery}reviewerEmail=${Uri.encodeQueryComponent(reviewerEmail)}',
+    );
+    if (decoded is! Map<String, dynamic>) {
+      return const <WeeklyImpulseVerificationRequest>[];
+    }
+
+    final rawItems = decoded['items'];
+    if (rawItems is! List<dynamic>) {
+      return const <WeeklyImpulseVerificationRequest>[];
+    }
+
+    return rawItems
+        .whereType<Map<String, dynamic>>()
+        .map(WeeklyImpulseVerificationRequest.fromJson)
+        .toList();
+  }
+
+  Future<void> approveVerificationRequest({
+    required String requestId,
+    required String reviewerName,
+    required String reviewerEmail,
+    required String reviewNote,
+    required String verificationLabel,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/verification-requests/$requestId/approve',
+      <String, dynamic>{
+        'reviewerName': reviewerName,
+        'reviewerEmail': reviewerEmail,
+        'reviewNote': reviewNote,
+        'verificationLabel': verificationLabel,
+      },
+    );
+  }
+
+  Future<List<WeeklyImpulseModerationReport>> fetchModerationReports({
+    required String impulseId,
+    required String moderatorEmail,
+    bool includeResolved = false,
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    final separator = APIConfig.getBackendWeeklyImpulsePath().contains('?')
+        ? '&'
+        : '?';
+    final path =
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/reports${separator}impulseId=${Uri.encodeQueryComponent(impulseId)}&includeResolved=${includeResolved ? '1' : '0'}&moderatorEmail=${Uri.encodeQueryComponent(moderatorEmail)}';
+    final decoded = await client.getJson(path);
+    if (decoded is! Map<String, dynamic>) {
+      return const <WeeklyImpulseModerationReport>[];
+    }
+
+    final rawItems = decoded['items'];
+    if (rawItems is! List<dynamic>) {
+      return const <WeeklyImpulseModerationReport>[];
+    }
+
+    return rawItems
+        .whereType<Map<String, dynamic>>()
+        .map(WeeklyImpulseModerationReport.fromJson)
+        .toList();
+  }
+
+  Future<void> resolveModerationReport({
+    required String impulseId,
+    required String reportId,
+    required String moderatorName,
+    required String moderatorEmail,
+    String moderatorNote = '',
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/reports/$reportId/resolve',
+      <String, dynamic>{
+        'impulseId': impulseId,
+        'moderatorName': moderatorName,
+        'moderatorEmail': moderatorEmail,
+        'moderatorNote': moderatorNote,
+      },
+    );
+  }
+
+  Future<void> setCommunityPostHidden({
+    required String impulseId,
+    required String postId,
+    required String moderatorName,
+    required String moderatorEmail,
+    required bool hidden,
+    String moderatorNote = '',
+    String reportId = '',
+  }) async {
+    final client = apiClient;
+    if (client == null) {
+      throw StateError('Weekly impulse backend unavailable');
+    }
+
+    await client.postJson(
+      '${APIConfig.getBackendWeeklyImpulsePath()}/community/posts/$postId/moderation-visibility',
+      <String, dynamic>{
+        'impulseId': impulseId,
+        'moderatorName': moderatorName,
+        'moderatorEmail': moderatorEmail,
+        'hidden': hidden,
+        'moderatorNote': moderatorNote,
+        'reportId': reportId,
+      },
+    );
   }
 
   WeeklyImpulse? _parseIfValid(dynamic decoded) {
@@ -64,6 +528,16 @@ class WeeklyImpulseService {
       debugPrint('WeeklyImpulse parse invalid payload: $e');
       return null;
     }
+  }
+
+  String _weeklyImpulsePath({String? viewerUserId}) {
+    final basePath = APIConfig.getBackendWeeklyImpulsePath();
+    if (viewerUserId == null || viewerUserId.trim().isEmpty) {
+      return basePath;
+    }
+
+    final separator = basePath.contains('?') ? '&' : '?';
+    return '$basePath${separator}viewerUserId=${Uri.encodeQueryComponent(viewerUserId.trim())}';
   }
 
   Future<void> _saveCache(Map<String, dynamic> raw) async {

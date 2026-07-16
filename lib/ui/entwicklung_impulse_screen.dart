@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/backend_service_factory.dart';
+import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
+import 'package:trusted_circle_demo/logic/weekly_impulse_service.dart';
 import 'package:trusted_circle_demo/models_and_widgets/weekly_impulse_feature.dart';
 import 'package:trusted_circle_demo/models_and_widgets/development_schema_feature.dart';
+import 'package:trusted_circle_demo/ui/calendar_screen.dart';
+import 'package:trusted_circle_demo/ui/chat_screen.dart';
 
 class EntwicklungImpulseScreen extends StatefulWidget {
-  const EntwicklungImpulseScreen({super.key});
+  final int initialTabIndex;
+
+  const EntwicklungImpulseScreen({
+    super.key,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<EntwicklungImpulseScreen> createState() =>
@@ -16,14 +29,135 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final FlutterTts _tts = FlutterTts();
+  final WeeklyImpulseService _weeklyImpulseService =
+      BackendServiceFactory.createWeeklyImpulseService();
 
   WeeklyImpulse? _weeklyImpulse;
+  WeeklyImpulseVerificationStatus? _verificationStatus;
   bool _isLoading = true;
+  String? _loadErrorMessage;
+  String? _nonBlockingNotice;
+
+  bool get _showModerationTools {
+    final email = AuthService.instance.currentUser?.email.toLowerCase().trim() ?? '';
+    return kDebugMode || email.endsWith('@parentpeak.de') || email.endsWith('@parentpeak.com');
+  }
+
+  String get _viewerUserId =>
+      AuthService.instance.currentUser?.uid.trim().isNotEmpty == true
+          ? AuthService.instance.currentUser!.uid.trim()
+          : 'guest_local_parent';
+
+  String get _viewerDisplayName {
+    final name = AuthService.instance.currentUser?.displayName.trim() ?? '';
+    return name.isEmpty ? 'Ein Elternteil aus der Community' : name;
+  }
+
+  String get _viewerEmail {
+    final email = AuthService.instance.currentUser?.email.trim() ?? '';
+    return email.isEmpty ? 'guest@parentpeak.local' : email;
+  }
+
+  String _formatModerationDate(DateTime? value) {
+    if (value == null) {
+      return 'unbekannt';
+    }
+
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final year = local.year.toString();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day.$month.$year, $hour:$minute';
+  }
+
+  String _describeLastModerationAction(WeeklyImpulseModerationReport report) {
+    switch (report.lastAction) {
+      case 'resolved':
+        return 'Zuletzt als bearbeitet markiert';
+      case 'hidden':
+        return 'Zuletzt global ausgeblendet';
+      case 'restored':
+        return 'Zuletzt wieder freigegeben';
+      default:
+        return 'Gemeldet';
+    }
+  }
+
+  Future<String?> _askModerationNote({
+    required String title,
+    required String hintText,
+    String initialValue = '',
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+    String? result;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                'Optional, aber fuer spaetere Nachvollziehbarkeit sehr hilfreich.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                minLines: 3,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  labelText: 'Moderationsnotiz',
+                  hintText: hintText,
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    result = controller.text.trim();
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Weiter'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
+  }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 1),
+    );
     _loadImpulse();
   }
 
@@ -35,19 +169,857 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
   }
 
   Future<void> _loadImpulse() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadErrorMessage = null;
+        _nonBlockingNotice = null;
+      });
+    }
+
     try {
-      final service = BackendServiceFactory.createWeeklyImpulseService();
-      final impulse = await service.fetchWeeklyImpulse();
+      final impulse = await _weeklyImpulseService.fetchWeeklyImpulse(
+        viewerUserId: _viewerUserId,
+      );
+
+      WeeklyImpulseVerificationStatus? verificationStatus;
+      try {
+        verificationStatus = await _weeklyImpulseService.fetchVerificationStatus(
+          userId: _viewerUserId,
+          email: _viewerEmail,
+        );
+      } catch (_) {
+        _nonBlockingNotice =
+            'Community-Status ist gerade eingeschraenkt. Der Wochenimpuls bleibt nutzbar.';
+      }
+
       if (!mounted) return;
       setState(() {
         _weeklyImpulse = impulse;
+        _verificationStatus = verificationStatus;
         _isLoading = false;
+        _loadErrorMessage = null;
       });
     } catch (e) {
       debugPrint('EntwicklungImpulseScreen._loadImpulse(): failed: $e');
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _loadErrorMessage = _friendlyLoadErrorMessage(e);
+      });
     }
+  }
+
+  String _friendlyLoadErrorMessage(Object error) {
+    if (error is TimeoutException) {
+      return 'Der Wochenimpuls braucht gerade zu lange. Bitte spaeter erneut versuchen.';
+    }
+    if (error is SocketException) {
+      return 'Keine stabile Verbindung. Bitte Internet pruefen oder spaeter erneut laden.';
+    }
+
+    final message = error.toString().toLowerCase();
+    if (message.contains('timeout')) {
+      return 'Der Wochenimpuls hat ein Zeitlimit erreicht. Bitte erneut versuchen.';
+    }
+    if (message.contains('socket') ||
+        message.contains('network') ||
+        message.contains('connection')) {
+      return 'Netzwerkproblem erkannt. Bitte Verbindung pruefen und erneut laden.';
+    }
+    if (message.contains('backend')) {
+      return 'Der Dienst ist gerade eingeschraenkt verfuegbar. Bitte spaeter erneut versuchen.';
+    }
+    return 'Wochenimpuls ist aktuell nicht verfuegbar. Bitte spaeter erneut versuchen.';
+  }
+
+  Future<void> _openChatFallback() async {
+    await ProductMetricsService.instance.recordWeeklyImpulseFallbackRouteTap(
+      from: 'weekly_impulse',
+      to: 'chat',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ChatScreen()),
+    );
+  }
+
+  Future<void> _openCalendarFallback() async {
+    await ProductMetricsService.instance.recordWeeklyImpulseFallbackRouteTap(
+      from: 'weekly_impulse',
+      to: 'calendar',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CalendarScreen()),
+    );
+  }
+
+  Future<void> _createCommunityPost(
+    String title,
+    String body,
+    String role,
+  ) async {
+    final impulse = _weeklyImpulse;
+    if (impulse == null) {
+      throw StateError('Weekly impulse unavailable');
+    }
+
+    await _weeklyImpulseService.createCommunityPost(
+      impulseId: impulse.id,
+      title: title,
+      body: body,
+      authorName: _viewerDisplayName,
+      authorUserId: _viewerUserId,
+      authorEmail: _viewerEmail,
+      role: role,
+    );
+    await _loadImpulse();
+  }
+
+  Future<void> _toggleCommunityLike(String postId, bool currentlyLiked) async {
+    final impulse = _weeklyImpulse;
+    if (impulse == null) {
+      throw StateError('Weekly impulse unavailable');
+    }
+
+    await _weeklyImpulseService.setCommunityLike(
+      impulseId: impulse.id,
+      postId: postId,
+      userId: _viewerUserId,
+      isLiked: !currentlyLiked,
+    );
+    await _loadImpulse();
+  }
+
+  Future<void> _addCommunityComment(String postId, String comment) async {
+    final impulse = _weeklyImpulse;
+    if (impulse == null) {
+      throw StateError('Weekly impulse unavailable');
+    }
+
+    await _weeklyImpulseService.addCommunityComment(
+      impulseId: impulse.id,
+      postId: postId,
+      authorName: _viewerDisplayName,
+      role: 'Elternteil',
+      comment: comment,
+    );
+    await _loadImpulse();
+  }
+
+  Future<void> _reportCommunityPost(String postId, String reason) async {
+    final impulse = _weeklyImpulse;
+    if (impulse == null) {
+      throw StateError('Weekly impulse unavailable');
+    }
+
+    await _weeklyImpulseService.reportCommunityPost(
+      impulseId: impulse.id,
+      postId: postId,
+      reporterUserId: _viewerUserId,
+      reporterName: _viewerDisplayName,
+      reason: reason,
+    );
+    await _loadImpulse();
+  }
+
+  Future<void> _showVerificationSheet() async {
+    final status = _verificationStatus;
+    final verifiedProfile = status?.verifiedProfile;
+    final latestRequest = status?.latestRequest;
+    final roleTitleController = TextEditingController();
+    final organizationController = TextEditingController();
+    final noteController = TextEditingController();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Fachprofil',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              if (status?.verified == true)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD1FAE5),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        '${status!.verificationLabel.isEmpty ? 'Verifiziert' : status.verificationLabel} seit ${_formatModerationDate(status.verifiedAt)}',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildVerificationInfoCard(
+                      title: 'Fachprofil',
+                      rows: [
+                        if ((verifiedProfile?.displayName ?? '').isNotEmpty)
+                          'Name: ${verifiedProfile!.displayName}',
+                        if ((verifiedProfile?.roleTitle ?? '').isNotEmpty)
+                          'Rolle: ${verifiedProfile!.roleTitle}',
+                        if ((verifiedProfile?.organization ?? '').isNotEmpty)
+                          'Einrichtung: ${verifiedProfile!.organization}',
+                        if ((verifiedProfile?.reviewedBy ?? '').isNotEmpty)
+                          'Freigegeben von: ${verifiedProfile!.reviewedBy}',
+                      ],
+                    ),
+                    if ((verifiedProfile?.reviewNote ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildVerificationInfoCard(
+                        title: 'Freigabehinweis',
+                        rows: [verifiedProfile!.reviewNote],
+                      ),
+                    ],
+                  ],
+                )
+              else if (status?.pendingRequest == true)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDE68A),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Text(
+                        'Deine Verifizierungsanfrage ist eingegangen und wird geprueft.',
+                      ),
+                    ),
+                    if (latestRequest != null) ...[
+                      const SizedBox(height: 16),
+                      _buildVerificationInfoCard(
+                        title: 'Deine Anfrage',
+                        rows: [
+                          if (latestRequest.roleTitle.isNotEmpty)
+                            'Rolle: ${latestRequest.roleTitle}',
+                          if (latestRequest.organization.isNotEmpty)
+                            'Einrichtung: ${latestRequest.organization}',
+                          'Eingereicht: ${_formatModerationDate(latestRequest.createdAt)}',
+                          if (latestRequest.note.isNotEmpty)
+                            'Kurzinfo: ${latestRequest.note}',
+                        ],
+                      ),
+                    ],
+                  ],
+                )
+              else ...[
+                Text(
+                  'Beantrage ein verifiziertes Fach-Badge fuer paedagogische Beitraege.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: roleTitleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Rolle / Qualifikation',
+                    hintText: 'Zum Beispiel: Erzieherin, Familienberater',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: organizationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Einrichtung / Kontext',
+                    hintText: 'Zum Beispiel: Kita Sonnenschein',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteController,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Kurzinfo',
+                    hintText: 'Welche Erfahrung oder Ausbildung bringst du mit?',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      await _weeklyImpulseService.createVerificationRequest(
+                        userId: _viewerUserId,
+                        email: _viewerEmail,
+                        displayName: _viewerDisplayName,
+                        roleTitle: roleTitleController.text.trim(),
+                        organization: organizationController.text.trim(),
+                        note: noteController.text.trim(),
+                      );
+                      if (!mounted) {
+                        return;
+                      }
+                      await _loadImpulse();
+                      if (!context.mounted) {
+                        return;
+                      }
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.verified_user_outlined),
+                    label: const Text('Verifizierung anfragen'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+
+    roleTitleController.dispose();
+    organizationController.dispose();
+    noteController.dispose();
+  }
+
+  Widget _buildVerificationInfoCard({
+    required String title,
+    required List<String> rows,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          ...rows.map(
+            (row) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(row),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showVerificationReviewSheet() async {
+    List<WeeklyImpulseVerificationRequest> requests =
+        const <WeeklyImpulseVerificationRequest>[];
+    var isLoading = true;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        Future<void> loadRequests(StateSetter setModalState) async {
+          final fetched = await _weeklyImpulseService.fetchVerificationRequests(
+            status: 'pending',
+            reviewerEmail: _viewerEmail,
+          );
+          setModalState(() {
+            requests = fetched;
+            isLoading = false;
+          });
+        }
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (isLoading) {
+              loadRequests(setModalState);
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Fachverifizierung pruefen',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  if (isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (requests.isEmpty)
+                    const Text('Keine offenen Anfragen.')
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 460),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: requests.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final request = requests[index];
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  request.displayName,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 6),
+                                Text('${request.roleTitle}  •  ${request.organization}'),
+                                if (request.note.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(request.note),
+                                ],
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: () async {
+                                    final note = await _askModerationNote(
+                                      title: 'Fachprofil freigeben',
+                                      hintText: 'Zum Beispiel: Ausbildung geprueft, Fachbadge freigegeben.',
+                                      initialValue: request.reviewNote,
+                                    );
+                                    if (note == null) {
+                                      return;
+                                    }
+                                    await _weeklyImpulseService.approveVerificationRequest(
+                                      requestId: request.id,
+                                      reviewerName: _viewerDisplayName,
+                                      reviewerEmail: _viewerEmail,
+                                      reviewNote: note,
+                                      verificationLabel: 'Verifizierte Fachstimme',
+                                    );
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    await _loadImpulse();
+                                    if (!context.mounted) {
+                                      return;
+                                    }
+                                    await loadRequests(setModalState);
+                                  },
+                                  icon: const Icon(Icons.verified_rounded),
+                                  label: const Text('Freigeben'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showModerationPanel() async {
+    final impulse = _weeklyImpulse;
+    if (impulse == null) {
+      return;
+    }
+
+    List<WeeklyImpulseModerationReport> reports = const <WeeklyImpulseModerationReport>[];
+    var isLoadingReports = true;
+    String? errorMessage;
+    String selectedFilter = 'offen';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        Future<void> loadReports(StateSetter setModalState) async {
+          setModalState(() {
+            isLoadingReports = true;
+            errorMessage = null;
+          });
+          try {
+            final fetched = await _weeklyImpulseService.fetchModerationReports(
+              impulseId: impulse.id,
+              moderatorEmail: _viewerEmail,
+              includeResolved: true,
+            );
+            setModalState(() {
+              reports = fetched;
+              isLoadingReports = false;
+            });
+          } catch (e) {
+            setModalState(() {
+              errorMessage = 'Moderationsdaten konnten nicht geladen werden.';
+              isLoadingReports = false;
+            });
+          }
+        }
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (isLoadingReports && reports.isEmpty && errorMessage == null) {
+              loadReports(setModalState);
+            }
+
+            final visibleReports = reports.where((report) {
+              switch (selectedFilter) {
+                case 'bearbeitet':
+                  return report.isResolved;
+                case 'ausgeblendet':
+                  return report.hiddenByModeration;
+                default:
+                  return !report.isResolved;
+              }
+            }).toList();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Moderation live',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => loadReports(setModalState),
+                        icon: const Icon(Icons.refresh_rounded),
+                        tooltip: 'Neu laden',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Hier siehst du Meldungen aus dem Backend und kannst Beitraege global ausblenden, freigeben oder als bearbeitet markieren.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Offen'),
+                        selected: selectedFilter == 'offen',
+                        onSelected: (_) {
+                          setModalState(() => selectedFilter = 'offen');
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('Bearbeitet'),
+                        selected: selectedFilter == 'bearbeitet',
+                        onSelected: (_) {
+                          setModalState(() => selectedFilter = 'bearbeitet');
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('Ausgeblendet'),
+                        selected: selectedFilter == 'ausgeblendet',
+                        onSelected: (_) {
+                          setModalState(() => selectedFilter = 'ausgeblendet');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (isLoadingReports && reports.isEmpty)
+                    const Center(child: CircularProgressIndicator())
+                  else if (errorMessage != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(errorMessage!),
+                    )
+                  else if (visibleReports.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        selectedFilter == 'bearbeitet'
+                            ? 'Keine bearbeiteten Meldungen.'
+                            : selectedFilter == 'ausgeblendet'
+                                ? 'Keine global ausgeblendeten Beitraege.'
+                                : 'Keine offenen Meldungen.',
+                      ),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 460),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: visibleReports.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final report = visibleReports[index];
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        report.postTitle,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: report.hiddenByModeration
+                                            ? const Color(0xFFFECACA)
+                                            : report.isResolved
+                                                ? const Color(0xFFD1FAE5)
+                                                : const Color(0xFFFDE68A),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(report.hiddenByModeration
+                                          ? 'Ausgeblendet'
+                                          : report.isResolved
+                                              ? 'Bearbeitet'
+                                              : 'Offen'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${report.postAuthorName}  •  ${report.postRole}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Grund: ${report.reason}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Gemeldet von ${report.reporterName}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Gemeldet am ${_formatModerationDate(report.createdAt)}',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                ),
+                                if (report.moderatorNote.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Moderationsnotiz: ${report.moderatorNote}',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                                if (report.hiddenByModeration) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Global ausgeblendet${report.hiddenBy.isNotEmpty ? ' von ${report.hiddenBy}' : ''} am ${_formatModerationDate(report.hiddenAt)}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                                if (report.isResolved) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Bearbeitet${report.resolvedBy.isNotEmpty ? ' von ${report.resolvedBy}' : ''} am ${_formatModerationDate(report.resolvedAt)}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                                if (report.lastActionAt != null) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surface,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .outlineVariant,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '${_describeLastModerationAction(report)} am ${_formatModerationDate(report.lastActionAt)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 14),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    FilledButton.icon(
+                                      onPressed: report.isResolved
+                                          ? null
+                                          : () async {
+                                              final note = await _askModerationNote(
+                                                title: 'Meldung abschliessen',
+                                                hintText: 'Zum Beispiel: Beitrag geprueft, im Ton grenzwertig, aber stehen gelassen.',
+                                                initialValue: report.moderatorNote,
+                                              );
+                                              if (note == null || !mounted) {
+                                                return;
+                                              }
+                                              await _weeklyImpulseService.resolveModerationReport(
+                                                impulseId: impulse.id,
+                                                reportId: report.id,
+                                                moderatorName: _viewerDisplayName,
+                                                moderatorEmail: _viewerEmail,
+                                                moderatorNote: note,
+                                              );
+                                              if (!mounted) {
+                                                return;
+                                              }
+                                              await _loadImpulse();
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              await loadReports(setModalState);
+                                            },
+                                      icon: const Icon(Icons.check_circle_outline_rounded),
+                                      label: const Text('Bearbeitet'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final note = await _askModerationNote(
+                                          title: report.hiddenByModeration
+                                              ? 'Beitrag wieder freigeben'
+                                              : 'Beitrag global ausblenden',
+                                          hintText: report.hiddenByModeration
+                                              ? 'Zum Beispiel: Nach Pruefung wieder freigegeben.'
+                                              : 'Zum Beispiel: Vorlaeufig ausgeblendet bis fachliche Pruefung abgeschlossen ist.',
+                                          initialValue: report.moderatorNote,
+                                        );
+                                        if (note == null || !mounted) {
+                                          return;
+                                        }
+                                        await _weeklyImpulseService.setCommunityPostHidden(
+                                          impulseId: impulse.id,
+                                          postId: report.postId,
+                                          moderatorName: _viewerDisplayName,
+                                          moderatorEmail: _viewerEmail,
+                                          hidden: !report.hiddenByModeration,
+                                          moderatorNote: note,
+                                          reportId: report.id,
+                                        );
+                                        if (!mounted) {
+                                          return;
+                                        }
+                                        await _loadImpulse();
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        await loadReports(setModalState);
+                                      },
+                                      icon: Icon(report.hiddenByModeration
+                                          ? Icons.visibility_rounded
+                                          : Icons.visibility_off_rounded),
+                                      label: Text(report.hiddenByModeration
+                                          ? 'Wieder freigeben'
+                                          : 'Global ausblenden'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _playAudio() async {
@@ -101,6 +1073,29 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
         title: const Text('Impulse & Entwicklung'),
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _showVerificationSheet,
+            icon: Icon(
+              _verificationStatus?.verified == true
+                  ? Icons.verified_rounded
+                  : Icons.verified_user_outlined,
+            ),
+            tooltip: 'Fachprofil',
+          ),
+          if (_showModerationTools)
+            IconButton(
+              onPressed: _showModerationPanel,
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              tooltip: 'Moderation',
+            ),
+          if (_showModerationTools)
+            IconButton(
+              onPressed: _showVerificationReviewSheet,
+              icon: const Icon(Icons.fact_check_outlined),
+              tooltip: 'Verifizierung pruefen',
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -250,7 +1245,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'Bitte Backend-Verbindung pruefen.',
+                _loadErrorMessage ?? 'Bitte Backend-Verbindung pruefen.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -259,11 +1254,36 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: () {
-                  setState(() => _isLoading = true);
                   _loadImpulse();
                 },
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Erneut laden'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () {
+                  _tabController.animateTo(1);
+                },
+                icon: const Icon(Icons.insights_rounded),
+                label: const Text('Mit Entwicklung weitermachen'),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _openChatFallback,
+                    icon: const Icon(Icons.tips_and_updates_rounded),
+                    label: const Text('Zur KI-Beratung'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _openCalendarFallback,
+                    icon: const Icon(Icons.calendar_month_rounded),
+                    label: const Text('Zum Kalender'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -271,11 +1291,50 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: WeeklyImpulseCard(
-        impulse: _weeklyImpulse!,
-        onAudioPressed: _playAudio,
+    return RefreshIndicator(
+      onRefresh: _loadImpulse,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            if (_nonBlockingNotice != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _nonBlockingNotice!,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            WeeklyImpulseCard(
+              impulse: _weeklyImpulse!,
+              onAudioPressed: _playAudio,
+              onCreateCommunityPost: _createCommunityPost,
+              onToggleLikePost: _toggleCommunityLike,
+              onAddComment: _addCommunityComment,
+              onReportPost: _reportCommunityPost,
+            ),
+          ],
+        ),
       ),
     );
   }

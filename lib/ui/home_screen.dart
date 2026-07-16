@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
+import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
 import 'package:trusted_circle_demo/ui/calendar_screen.dart';
 import 'package:trusted_circle_demo/ui/events_activities_screen.dart';
 import 'package:trusted_circle_demo/ui/event_invitations_screen.dart';
@@ -11,7 +12,6 @@ import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 import 'package:trusted_circle_demo/ui/parent_matching_screen.dart';
 import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/finance_budget_screen.dart';
-import 'package:trusted_circle_demo/ui/simple_meal_planner.dart';
 import 'package:trusted_circle_demo/ui/gemeinsam_satt_screen.dart';
 import 'package:trusted_circle_demo/ui/treasure_handover_screen.dart';
 import 'package:trusted_circle_demo/l10n/app_localizations.dart';
@@ -32,6 +32,9 @@ class _FeatureAction {
   });
 }
 
+const String _debugOpenFeature =
+  String.fromEnvironment('PP_DEBUG_OPEN_FEATURE', defaultValue: '');
+
 class HomeScreen extends StatefulWidget {
   final String? initialInviteInput;
 
@@ -47,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const int _recentTilesLimit = 3;
 
   bool _initialInviteHandled = false;
+  bool _debugFeatureHandled = false;
   List<String> _recentTileLabels = const [];
   List<String> _customTileOrderLabels = const [];
 
@@ -58,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _restoreTileOrder();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openInitialInviteIfNeeded();
+      _openDebugFeatureIfNeeded();
     });
   }
 
@@ -78,6 +83,28 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => EventInvitationsScreen(initialInviteInput: input),
       ),
     );
+  }
+
+  void _openDebugFeatureIfNeeded() {
+    if (_debugFeatureHandled || !mounted) return;
+    final target = _debugOpenFeature.trim().toLowerCase();
+    if (target.isEmpty) return;
+
+    _debugFeatureHandled = true;
+    if (target == 'entwicklung' || target == 'impulse') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const EntwicklungImpulseScreen()),
+      );
+      return;
+    }
+
+    if (target == 'entwicklung-tab') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+        ),
+      );
+    }
   }
 
   Future<void> _restoreRecentTiles() async {
@@ -299,13 +326,6 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const GemeinsamSattScreen(),
       ),
       _FeatureAction(
-        label: 'Essensplaner',
-        description: 'Wochenplan, Rezepte & Einkaufsliste',
-        icon: Icons.restaurant_menu_rounded,
-        color: const Color(0xFFF59E0B),
-        builder: (_) => const SimpleMealPlanner(),
-      ),
-      _FeatureAction(
         label: 'Finanzen & Budget',
         description: 'Ausgaben fair teilen und smarter sparen',
         icon: Icons.account_balance_wallet_rounded,
@@ -318,6 +338,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final actionByLabel = <String, _FeatureAction>{
       for (final action in visibleGridActions) action.label: action,
     };
+    final developmentAction = actionByLabel['Impulse & Entwicklung'];
+    final chatAction = actionByLabel['KI Elternberatung'];
+    final calendarAction = actionByLabel['Kalender'];
     final recentActions = _recentTileLabels
         .map((label) => actionByLabel[label])
         .whereType<_FeatureAction>()
@@ -349,6 +372,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
+                    padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
+                    child: _buildTodayFlowCard(
+                      theme,
+                      developmentAction: developmentAction,
+                      chatAction: chatAction,
+                      calendarAction: calendarAction,
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                     child: Container(
                       height: 1,
@@ -360,6 +394,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             theme.colorScheme.outline.withValues(alpha: 0),
                           ],
                         ),
+                      ),
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(horizontalPadding, 2, horizontalPadding, 10),
+                    child: Text(
+                      'Alle Bereiche',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
@@ -533,6 +578,164 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTodayFlowCard(
+    ThemeData theme, {
+    required _FeatureAction? developmentAction,
+    required _FeatureAction? chatAction,
+    required _FeatureAction? calendarAction,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: theme.colorScheme.surface,
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0EA5A4).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.flag_rounded, color: Color(0xFF0F766E), size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Heute starten',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ein Schritt reicht: Kurzcheck in Impulse & Entwicklung und danach nur eine konkrete Alltagsaktion.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: developmentAction == null
+                    ? null
+                    : () async {
+                        await ProductMetricsService.instance.recordHomeQuickCheckCtaTap(
+                          userId: AuthService.instance.currentUser?.uid,
+                        );
+                        await _openFeature(developmentAction);
+                      },
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Jetzt Kurzcheck'),
+              ),
+              OutlinedButton.icon(
+                onPressed: chatAction == null ? null : () => _openFeature(chatAction),
+                icon: const Icon(Icons.tips_and_updates_rounded),
+                label: const Text('Frage die KI'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await ProductMetricsService.instance.recordHomeDevelopmentDirectCtaTap(
+                    userId: AuthService.instance.currentUser?.uid,
+                  );
+                  if (!mounted) return;
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.insights_rounded),
+                label: const Text('Direkt Entwicklung'),
+              ),
+              OutlinedButton.icon(
+                onPressed: calendarAction == null ? null : () => _openFeature(calendarAction),
+                icon: const Icon(Icons.calendar_month_rounded),
+                label: const Text('Zum Kalender'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Fallback: Wenn der Wochenimpuls gerade nicht laedt, starte direkt mit Entwicklung.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: chatAction == null
+                      ? null
+                      : () async {
+                          await ProductMetricsService.instance.recordHomeFallbackRouteTap(
+                            from: 'calendar',
+                            to: 'chat',
+                            userId: AuthService.instance.currentUser?.uid,
+                          );
+                          if (!mounted) return;
+                          await _openFeature(chatAction);
+                        },
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  label: const Text('Fallback Kalender → KI'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await ProductMetricsService.instance.recordHomeFallbackRouteTap(
+                      from: 'chat',
+                      to: 'development',
+                      userId: AuthService.instance.currentUser?.uid,
+                    );
+                    if (!mounted) return;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  label: const Text('Fallback KI → Entwicklung'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Hinweis: Die App liefert Orientierung, keine medizinische Diagnose.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

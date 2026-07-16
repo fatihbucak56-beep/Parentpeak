@@ -3,11 +3,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
 import 'package:trusted_circle_demo/logic/event_discovery_agent.dart';
+import 'package:trusted_circle_demo/logic/product_metrics_service.dart';
 import 'package:trusted_circle_demo/logic/event_service.dart';
 import 'package:trusted_circle_demo/models/event_invitation.dart';
 import 'package:trusted_circle_demo/models/discovered_event.dart';
 import 'package:trusted_circle_demo/models/meetup_event.dart';
+import 'package:trusted_circle_demo/ui/calendar_screen.dart';
+import 'package:trusted_circle_demo/ui/chat_screen.dart';
 import 'package:trusted_circle_demo/ui/create_event_screen.dart';
+import 'package:trusted_circle_demo/ui/entwicklung_impulse_screen.dart';
 import 'package:trusted_circle_demo/ui/event_detail_screen.dart';
 import 'package:trusted_circle_demo/ui/event_invitations_screen.dart';
 
@@ -486,6 +490,47 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
     }
   }
 
+  Future<void> _openDevelopmentFallback() async {
+    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
+      surface: 'events',
+      from: 'events_feed_error',
+      to: 'development',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
+      ),
+    );
+  }
+
+  Future<void> _openChatFallback() async {
+    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
+      surface: 'events',
+      from: 'events_feed_error',
+      to: 'chat',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ChatScreen()),
+    );
+  }
+
+  Future<void> _openCalendarFallback() async {
+    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
+      surface: 'events',
+      from: 'events_feed_error',
+      to: 'calendar',
+      userId: AuthService.instance.currentUser?.uid,
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CalendarScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -558,6 +603,28 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
                       onPressed: _refreshFeed,
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('Erneut laden'),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _openChatFallback,
+                          icon: const Icon(Icons.tips_and_updates_rounded),
+                          label: const Text('Zur KI-Beratung'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _openDevelopmentFallback,
+                          icon: const Icon(Icons.insights_rounded),
+                          label: const Text('Zu Entwicklung'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _openCalendarFallback,
+                          icon: const Icon(Icons.calendar_month_rounded),
+                          label: const Text('Zum Kalender'),
+                        ),
+                      ],
                     ),
                   ],
                 ),

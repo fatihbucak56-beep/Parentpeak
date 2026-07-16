@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trusted_circle_demo/main.dart';
 import 'package:trusted_circle_demo/logic/auth_service.dart';
@@ -255,6 +256,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _openParentMatchQuickAction({
     required bool openNewConnections,
   }) async {
+    await HapticFeedback.lightImpact();
     await _storeRecentTileTap('Eltern Match');
     if (!mounted) return;
     await Navigator.push(

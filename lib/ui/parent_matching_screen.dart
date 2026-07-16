@@ -55,9 +55,12 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   final Set<String> _myInterests = {..._defaultMyInterests};
   final Set<String> _myLanguages = {..._defaultMyLanguages};
   final Set<String> _myValues = {..._defaultMyValues};
+  final Set<String> _seenMatchedProfileIds = {};
+  final Set<String> _newlyConfirmedProfileIds = {};
 
   double _maxDistanceKm = 20;
   String _homeCity = 'Berlin';
+  int _newConfirmedSinceLastVisit = 0;
 
   int _currentIndex = 0;
   bool _isRestoring = true;
@@ -129,6 +132,12 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         _matchedProfiles
           ..clear()
           ..addAll(_allProfiles.where((p) => matchedIds.contains(p.id)));
+        _seenMatchedProfileIds
+          ..clear()
+          ..addAll((decoded['seenMatchedProfileIds'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              matchedIds);
         _blockedProfileIds
           ..clear()
           ..addAll(blockedIds);
@@ -216,24 +225,115 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       'myValues': _myValues.toList(),
       'homeCity': _homeCity,
       'maxDistanceKm': _maxDistanceKm,
+      'seenMatchedProfileIds': _seenMatchedProfileIds.toList(),
       'currentIndex': _currentIndex,
     };
     await prefs.setString(_storageKey, jsonEncode(payload));
   }
 
-  Future<void> _refreshConnectionsFromBackend() async {
+  Future<void> _refreshConnectionsFromBackend({bool announce = true}) async {
     final userId = _currentUserId;
     if (userId == null || userId.isEmpty) return;
 
     final connectedIds =
         await _service.fetchConnectedProfileIds(userId: userId);
+    final newlyConfirmedIds = connectedIds.difference(_seenMatchedProfileIds);
+
     if (!mounted) return;
     setState(() {
       _matchedProfiles
         ..clear()
         ..addAll(_allProfiles.where((p) => connectedIds.contains(p.id)));
+      _newlyConfirmedProfileIds
+        ..clear()
+        ..addAll(newlyConfirmedIds);
+      _newConfirmedSinceLastVisit = _newlyConfirmedProfileIds.length;
     });
+
+    if (announce && newlyConfirmedIds.isNotEmpty) {
+      final count = newlyConfirmedIds.length;
+      final text = count == 1
+          ? 'Neue bestätigte Verbindung verfügbar.'
+          : '$count neue bestätigte Verbindungen verfügbar.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(text),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
     _persistState();
+  }
+
+  Future<void> _acknowledgeNewConnections() async {
+    setState(() {
+      _seenMatchedProfileIds.addAll(_matchedProfiles.map((p) => p.id));
+      _newlyConfirmedProfileIds.clear();
+      _newConfirmedSinceLastVisit = 0;
+    });
+    await _persistState();
+  }
+
+  void _openNewConnectionsSheet() {
+    final names = _matchedProfiles
+        .where((profile) => _newlyConfirmedProfileIds.contains(profile.id))
+        .map((profile) => profile.name)
+        .toList();
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Neue bestätigte Verbindungen',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                if (names.isEmpty)
+                  const Text('Aktuell keine neuen bestätigten Verbindungen.')
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: names
+                        .map(
+                          (name) => Chip(
+                            avatar:
+                                const Icon(Icons.handshake_rounded, size: 16),
+                            label: Text(name),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      await _acknowledgeNewConnections();
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Alles gesehen'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   List<_ParentProfile> get _filteredProfiles {
@@ -412,7 +512,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       action: 'like',
       userId: _currentUserId,
     );
-    await _refreshConnectionsFromBackend();
+    await _refreshConnectionsFromBackend(announce: false);
     if (!mounted) return;
 
     if (result.connected || result.matchState == 'matched') {
@@ -906,6 +1006,39 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       appBar: AppBar(
         title: const Text('Eltern-Matching'),
         actions: [
+          IconButton(
+            tooltip: 'Neue Verbindungen',
+            onPressed: _openNewConnectionsSheet,
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_none_rounded),
+                if (_newConfirmedSinceLastVisit > 0)
+                  Positioned(
+                    right: -6,
+                    top: -6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _newConfirmedSinceLastVisit > 9
+                            ? '9+'
+                            : _newConfirmedSinceLastVisit.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           IconButton(
             tooltip: 'Mein Profil',
             onPressed: _openPreferenceSheet,

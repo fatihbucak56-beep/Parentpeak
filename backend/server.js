@@ -6674,7 +6674,6 @@ app.get('/api/treasures/:id', async (req, res) => {
     const treasure = await prisma.treasureItem.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, avatar: true } },
         ratings: { include: { fromUser: { select: { id: true, firstName: true, lastName: true, avatar: true } } } },
         handovers: true
       }

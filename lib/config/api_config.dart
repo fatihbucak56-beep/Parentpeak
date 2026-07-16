@@ -14,17 +14,17 @@ class APIConfig {
       String.fromEnvironment('BACKEND_API_TOKEN', defaultValue: '');
   static const String _backendBaseUrlDefine =
       String.fromEnvironment('BACKEND_BASE_URL', defaultValue: '');
-    static const String _stripePublishableKeyDefine =
+  static const String _stripePublishableKeyDefine =
       String.fromEnvironment('STRIPE_PUBLISHABLE_KEY', defaultValue: '');
   static const String _geminiModelNameDefine =
       String.fromEnvironment('GEMINI_MODEL_NAME', defaultValue: '');
-    static const String _privacyPolicyUrlDefine =
+  static const String _privacyPolicyUrlDefine =
       String.fromEnvironment('PRIVACY_POLICY_URL', defaultValue: '');
-    static const String _termsOfServiceUrlDefine =
+  static const String _termsOfServiceUrlDefine =
       String.fromEnvironment('TERMS_OF_SERVICE_URL', defaultValue: '');
-    static const String _contactEmailDefine =
+  static const String _contactEmailDefine =
       String.fromEnvironment('CONTACT_EMAIL', defaultValue: '');
-    static const String _contactSupportUrlDefine =
+  static const String _contactSupportUrlDefine =
       String.fromEnvironment('CONTACT_SUPPORT_URL', defaultValue: '');
 
   // Gemini API Configuration - default to Gemini 3.5 Flash, overridable via env.
@@ -157,7 +157,8 @@ class APIConfig {
   }
 
   static String getBackendProviderCategoriesPath() {
-    return _getEnvOrDefault('BACKEND_PROVIDER_CATEGORIES_PATH', '/api/categories');
+    return _getEnvOrDefault(
+        'BACKEND_PROVIDER_CATEGORIES_PATH', '/api/categories');
   }
 
   static String getBackendProviderSearchPath() {
@@ -165,7 +166,8 @@ class APIConfig {
   }
 
   static String getBackendProviderFilterPath() {
-    return _getEnvOrDefault('BACKEND_PROVIDER_FILTER_PATH', '/api/providers/filter');
+    return _getEnvOrDefault(
+        'BACKEND_PROVIDER_FILTER_PATH', '/api/providers/filter');
   }
 
   static String getBackendApiVersion() {
@@ -198,7 +200,8 @@ class APIConfig {
   }
 
   static String getBackendKettenbrecherHubPath() {
-    return _getEnvOrDefault('BACKEND_KETTENBRECHER_HUB_PATH', '/kettenbrecher/hub');
+    return _getEnvOrDefault(
+        'BACKEND_KETTENBRECHER_HUB_PATH', '/kettenbrecher/hub');
   }
 
   static String getBackendKettenbrecherLocalHelpProfilesPath() {
@@ -209,7 +212,8 @@ class APIConfig {
   }
 
   static String getBackendKettenbrecherSosPath() {
-    return _getEnvOrDefault('BACKEND_KETTENBRECHER_SOS_PATH', '/kettenbrecher/sos');
+    return _getEnvOrDefault(
+        'BACKEND_KETTENBRECHER_SOS_PATH', '/kettenbrecher/sos');
   }
 
   static String getBackendKettenbrecherSosResponderActionPath() {
@@ -220,15 +224,18 @@ class APIConfig {
   }
 
   static String getBackendCommunitySnacksPath() {
-    return _getEnvOrDefault('BACKEND_COMMUNITY_SNACKS_PATH', '/community/snacks');
+    return _getEnvOrDefault(
+        'BACKEND_COMMUNITY_SNACKS_PATH', '/community/snacks');
   }
 
   static String getBackendAudioHacksPath() {
-    return _getEnvOrDefault('BACKEND_AUDIO_HACKS_PATH', '/community/audio-hacks');
+    return _getEnvOrDefault(
+        'BACKEND_AUDIO_HACKS_PATH', '/community/audio-hacks');
   }
 
   static String getBackendIngredientSharesPath() {
-    return _getEnvOrDefault('BACKEND_INGREDIENT_SHARES_PATH', '/community/ingredient-shares');
+    return _getEnvOrDefault(
+        'BACKEND_INGREDIENT_SHARES_PATH', '/community/ingredient-shares');
   }
 
   static String getBackendHealthPath() {
@@ -258,6 +265,20 @@ class APIConfig {
     );
   }
 
+  static String getBackendParentMatchingConnectionsPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PARENT_MATCHING_CONNECTIONS_PATH',
+      '/parent-matching/connections',
+    );
+  }
+
+  static String getBackendParentMatchingMessagesPath() {
+    return _getEnvOrDefault(
+      'BACKEND_PARENT_MATCHING_MESSAGES_PATH',
+      '/parent-matching/messages',
+    );
+  }
+
   static String getBackendFamilyContactsPath() {
     return _getEnvOrDefault('BACKEND_FAMILY_CONTACTS_PATH', '/family/contacts');
   }
@@ -271,7 +292,8 @@ class APIConfig {
   }
 
   static String getBackendEventInvitationsPath() {
-    return _getEnvOrDefault('BACKEND_EVENT_INVITATIONS_PATH', '/events/invitations');
+    return _getEnvOrDefault(
+        'BACKEND_EVENT_INVITATIONS_PATH', '/events/invitations');
   }
 
   static String getBackendEventInvitationsJoinPath() {
@@ -363,7 +385,7 @@ class APIConfig {
   }
 
   // ──  Legal & Compliance URLs ──────────────────────────────────────────────
-  
+
   /// Privacy Policy URL (required for stores)
   static String? getPrivacyPolicyUrl() {
     return _getEnvOrDefault('PRIVACY_POLICY_URL', '');
@@ -401,7 +423,8 @@ class APIConfig {
     } catch (e) {
       final message = e.toString();
       if (!message.contains('NotInitializedError')) {
-        debugPrint('APIConfig._readEnvOrDefine(): dotenv read failed for $key: $e');
+        debugPrint(
+            'APIConfig._readEnvOrDefine(): dotenv read failed for $key: $e');
       }
     }
 
@@ -432,7 +455,9 @@ class APIConfig {
             ? _geminiModelNameDefine
             : null;
       case 'PRIVACY_POLICY_URL':
-        return _privacyPolicyUrlDefine.isNotEmpty ? _privacyPolicyUrlDefine : null;
+        return _privacyPolicyUrlDefine.isNotEmpty
+            ? _privacyPolicyUrlDefine
+            : null;
       case 'TERMS_OF_SERVICE_URL':
         return _termsOfServiceUrlDefine.isNotEmpty
             ? _termsOfServiceUrlDefine

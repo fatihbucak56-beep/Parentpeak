@@ -11,15 +11,22 @@ class ParentMatchingBackendService {
   final BackendApiClient? apiClient;
   String? lastSyncError;
 
-  static const String _profilesStorageKey = 'backend.parent_matching.profiles.v1';
+  static const String _profilesStorageKey =
+      'backend.parent_matching.profiles.v1';
 
-  Future<List<Map<String, dynamic>>> fetchProfiles() async {
+  Future<List<Map<String, dynamic>>> fetchProfiles({String? userId}) async {
     lastSyncError = null;
 
     if (apiClient != null) {
       try {
-        final payload = await apiClient!
-            .getJson(APIConfig.getBackendParentMatchingProfilesPath());
+        final profilePath = _buildPathWithQuery(
+          APIConfig.getBackendParentMatchingProfilesPath(),
+          {
+            if (userId != null && userId.trim().isNotEmpty)
+              'userId': userId.trim(),
+          },
+        );
+        final payload = await apiClient!.getJson(profilePath);
         final profiles = _parseProfiles(payload);
         if (profiles.isNotEmpty) {
           await _persistProfiles(profiles);
@@ -38,15 +45,15 @@ class ParentMatchingBackendService {
     return [];
   }
 
-  Future<void> sendAction({
+  Future<bool> sendAction({
     required String profileId,
     required String action,
     String? userId,
   }) async {
-    if (apiClient == null) return;
+    if (apiClient == null) return action == 'like';
 
     try {
-      await apiClient!.postJsonAny(
+      final payload = await apiClient!.postJsonAny(
         APIConfig.getBackendParentMatchingActionsPath(),
         {
           'familyId': APIConfig.getBackendFamilyId(),
@@ -57,9 +64,118 @@ class ParentMatchingBackendService {
           'schemaVersion': APIConfig.getBackendApiVersion(),
         },
       );
+
+      if (payload is Map<String, dynamic>) {
+        return payload['connected'] == true;
+      }
+      return action == 'like';
     } catch (e) {
       lastSyncError = 'Matching-Aktion konnte nicht synchronisiert werden: $e';
+      return action == 'like';
     }
+  }
+
+  Future<Set<String>> fetchConnectedProfileIds({required String userId}) async {
+    if (apiClient == null || userId.trim().isEmpty) {
+      return <String>{};
+    }
+
+    try {
+      final path = _buildPathWithQuery(
+        APIConfig.getBackendParentMatchingConnectionsPath(),
+        {
+          'familyId': APIConfig.getBackendFamilyId(),
+          'userId': userId.trim(),
+        },
+      );
+      final payload = await apiClient!.getJson(path);
+      if (payload is Map<String, dynamic>) {
+        final ids = (payload['profileIds'] as List?)
+                ?.map((item) => item.toString())
+                .where((item) => item.isNotEmpty)
+                .toSet() ??
+            <String>{};
+        return ids;
+      }
+    } catch (e) {
+      lastSyncError = 'Verbindungen konnten nicht geladen werden: $e';
+    }
+
+    return <String>{};
+  }
+
+  Future<List<Map<String, dynamic>>> fetchMessages({
+    required String profileId,
+    required String userId,
+  }) async {
+    if (apiClient == null ||
+        userId.trim().isEmpty ||
+        profileId.trim().isEmpty) {
+      return const [];
+    }
+
+    try {
+      final path = _buildPathWithQuery(
+        APIConfig.getBackendParentMatchingMessagesPath(),
+        {
+          'familyId': APIConfig.getBackendFamilyId(),
+          'userId': userId.trim(),
+          'profileId': profileId.trim(),
+        },
+      );
+      final payload = await apiClient!.getJson(path);
+      if (payload is Map<String, dynamic>) {
+        final list = payload['items'];
+        if (list is List) {
+          return list
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        }
+      }
+    } catch (e) {
+      lastSyncError = 'Nachrichten konnten nicht geladen werden: $e';
+    }
+
+    return const [];
+  }
+
+  Future<Map<String, dynamic>?> sendMessage({
+    required String profileId,
+    required String userId,
+    required String userName,
+    required String content,
+  }) async {
+    if (apiClient == null ||
+        userId.trim().isEmpty ||
+        profileId.trim().isEmpty ||
+        content.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      final payload = await apiClient!.postJsonAny(
+        APIConfig.getBackendParentMatchingMessagesPath(),
+        {
+          'familyId': APIConfig.getBackendFamilyId(),
+          'profileId': profileId.trim(),
+          'userId': userId.trim(),
+          'userName': userName.trim().isEmpty ? 'Elternteil' : userName.trim(),
+          'content': content.trim(),
+        },
+      );
+
+      if (payload is Map<String, dynamic>) {
+        final item = payload['item'];
+        if (item is Map) {
+          return Map<String, dynamic>.from(item);
+        }
+      }
+    } catch (e) {
+      lastSyncError = 'Nachricht konnte nicht gesendet werden: $e';
+    }
+
+    return null;
   }
 
   List<Map<String, dynamic>> _parseProfiles(dynamic payload) {
@@ -89,15 +205,24 @@ class ParentMatchingBackendService {
   Map<String, dynamic> _normalizeProfile(Map<String, dynamic> raw) {
     List<String> toStringList(dynamic value) {
       if (value is List) {
-        return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+        return value
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
       return const [];
     }
 
     return {
-      'id': (raw['id'] ?? raw['_id'] ?? raw['uuid'] ?? DateTime.now().microsecondsSinceEpoch.toString()).toString(),
+      'id': (raw['id'] ??
+              raw['_id'] ??
+              raw['uuid'] ??
+              DateTime.now().microsecondsSinceEpoch.toString())
+          .toString(),
       'name': (raw['name'] ?? 'Unbekannt').toString(),
-      'age': (raw['age'] is num) ? (raw['age'] as num).toInt() : int.tryParse('${raw['age']}') ?? 30,
+      'age': (raw['age'] is num)
+          ? (raw['age'] as num).toInt()
+          : int.tryParse('${raw['age']}') ?? 30,
       'city': (raw['city'] ?? 'Unbekannt').toString(),
       'bio': (raw['bio'] ?? '').toString(),
       'interests': toStringList(raw['interests']),
@@ -106,7 +231,23 @@ class ParentMatchingBackendService {
       'childAges': toStringList(raw['childAges']),
       'familyForm': (raw['familyForm'] ?? 'Kernfamilie').toString(),
       'verificationLevel': (raw['verificationLevel'] ?? 'basic').toString(),
+      'latitude': (raw['latitude'] is num)
+          ? (raw['latitude'] as num).toDouble()
+          : double.tryParse('${raw['latitude']}'),
+      'longitude': (raw['longitude'] is num)
+          ? (raw['longitude'] as num).toDouble()
+          : double.tryParse('${raw['longitude']}'),
     };
+  }
+
+  String _buildPathWithQuery(String basePath, Map<String, String> query) {
+    if (query.isEmpty) return basePath;
+    final separator = basePath.contains('?') ? '&' : '?';
+    final queryString = query.entries
+        .map((entry) =>
+            '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value)}')
+        .join('&');
+    return '$basePath$separator$queryString';
   }
 
   Future<List<Map<String, dynamic>>> _readLocalProfiles() async {
@@ -128,5 +269,4 @@ class ParentMatchingBackendService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_profilesStorageKey, jsonEncode(profiles));
   }
-
 }

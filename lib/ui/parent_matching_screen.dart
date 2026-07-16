@@ -17,19 +17,26 @@ class ParentMatchingScreen extends StatefulWidget {
 
 class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   static const String _storageKey = 'parent_matching.v1';
-  static const Set<String> _myInterests = {
+  static const Set<String> _defaultMyInterests = {
     'Bildung',
     'Spielplatz',
     'Familienzeit',
     'Outdoor',
     'Gesundheit'
   };
-  static const Set<String> _myLanguages = {'Deutsch', 'Englisch'};
-  static const Set<String> _myValues = {
+  static const Set<String> _defaultMyLanguages = {'Deutsch', 'Englisch'};
+  static const Set<String> _defaultMyValues = {
     'Gewaltfrei',
     'Respekt',
     'Inklusion',
     'Empathie'
+  };
+  static const Map<String, (double, double)> _cityCenters = {
+    'Berlin': (52.520008, 13.404954),
+    'Koeln': (50.937531, 6.960279),
+    'Hamburg': (53.551086, 9.993682),
+    'Muenchen': (48.137154, 11.576124),
+    'Frankfurt': (50.110924, 8.682127),
   };
 
   final ParentMatchingBackendService _service =
@@ -45,6 +52,12 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   final Set<String> _valuesFilter = {};
   final Set<String> _familyFormFilter = {};
   final Set<String> _childAgeFilter = {};
+  final Set<String> _myInterests = {..._defaultMyInterests};
+  final Set<String> _myLanguages = {..._defaultMyLanguages};
+  final Set<String> _myValues = {..._defaultMyValues};
+
+  double _maxDistanceKm = 20;
+  String _homeCity = 'Berlin';
 
   int _currentIndex = 0;
   bool _isRestoring = true;
@@ -64,10 +77,11 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
   Future<void> _bootstrap() async {
     await _loadProfiles();
     await _restoreState();
+    await _refreshConnectionsFromBackend();
   }
 
   Future<void> _loadProfiles() async {
-    final rawProfiles = await _service.fetchProfiles();
+    final rawProfiles = await _service.fetchProfiles(userId: _currentUserId);
     final parsed = rawProfiles.map(_profileFromMap).toList();
     if (!mounted) return;
     setState(() {
@@ -153,6 +167,28 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                   .toSet() ??
               <String>{});
 
+        _myInterests
+          ..clear()
+          ..addAll((decoded['myInterests'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              _defaultMyInterests);
+        _myLanguages
+          ..clear()
+          ..addAll((decoded['myLanguages'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              _defaultMyLanguages);
+        _myValues
+          ..clear()
+          ..addAll((decoded['myValues'] as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              _defaultMyValues);
+        _homeCity = (decoded['homeCity'] ?? _homeCity).toString();
+        _maxDistanceKm =
+            (decoded['maxDistanceKm'] as num?)?.toDouble().clamp(3, 100) ?? 20;
+
         _currentIndex = (decoded['currentIndex'] as num?)?.toInt() ?? 0;
         _isRestoring = false;
       });
@@ -175,13 +211,33 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       'valuesFilter': _valuesFilter.toList(),
       'familyFormFilter': _familyFormFilter.toList(),
       'childAgeFilter': _childAgeFilter.toList(),
+      'myInterests': _myInterests.toList(),
+      'myLanguages': _myLanguages.toList(),
+      'myValues': _myValues.toList(),
+      'homeCity': _homeCity,
+      'maxDistanceKm': _maxDistanceKm,
       'currentIndex': _currentIndex,
     };
     await prefs.setString(_storageKey, jsonEncode(payload));
   }
 
+  Future<void> _refreshConnectionsFromBackend() async {
+    final userId = _currentUserId;
+    if (userId == null || userId.isEmpty) return;
+
+    final connectedIds =
+        await _service.fetchConnectedProfileIds(userId: userId);
+    if (!mounted) return;
+    setState(() {
+      _matchedProfiles
+        ..clear()
+        ..addAll(_allProfiles.where((p) => connectedIds.contains(p.id)));
+    });
+    _persistState();
+  }
+
   List<_ParentProfile> get _filteredProfiles {
-    return _allProfiles.where((profile) {
+    final list = _allProfiles.where((profile) {
       if (_blockedProfileIds.contains(profile.id)) {
         return false;
       }
@@ -208,8 +264,15 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
           profile.childAges.toSet().intersection(_childAgeFilter).isEmpty) {
         return false;
       }
+      final distanceKm = _distanceKm(profile);
+      if (distanceKm != null && distanceKm > _maxDistanceKm) {
+        return false;
+      }
       return true;
     }).toList();
+
+    list.sort((a, b) => _compatibility(b).compareTo(_compatibility(a)));
+    return list;
   }
 
   _ParentProfile? get _currentProfile {
@@ -238,11 +301,51 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         profile.languages.toSet().intersection(_myLanguages).length;
     final valuesMatch =
         profile.valuesFocus.toSet().intersection(_myValues).length;
+    final distanceKm = _distanceKm(profile);
 
-    final base =
-        (interestsMatch * 18) + (languagesMatch * 16) + (valuesMatch * 14);
+    var distanceBoost = 0;
+    if (distanceKm != null) {
+      if (distanceKm <= 5) {
+        distanceBoost = 18;
+      } else if (distanceKm <= 10) {
+        distanceBoost = 12;
+      } else if (distanceKm <= 20) {
+        distanceBoost = 8;
+      } else if (distanceKm <= _maxDistanceKm) {
+        distanceBoost = 4;
+      }
+    }
+
+    final base = (interestsMatch * 15) +
+        (languagesMatch * 13) +
+        (valuesMatch * 11) +
+        distanceBoost;
     return min(98, max(45, base));
   }
+
+  (double, double)? get _homeLatLng => _cityCenters[_homeCity];
+
+  double? _distanceKm(_ParentProfile profile) {
+    if (profile.latitude == null || profile.longitude == null) {
+      return null;
+    }
+    final home = _homeLatLng;
+    if (home == null) return null;
+    return _haversineKm(
+        home.$1, home.$2, profile.latitude!, profile.longitude!);
+  }
+
+  double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
+    const earthRadiusKm = 6371.0;
+    final dLat = _toRadians(lat2 - lat1);
+    final dLon = _toRadians(lon2 - lon1);
+    final a = pow(sin(dLat / 2), 2) +
+        cos(_toRadians(lat1)) * cos(_toRadians(lat2)) * pow(sin(dLon / 2), 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  double _toRadians(double degree) => degree * pi / 180;
 
   int _categoryScore(List<String> profileValues, Set<String> myValues) {
     if (profileValues.isEmpty) return 0;
@@ -277,13 +380,17 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     if (sharedValues.isNotEmpty) {
       reasons.add('Ähnliche Werte: ${sharedValues.take(2).join(', ')}');
     }
+    final distance = _distanceKm(profile);
+    if (distance != null) {
+      reasons.add('Wohnortnähe: ${distance.toStringAsFixed(1)} km entfernt');
+    }
     if (reasons.isEmpty) {
       reasons.add('Passende Familienphase und Offenheit für Austausch');
     }
     return reasons;
   }
 
-  void _likeCurrent() {
+  Future<void> _likeCurrent() async {
     final profile = _currentProfile;
     if (profile == null) return;
 
@@ -292,24 +399,32 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     }
 
     final score = _compatibility(profile);
-    final isMatch = score >= 70;
-    if (isMatch && !_matchedProfiles.any((p) => p.id == profile.id)) {
-      _matchedProfiles.add(profile);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Neue Verbindung mit ${profile.name} ($score%)'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
 
     _moveNext();
     _persistState();
-    _service.sendAction(
+    final connected = await _service.sendAction(
       profileId: profile.id,
       action: 'like',
       userId: _currentUserId,
     );
+    await _refreshConnectionsFromBackend();
+    if (!mounted) return;
+
+    if (connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Verbindung aktiv mit ${profile.name} ($score%)'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Anfrage gesendet. Verbindung wird bestätigt.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   void _reportCurrent() {
@@ -386,7 +501,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                 leading: Icon(Icons.flag_outlined),
                 title: Text('Profile melden'),
                 subtitle: Text(
-                  'Unpassende Inhalte können jederzeit gemeldet werden.'),
+                    'Unpassende Inhalte können jederzeit gemeldet werden.'),
               ),
               const ListTile(
                 leading: Icon(Icons.block_rounded),
@@ -418,7 +533,10 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MatchConversationScreen(profileName: profile.name),
+        builder: (_) => MatchConversationScreen(
+          profileId: profile.id,
+          profileName: profile.name,
+        ),
       ),
     );
   }
@@ -584,6 +702,182 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     );
   }
 
+  void _openPreferenceSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Widget buildGroup({
+              required String title,
+              required List<String> options,
+              required Set<String> selected,
+            }) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: options.map((option) {
+                      final isSelected = selected.contains(option);
+                      return FilterChip(
+                        label: Text(option),
+                        selected: isSelected,
+                        onSelected: (value) {
+                          setModalState(() {
+                            if (value) {
+                              selected.add(option);
+                            } else {
+                              selected.remove(option);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text('Mein Matching-Profil',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 18)),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () {
+                              setModalState(() {
+                                _myInterests
+                                  ..clear()
+                                  ..addAll(_defaultMyInterests);
+                                _myLanguages
+                                  ..clear()
+                                  ..addAll(_defaultMyLanguages);
+                                _myValues
+                                  ..clear()
+                                  ..addAll(_defaultMyValues);
+                                _homeCity = 'Berlin';
+                                _maxDistanceKm = 20;
+                              });
+                            },
+                            child: const Text('Reset'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _homeCity,
+                        decoration: const InputDecoration(
+                          labelText: 'Standort (Mittelpunkt)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _cityCenters.keys
+                            .map((city) => DropdownMenuItem<String>(
+                                  value: city,
+                                  child: Text(city),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setModalState(() => _homeCity = value);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Text('Radius: ${_maxDistanceKm.toStringAsFixed(0)} km'),
+                      Slider(
+                        value: _maxDistanceKm,
+                        min: 3,
+                        max: 100,
+                        divisions: 97,
+                        label: '${_maxDistanceKm.toStringAsFixed(0)} km',
+                        onChanged: (value) {
+                          setModalState(() => _maxDistanceKm = value);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      buildGroup(
+                        title: 'Meine Interessen',
+                        options: const [
+                          'Bildung',
+                          'Outdoor',
+                          'Sport',
+                          'Familienzeit',
+                          'Kreativ',
+                          'Gesundheit',
+                          'Spielplatz'
+                        ],
+                        selected: _myInterests,
+                      ),
+                      const SizedBox(height: 14),
+                      buildGroup(
+                        title: 'Meine Sprachen',
+                        options: const [
+                          'Deutsch',
+                          'Englisch',
+                          'Türkisch',
+                          'Arabisch',
+                          'Kurdisch',
+                          'Französisch'
+                        ],
+                        selected: _myLanguages,
+                      ),
+                      const SizedBox(height: 14),
+                      buildGroup(
+                        title: 'Meine Werte',
+                        options: const [
+                          'Gewaltfrei',
+                          'Respekt',
+                          'Inklusion',
+                          'Empathie',
+                          'Tradition',
+                          'Offenheit'
+                        ],
+                        selected: _myValues,
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () {
+                            setState(() {
+                              _currentIndex = 0;
+                            });
+                            _persistState();
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Speichern'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -600,14 +894,19 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         title: const Text('Eltern-Matching'),
         actions: [
           IconButton(
+            tooltip: 'Mein Profil',
+            onPressed: _openPreferenceSheet,
+            icon: const Icon(Icons.tune_rounded),
+          ),
+          IconButton(
             tooltip: 'Sicherheit',
             onPressed: _openSafetyInfo,
             icon: const Icon(Icons.shield_outlined),
           ),
           IconButton(
-            tooltip: 'Filter',
+            tooltip: 'Suche filtern',
             onPressed: _openFilterSheet,
-            icon: const Icon(Icons.tune_rounded),
+            icon: const Icon(Icons.filter_list_rounded),
           ),
         ],
       ),
@@ -642,11 +941,12 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.45),
+                color: theme.colorScheme.secondaryContainer
+                    .withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Nur für Freundschaft, Playdates und Eltern-Austausch.',
+                'Nur für Freundschaft, Playdates und Eltern-Austausch · Radius ${_maxDistanceKm.toStringAsFixed(0)} km ab $_homeCity',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -669,6 +969,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                   : _ProfileCard(
                       profile: profile,
                       compatibility: _compatibility(profile),
+                      distanceKm: _distanceKm(profile),
                       quality: _matchQuality(profile),
                       reasons: _whyMatch(profile),
                       onReport: _reportCurrent,
@@ -701,7 +1002,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  color:
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Wrap(
@@ -764,6 +1066,7 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
     required this.compatibility,
+    required this.distanceKm,
     required this.quality,
     required this.reasons,
     required this.onReport,
@@ -772,6 +1075,7 @@ class _ProfileCard extends StatelessWidget {
 
   final _ParentProfile profile;
   final int compatibility;
+  final double? distanceKm;
   final _MatchQuality quality;
   final List<String> reasons;
   final VoidCallback onReport;
@@ -825,9 +1129,12 @@ class _ProfileCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(profile.city,
+                      Text(
+                          distanceKm == null
+                              ? profile.city
+                              : '${profile.city} · ${distanceKm!.toStringAsFixed(1)} km',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.95),
+                              color: Colors.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w500)),
                     ],
                   ),
@@ -1038,6 +1345,8 @@ class _ParentProfile {
     required this.valuesFocus,
     required this.childAges,
     required this.familyForm,
+    this.latitude,
+    this.longitude,
     this.verificationLevel = _VerificationLevel.basic,
   });
 
@@ -1051,6 +1360,8 @@ class _ParentProfile {
   final List<String> valuesFocus;
   final List<String> childAges;
   final String familyForm;
+  final double? latitude;
+  final double? longitude;
   final _VerificationLevel verificationLevel;
 }
 
@@ -1139,7 +1450,9 @@ _ParentProfile _profileFromMap(Map<String, dynamic> raw) {
       DateTime.now().microsecondsSinceEpoch.toString(),
     ),
     name: _safeProfileName(raw['name']),
-    age: (raw['age'] is num) ? (raw['age'] as num).toInt() : int.tryParse('${raw['age']}') ?? 30,
+    age: (raw['age'] is num)
+        ? (raw['age'] as num).toInt()
+        : int.tryParse('${raw['age']}') ?? 30,
     city: _safeTextValue(raw['city'], 'Unbekannt'),
     bio: (raw['bio'] ?? '').toString(),
     interests: toStringList(raw['interests']),
@@ -1147,6 +1460,12 @@ _ParentProfile _profileFromMap(Map<String, dynamic> raw) {
     valuesFocus: toStringList(raw['valuesFocus']),
     childAges: toStringList(raw['childAges']),
     familyForm: _safeTextValue(raw['familyForm'], 'Kernfamilie'),
+    latitude: (raw['latitude'] is num)
+        ? (raw['latitude'] as num).toDouble()
+        : double.tryParse('${raw['latitude']}'),
+    longitude: (raw['longitude'] is num)
+        ? (raw['longitude'] as num).toDouble()
+        : double.tryParse('${raw['longitude']}'),
     verificationLevel:
         parseVerificationLevel(raw['verificationLevel']?.toString()),
   );

@@ -747,9 +747,12 @@ const photoAlbums = [
 const parentProfiles = [
   {
     id: 'p1',
+    ownerUserId: 'seed-user-miriam',
     name: 'Miriam',
     age: 34,
     city: 'Berlin',
+    latitude: 52.520008,
+    longitude: 13.404954,
     bio: 'Ich suche Eltern für gemeinsame Wochenendaktivitäten und ehrlichen Austausch.',
     interests: ['Spielplatz', 'Outdoor', 'Familienzeit', 'Bildung'],
     languages: ['Deutsch', 'Englisch'],
@@ -760,9 +763,12 @@ const parentProfiles = [
   },
   {
     id: 'p2',
+    ownerUserId: 'seed-user-sibel',
     name: 'Sibel',
     age: 37,
     city: 'Köln',
+    latitude: 50.937531,
+    longitude: 6.960279,
     bio: 'Alleinerziehend, offen für neue Freundschaften mit Eltern in ähnlicher Situation.',
     interests: ['Gesundheit', 'Bildung', 'Kreativ'],
     languages: ['Deutsch', 'Türkisch'],
@@ -774,6 +780,7 @@ const parentProfiles = [
 ];
 
 const parentMatchingActions = [];
+const parentMatchingMessages = [];
 const parentMatchingAllowedActions = new Set(['like', 'report', 'block']);
 let parentMatchingSchemaEnsured = false;
 
@@ -786,9 +793,12 @@ async function ensureParentMatchingSchemaReady() {
     CREATE TABLE IF NOT EXISTS "ParentMatchingProfile" (
       "id" TEXT PRIMARY KEY,
       "externalId" TEXT,
+      "ownerUserId" TEXT,
       "name" TEXT NOT NULL,
       "age" INTEGER NOT NULL,
       "city" TEXT NOT NULL,
+      "latitude" DOUBLE PRECISION,
+      "longitude" DOUBLE PRECISION,
       "bio" TEXT,
       "interests" TEXT[] DEFAULT ARRAY[]::TEXT[],
       "languages" TEXT[] DEFAULT ARRAY[]::TEXT[],
@@ -814,12 +824,28 @@ async function ensureParentMatchingSchemaReady() {
   `);
 
   await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ParentMatchingMessage" (
+      "id" TEXT PRIMARY KEY,
+      "familyId" TEXT NOT NULL,
+      "profileId" TEXT NOT NULL,
+      "authorUserId" TEXT NOT NULL,
+      "authorName" TEXT NOT NULL,
+      "content" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "ParentMatchingProfile_externalId_key"
     ON "ParentMatchingProfile"("externalId");
   `);
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "ParentMatchingProfile_city_idx"
     ON "ParentMatchingProfile"("city");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingProfile_ownerUserId_idx"
+    ON "ParentMatchingProfile"("ownerUserId");
   `);
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "ParentMatchingProfile_isActive_idx"
@@ -849,6 +875,18 @@ async function ensureParentMatchingSchemaReady() {
     CREATE INDEX IF NOT EXISTS "ParentMatchingAction_actorUserId_idx"
     ON "ParentMatchingAction"("actorUserId");
   `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingMessage_familyId_idx"
+    ON "ParentMatchingMessage"("familyId");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingMessage_profileId_idx"
+    ON "ParentMatchingMessage"("profileId");
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ParentMatchingMessage_createdAt_idx"
+    ON "ParentMatchingMessage"("createdAt");
+  `);
 
   parentMatchingSchemaEnsured = true;
 }
@@ -856,9 +894,12 @@ async function ensureParentMatchingSchemaReady() {
 function mapParentMatchingProfileForClient(profile) {
   return {
     id: profile.id,
+    ownerUserId: profile.ownerUserId || null,
     name: profile.name,
     age: profile.age,
     city: profile.city,
+    latitude: profile.latitude ?? null,
+    longitude: profile.longitude ?? null,
     bio: profile.bio || '',
     interests: Array.isArray(profile.interests) ? profile.interests : [],
     languages: Array.isArray(profile.languages) ? profile.languages : [],
@@ -885,9 +926,14 @@ async function ensureParentMatchingProfilesSeeded() {
       prisma.parentMatchingProfile.upsert({
         where: { externalId: profile.id },
         update: {
+          ownerUserId: profile.ownerUserId || null,
           name: profile.name,
           age: Number(profile.age) || 30,
           city: profile.city || 'Unbekannt',
+          latitude:
+            Number.isFinite(Number(profile.latitude)) ? Number(profile.latitude) : null,
+          longitude:
+            Number.isFinite(Number(profile.longitude)) ? Number(profile.longitude) : null,
           bio: profile.bio || '',
           interests: Array.isArray(profile.interests) ? profile.interests : [],
           languages: Array.isArray(profile.languages) ? profile.languages : [],
@@ -899,9 +945,14 @@ async function ensureParentMatchingProfilesSeeded() {
         },
         create: {
           externalId: profile.id,
+          ownerUserId: profile.ownerUserId || null,
           name: profile.name,
           age: Number(profile.age) || 30,
           city: profile.city || 'Unbekannt',
+          latitude:
+            Number.isFinite(Number(profile.latitude)) ? Number(profile.latitude) : null,
+          longitude:
+            Number.isFinite(Number(profile.longitude)) ? Number(profile.longitude) : null,
           bio: profile.bio || '',
           interests: Array.isArray(profile.interests) ? profile.interests : [],
           languages: Array.isArray(profile.languages) ? profile.languages : [],
@@ -2715,10 +2766,15 @@ app.post('/photos', (req, res) => {
 
 // 12. Parent matching
 app.get('/parent-matching/profiles', async (req, res) => {
+  const userId = (req.query.userId || '').toString().trim();
+
   try {
     await ensureParentMatchingProfilesSeeded();
     const profiles = await prisma.parentMatchingProfile.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(userId ? { ownerUserId: { not: userId } } : {}),
+      },
       orderBy: [{ verificationLevel: 'desc' }, { createdAt: 'desc' }],
     });
 
@@ -2727,7 +2783,49 @@ app.get('/parent-matching/profiles', async (req, res) => {
     });
   } catch (error) {
     console.error('GET /parent-matching/profiles fallback (in-memory):', error?.message || error);
-    return res.json({ profiles: parentProfiles });
+    return res.json({
+      profiles: parentProfiles.filter(item => !userId || item.ownerUserId !== userId),
+    });
+  }
+});
+
+app.get('/parent-matching/connections', async (req, res) => {
+  const familyId = (req.query.familyId || DEMO_FAMILY_ID).toString().trim();
+  const userId = (req.query.userId || '').toString().trim();
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
+
+  try {
+    await ensureParentMatchingSchemaReady();
+    const actions = await prisma.parentMatchingAction.findMany({
+      where: {
+        familyId,
+        actorUserId: userId,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const latestByProfile = new Map();
+    for (const action of actions) {
+      if (!latestByProfile.has(action.profileId)) {
+        latestByProfile.set(action.profileId, action.action);
+      }
+    }
+
+    const connectedProfileIds = Array.from(latestByProfile.entries())
+      .filter(([, action]) => action === 'like')
+      .map(([profileId]) => profileId);
+
+    return res.json({ profileIds: connectedProfileIds });
+  } catch (error) {
+    console.error('GET /parent-matching/connections fallback (in-memory):', error?.message || error);
+    const profileIds = parentMatchingActions
+      .filter(item => item.familyId === familyId && item.userId === userId)
+      .filter(item => item.action === 'like')
+      .map(item => item.profileId);
+    return res.json({ profileIds: Array.from(new Set(profileIds)) });
   }
 });
 
@@ -2776,7 +2874,10 @@ app.post('/parent-matching/actions', async (req, res) => {
       },
     });
 
-    return res.status(201).json({ item: createdAction });
+    return res.status(201).json({
+      item: createdAction,
+      connected: actionValue === 'like',
+    });
   } catch (error) {
     console.error('POST /parent-matching/actions fallback (in-memory):', error?.message || error);
     const action = {
@@ -2788,7 +2889,104 @@ app.post('/parent-matching/actions', async (req, res) => {
       userId: actorUserId || null,
     };
     parentMatchingActions.unshift(action);
-    return res.status(201).json({ item: action, source: 'in-memory-fallback' });
+    return res.status(201).json({
+      item: action,
+      connected: actionValue === 'like',
+      source: 'in-memory-fallback',
+    });
+  }
+});
+
+app.get('/parent-matching/messages', async (req, res) => {
+  const familyId = (req.query.familyId || DEMO_FAMILY_ID).toString().trim();
+  const profileId = (req.query.profileId || '').toString().trim();
+
+  if (!profileId) {
+    return res.status(400).json({ error: 'profileId fehlt' });
+  }
+
+  try {
+    await ensureParentMatchingSchemaReady();
+    const rows = await prisma.$queryRaw`
+      SELECT "id", "familyId", "profileId", "authorUserId", "authorName", "content", "createdAt"
+      FROM "ParentMatchingMessage"
+      WHERE "familyId" = ${familyId} AND "profileId" = ${profileId}
+      ORDER BY "createdAt" ASC
+      LIMIT 300
+    `;
+
+    return res.json({
+      items: rows.map(item => ({
+        id: item.id,
+        familyId: item.familyId,
+        profileId: item.profileId,
+        authorUserId: item.authorUserId,
+        authorName: item.authorName,
+        content: item.content,
+        createdAt: item.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('GET /parent-matching/messages fallback (in-memory):', error?.message || error);
+    const items = parentMatchingMessages
+      .filter(item => item.familyId === familyId && item.profileId === profileId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return res.json({ items });
+  }
+});
+
+app.post('/parent-matching/messages', async (req, res) => {
+  const familyId = (req.body.familyId || DEMO_FAMILY_ID).toString().trim();
+  const profileId = (req.body.profileId || '').toString().trim();
+  const authorUserId = (req.body.userId || '').toString().trim();
+  const authorName = (req.body.userName || 'Elternteil').toString().trim();
+  const content = (req.body.content || '').toString().trim();
+
+  if (!profileId) {
+    return res.status(400).json({ error: 'profileId fehlt' });
+  }
+  if (!authorUserId) {
+    return res.status(400).json({ error: 'userId fehlt' });
+  }
+  if (!content) {
+    return res.status(400).json({ error: 'Nachricht fehlt' });
+  }
+
+  try {
+    await ensureParentMatchingSchemaReady();
+    const id = generateId('pm-msg');
+    await prisma.$executeRaw`
+      INSERT INTO "ParentMatchingMessage" (
+        "id", "familyId", "profileId", "authorUserId", "authorName", "content", "createdAt"
+      ) VALUES (
+        ${id}, ${familyId}, ${profileId}, ${authorUserId}, ${authorName}, ${content}, ${new Date()}
+      )
+    `;
+
+    return res.status(201).json({
+      item: {
+        id,
+        familyId,
+        profileId,
+        authorUserId,
+        authorName,
+        content,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('POST /parent-matching/messages fallback (in-memory):', error?.message || error);
+    const item = {
+      id: generateId('pm-msg'),
+      familyId,
+      profileId,
+      authorUserId,
+      authorName,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    parentMatchingMessages.push(item);
+    return res.status(201).json({ item, source: 'in-memory-fallback' });
   }
 });
 

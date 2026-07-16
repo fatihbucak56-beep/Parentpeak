@@ -261,7 +261,67 @@ async function runTests() {
 
   // Test 7: Delete treasure (owner verification)
   try {
-    console.log('\n🗑️  Test 7: Delete treasure (owner verification)');
+    console.log('\n🚩 Test 7: Report flow (create, list, resolve)');
+
+    const createReportRes = await makeRequest(
+      'POST',
+      `/api/treasures/${treasureId2}/report`,
+      {
+        reporterUserId: 'user-parent-qa',
+        reason: 'Unpassender Inhalt',
+        note: 'Bitte kurz moderieren.',
+      },
+      BEARER_TOKEN,
+    );
+
+    if (createReportRes.status !== 201 || !createReportRes.body.report?.id) {
+      throw new Error(
+        `Expected 201 with report.id, got ${createReportRes.status}: ${JSON.stringify(createReportRes.body)}`,
+      );
+    }
+
+    const reportId = createReportRes.body.report.id;
+
+    const unauthorizedListRes = await makeRequest('GET', '/api/treasures/reports');
+    if (unauthorizedListRes.status !== 401) {
+      throw new Error(`Expected 401 for unauthorized report list, got ${unauthorizedListRes.status}`);
+    }
+
+    const listRes = await makeRequest('GET', '/api/treasures/reports?status=pending', null, BEARER_TOKEN);
+    if (listRes.status !== 200 || !Array.isArray(listRes.body.reports)) {
+      throw new Error(`Expected 200 with reports array, got ${listRes.status}`);
+    }
+
+    const hasReport = listRes.body.reports.some((item) => item.id === reportId);
+    if (!hasReport) {
+      throw new Error(`Expected report ${reportId} in pending list`);
+    }
+
+    const resolveRes = await makeRequest(
+      'POST',
+      `/api/treasures/reports/${reportId}/resolve`,
+      {
+        action: 'resolved',
+        moderatorId: 'mod-qa-1',
+        moderatorNote: 'Checked and resolved.',
+      },
+      BEARER_TOKEN,
+    );
+
+    if (resolveRes.status === 200 && resolveRes.body.report?.status === 'resolved') {
+      console.log('  ✓ Report flow works (create/list/resolve)');
+      passed++;
+    } else {
+      throw new Error(`Expected 200 resolved, got ${resolveRes.status}: ${JSON.stringify(resolveRes.body)}`);
+    }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 8: Delete treasure (owner verification)
+  try {
+    console.log('\n🗑️  Test 8: Delete treasure (owner verification)');
     const res = await makeRequest('DELETE', `/api/treasures/${treasureId1}?userId=user-berlin-1`, null, BEARER_TOKEN);
 
     if (res.status === 200 || res.status === 204) {
@@ -284,9 +344,9 @@ async function runTests() {
     failed++;
   }
 
-  // Test 8: Pagination support
+  // Test 9: Pagination support
   try {
-    console.log('\n📄 Test 8: Pagination support');
+    console.log('\n📄 Test 9: Pagination support');
     const res1 = await makeRequest('GET', '/api/treasures?maxResults=1&offset=0');
     const res2 = await makeRequest('GET', '/api/treasures?maxResults=1&offset=1');
 
@@ -303,9 +363,9 @@ async function runTests() {
     failed++;
   }
 
-  // Test 9: Input validation
+  // Test 10: Input validation
   try {
-    console.log('\n✓ Test 9: Input validation');
+    console.log('\n✓ Test 10: Input validation');
     const invalidData = {
       userId: 'user-test',
       title: 'A', // Too short (< 3 chars)

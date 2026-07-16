@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/models/treasure_listing.dart';
+import 'package:parentpeak/logic/treasure_backend_service.dart';
 
 class TreasureListingService {
   TreasureListingService._();
@@ -12,10 +14,25 @@ class TreasureListingService {
   static const String _draftStorageKey = 'treasure_upload_draft.v1';
 
   List<TreasureListing>? _cache;
+  final TreasureBackendService _backendService = TreasureBackendService();
+  String? lastSyncError;
+
+  bool get isBackendEnabled => _backendService.isEnabled;
 
   Future<List<TreasureListing>> loadListings() async {
     if (_cache != null) {
       return List<TreasureListing>.from(_cache!);
+    }
+
+    if (_backendService.isEnabled) {
+      final remoteListings = await _backendService.fetchTreasures();
+      if (remoteListings.isNotEmpty || _backendService.lastSyncError == null) {
+        _cache = remoteListings;
+        await _persist();
+        lastSyncError = _backendService.lastSyncError;
+        return List<TreasureListing>.from(_cache!);
+      }
+      lastSyncError = _backendService.lastSyncError;
     }
 
     try {
@@ -38,12 +55,68 @@ class TreasureListingService {
     return List<TreasureListing>.from(_cache!);
   }
 
-  Future<List<TreasureListing>> createListing(TreasureListing listing) async {
+  Future<List<TreasureListing>> createListing(
+    TreasureListing listing, {
+    String? userId,
+  }) async {
+    if (_backendService.isEnabled) {
+      final resolvedUserId = (userId != null && userId.trim().isNotEmpty)
+          ? userId.trim()
+          : (AuthService.instance.currentUser?.uid ?? 'anonymous-user');
+      final created = await _backendService.createTreasure(
+        listing: listing,
+        userId: resolvedUserId,
+        location: listing.locationLabel ?? 'Familien-Nachbarschaft',
+        latitude: listing.latitude ?? 52.5200,
+        longitude: listing.longitude ?? 13.4050,
+      );
+
+      if (created != null) {
+        final listings = await loadListings();
+        final merged = [
+          created,
+          ...listings.where((item) => item.id != created.id),
+        ];
+        _cache = merged;
+        await _persist();
+        lastSyncError = _backendService.lastSyncError;
+        return List<TreasureListing>.from(_cache!);
+      }
+      lastSyncError = _backendService.lastSyncError;
+    }
+
     final listings = await loadListings();
     listings.insert(0, listing);
     _cache = listings;
     await _persist();
+    lastSyncError = 'Backend nicht erreichbar - lokal gespeichert.';
     return List<TreasureListing>.from(_cache!);
+  }
+
+  Future<bool> reportListing({
+    required String listingId,
+    required String reason,
+    String? note,
+    String? reporterUserId,
+  }) async {
+    if (!_backendService.isEnabled) {
+      lastSyncError = 'Backend nicht verfügbar. Meldung lokal markiert.';
+      return false;
+    }
+
+    final resolvedReporter =
+        (reporterUserId != null && reporterUserId.trim().isNotEmpty)
+            ? reporterUserId.trim()
+            : (AuthService.instance.currentUser?.uid ?? 'anonymous-user');
+
+    final sent = await _backendService.reportTreasure(
+      treasureId: listingId,
+      reporterUserId: resolvedReporter,
+      reason: reason,
+      note: note,
+    );
+    lastSyncError = _backendService.lastSyncError;
+    return sent;
   }
 
   Future<Map<String, dynamic>?> loadDraft() async {

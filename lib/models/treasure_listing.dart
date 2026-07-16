@@ -8,6 +8,12 @@ class TreasureListing {
     required this.distanceMeters,
     required this.colorLabel,
     required this.note,
+    this.locationLabel,
+    this.latitude,
+    this.longitude,
+    this.rating = 0,
+    this.ratingCount = 0,
+    this.views = 0,
     this.imagePath,
     this.imagePaths = const [],
     required this.createdAt,
@@ -21,6 +27,12 @@ class TreasureListing {
   final int distanceMeters;
   final String colorLabel;
   final String note;
+  final String? locationLabel;
+  final double? latitude;
+  final double? longitude;
+  final double rating;
+  final int ratingCount;
+  final int views;
   final String? imagePath;
   final List<String> imagePaths;
   final DateTime createdAt;
@@ -59,6 +71,12 @@ class TreasureListing {
     int? distanceMeters,
     String? colorLabel,
     String? note,
+    String? locationLabel,
+    double? latitude,
+    double? longitude,
+    double? rating,
+    int? ratingCount,
+    int? views,
     String? imagePath,
     List<String>? imagePaths,
     DateTime? createdAt,
@@ -72,6 +90,12 @@ class TreasureListing {
       distanceMeters: distanceMeters ?? this.distanceMeters,
       colorLabel: colorLabel ?? this.colorLabel,
       note: note ?? this.note,
+      locationLabel: locationLabel ?? this.locationLabel,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      rating: rating ?? this.rating,
+      ratingCount: ratingCount ?? this.ratingCount,
+      views: views ?? this.views,
       imagePath: imagePath ?? this.imagePath,
       imagePaths: imagePaths ?? this.imagePaths,
       createdAt: createdAt ?? this.createdAt,
@@ -92,6 +116,12 @@ class TreasureListing {
       distanceMeters: int.tryParse(map['distanceMeters']?.toString() ?? '') ?? 200,
       colorLabel: map['colorLabel']?.toString() ?? '',
       note: map['note']?.toString() ?? '',
+      locationLabel: map['locationLabel']?.toString(),
+      latitude: double.tryParse(map['latitude']?.toString() ?? ''),
+      longitude: double.tryParse(map['longitude']?.toString() ?? ''),
+      rating: double.tryParse(map['rating']?.toString() ?? '') ?? 0,
+      ratingCount: int.tryParse(map['ratingCount']?.toString() ?? '') ?? 0,
+      views: int.tryParse(map['views']?.toString() ?? '') ?? 0,
       imagePath: map['imagePath']?.toString(),
       imagePaths: imagePaths,
       createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ?? DateTime.now(),
@@ -109,6 +139,12 @@ class TreasureListing {
       'distanceMeters': distanceMeters,
       'colorLabel': colorLabel,
       'note': note,
+      'locationLabel': locationLabel,
+      'latitude': latitude,
+      'longitude': longitude,
+      'rating': rating,
+      'ratingCount': ratingCount,
+      'views': views,
       'imagePath': primaryImagePath,
       'imagePaths': resolvedPaths,
       'createdAt': createdAt.toIso8601String(),

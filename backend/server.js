@@ -5402,6 +5402,24 @@ app.post('/admin/migrate-db', async (req, res) => {
       );
     `);
 
+    // Create TreasureReport table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "TreasureReport" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "treasureId" TEXT NOT NULL,
+        "reporterUserId" TEXT NOT NULL,
+        "reason" TEXT NOT NULL,
+        "note" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'pending',
+        "moderatorId" TEXT,
+        "moderatorNote" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "resolvedAt" TIMESTAMP(3),
+        "updatedAt" TIMESTAMP(3) NOT NULL,
+        CONSTRAINT "TreasureReport_treasureId_fkey" FOREIGN KEY ("treasureId") REFERENCES "TreasureItem" ("id") ON DELETE CASCADE
+      );
+    `);
+
     // Create indexes if they don't exist
     await prisma.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "TreasureItem_userId_idx" ON "TreasureItem"("userId");
@@ -5409,9 +5427,13 @@ app.post('/admin/migrate-db', async (req, res) => {
       CREATE INDEX IF NOT EXISTS "TreasureItem_visibility_idx" ON "TreasureItem"("visibility");
       CREATE INDEX IF NOT EXISTS "TreasureItem_createdAt_idx" ON "TreasureItem"("createdAt");
       CREATE INDEX IF NOT EXISTS "TreasureItem_category_idx" ON "TreasureItem"("category");
+      CREATE INDEX IF NOT EXISTS "TreasureReport_treasureId_idx" ON "TreasureReport"("treasureId");
+      CREATE INDEX IF NOT EXISTS "TreasureReport_reporterUserId_idx" ON "TreasureReport"("reporterUserId");
+      CREATE INDEX IF NOT EXISTS "TreasureReport_status_idx" ON "TreasureReport"("status");
+      CREATE INDEX IF NOT EXISTS "TreasureReport_createdAt_idx" ON "TreasureReport"("createdAt");
     `);
     
-    res.json({ success: true, message: 'Database migrated successfully (Events + Treasures)' });
+    res.json({ success: true, message: 'Database migrated successfully (Events + Treasures + Reports)' });
   } catch (err) {
     console.error('Migration error:', err.message);
     res.status(500).json({ error: `Migration failed: ${err.message}` });
@@ -6660,6 +6682,146 @@ app.get('/api/treasures', async (req, res) => {
   } catch (err) {
     console.error('❌ Treasures list error:', err.message);
     res.status(500).json({ error: `Failed to list treasures: ${err.message}` });
+  }
+});
+
+function isAdminTokenAuthorized(req) {
+  if (!backendApiToken) return false;
+  const authHeader = req.headers.authorization || '';
+  return authHeader === `Bearer ${backendApiToken}`;
+}
+
+/**
+ * POST /api/treasures/:id/report
+ * Report a treasure listing for moderation
+ */
+app.post('/api/treasures/:id/report', async (req, res) => {
+  const { id } = req.params;
+  const { reporterUserId, reason, note } = req.body;
+
+  if (!reporterUserId || !reason) {
+    return res.status(400).json({ error: 'reporterUserId und reason erforderlich' });
+  }
+
+  const normalizedReason = String(reason).trim();
+  if (normalizedReason.length < 3 || normalizedReason.length > 120) {
+    return res.status(400).json({ error: 'reason muss 3-120 Zeichen lang sein' });
+  }
+
+  try {
+    const treasure = await prisma.treasureItem.findUnique({ where: { id } });
+    if (!treasure) {
+      return res.status(404).json({ error: 'Treasure nicht gefunden' });
+    }
+
+    const report = await prisma.treasureReport.create({
+      data: {
+        treasureId: id,
+        reporterUserId: String(reporterUserId).slice(0, 120),
+        reason: normalizedReason.slice(0, 120),
+        note: note ? String(note).slice(0, 1200) : null,
+        status: 'pending',
+      },
+    });
+
+    res.status(201).json({ report });
+  } catch (err) {
+    console.error('❌ Treasure report create error:', err.message);
+    res.status(500).json({ error: `Failed to create treasure report: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/treasures/reports
+ * List treasure reports (admin token required)
+ */
+app.get('/api/treasures/reports', async (req, res) => {
+  if (!isAdminTokenAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const {
+    status,
+    maxResults = 50,
+    offset = 0,
+  } = req.query;
+
+  try {
+    const reports = await prisma.treasureReport.findMany({
+      where: {
+        ...(status ? { status: String(status) } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(parseInt(maxResults, 10) || 50, 100),
+      skip: parseInt(offset, 10) || 0,
+      include: {
+        treasure: {
+          select: {
+            id: true,
+            title: true,
+            userId: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    res.json({ reports, total: reports.length });
+  } catch (err) {
+    console.error('❌ Treasure report list error:', err.message);
+    res.status(500).json({ error: `Failed to list treasure reports: ${err.message}` });
+  }
+});
+
+/**
+ * POST /api/treasures/reports/:reportId/resolve
+ * Resolve or dismiss a treasure report (admin token required)
+ */
+app.post('/api/treasures/reports/:reportId/resolve', async (req, res) => {
+  if (!isAdminTokenAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { reportId } = req.params;
+  const { action = 'resolved', moderatorId, moderatorNote } = req.body;
+  const normalizedAction = String(action).trim();
+  const allowedActions = new Set(['resolved', 'dismissed']);
+
+  if (!allowedActions.has(normalizedAction)) {
+    return res.status(400).json({ error: 'action muss resolved oder dismissed sein' });
+  }
+
+  try {
+    const existing = await prisma.treasureReport.findUnique({ where: { id: reportId } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Report nicht gefunden' });
+    }
+
+    const updated = await prisma.treasureReport.update({
+      where: { id: reportId },
+      data: {
+        status: normalizedAction,
+        moderatorId: moderatorId ? String(moderatorId).slice(0, 120) : null,
+        moderatorNote: moderatorNote ? String(moderatorNote).slice(0, 1200) : null,
+        resolvedAt: new Date(),
+        updatedAt: new Date(),
+      },
+      include: {
+        treasure: {
+          select: {
+            id: true,
+            title: true,
+            userId: true,
+          },
+        },
+      },
+    });
+
+    res.json({ report: updated });
+  } catch (err) {
+    console.error('❌ Treasure report resolve error:', err.message);
+    res.status(500).json({ error: `Failed to resolve treasure report: ${err.message}` });
   }
 });
 

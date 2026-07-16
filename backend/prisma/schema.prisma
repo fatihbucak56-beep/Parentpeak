@@ -273,6 +273,7 @@ model TreasureItem {
   // Relations
   ratings               TreasureRating[]
   handovers             TreasureHandover[]
+  reports               TreasureReport[]
   
   @@index([userId])
   @@index([familyId])
@@ -320,6 +321,29 @@ model TreasureHandover {
   @@index([treasureId])
   @@index([requesterId])
   @@index([status])
+}
+
+model TreasureReport {
+  id                    String   @id @default(cuid())
+
+  treasureId            String
+  treasure              TreasureItem @relation(fields: [treasureId], references: [id], onDelete: Cascade)
+
+  reporterUserId        String
+  reason                String
+  note                  String?
+  status                String   @default("pending") // pending, resolved, dismissed
+  moderatorId           String?
+  moderatorNote         String?
+
+  createdAt             DateTime @default(now())
+  resolvedAt            DateTime?
+  updatedAt             DateTime @updatedAt
+
+  @@index([treasureId])
+  @@index([reporterUserId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // ============================================================================

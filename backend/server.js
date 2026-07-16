@@ -85,9 +85,6 @@ const stripeWebhookToleranceSec = Number.parseInt(
   10,
 );
 const stripeSecretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
-const allowMockPaymentFallback =
-  process.env.NODE_ENV !== 'production' &&
-  (process.env.ALLOW_MOCK_PAYMENT_FALLBACK || '0') === '1';
 
 // Stripe client — initialized if secret key is available.
 let stripe = null;
@@ -95,11 +92,7 @@ if (stripeSecretKey) {
   stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-04-10' });
   console.log('✅ Stripe SDK mit echtem API-Schlüssel initialisiert');
 } else {
-  if (allowMockPaymentFallback) {
-    console.warn('⚠️  STRIPE_SECRET_KEY nicht gesetzt — Stripe-Zahlungen nutzen Mock-Modus (Test nur)');
-  } else {
-    console.error('❌ STRIPE_SECRET_KEY nicht gesetzt — Mock-Zahlungen sind deaktiviert');
-  }
+  console.error('❌ STRIPE_SECRET_KEY nicht gesetzt — Stripe-Zahlungen sind deaktiviert');
 }
 const allowClientProviderEvents =
   (process.env.ALLOW_CLIENT_PROVIDER_EVENTS ||
@@ -4978,23 +4971,8 @@ app.post('/payments/stripe/initiate', async (req, res) => {
       });
     }
 
-    if (!allowMockPaymentFallback) {
-      return res.status(503).json({
-        error: 'Stripe ist nicht konfiguriert. Mock-Fallback ist deaktiviert.',
-      });
-    }
-
-    // Dev fallback: mock mode when no Stripe secret key configured
-    return res.status(201).json({
-      item: {
-        provider: 'stripe',
-        mode: 'mock_backend',
-        eventId,
-        hosterId,
-        amount,
-        clientSecret: `pi_mock_${Date.now()}`,
-        status: 'requires_payment_method',
-      },
+    return res.status(503).json({
+      error: 'Stripe ist nicht konfiguriert.',
     });
   } catch (error) {
     console.error('Stripe PaymentIntent creation failed:', error?.message || error);
@@ -5025,20 +5003,8 @@ app.get('/payments/stripe/confirm/:intentId', async (req, res) => {
       });
     }
 
-    if (!allowMockPaymentFallback) {
-      return res.status(503).json({
-        error: 'Stripe ist nicht konfiguriert. Mock-Fallback ist deaktiviert.',
-      });
-    }
-
-    // Dev fallback: mock mode
-    return res.json({
-      item: {
-        id: intentId,
-        amount: 0,
-        status: 'succeeded',
-        clientSecret: `pi_mock_${Date.now()}`,
-      },
+    return res.status(503).json({
+      error: 'Stripe ist nicht konfiguriert.',
     });
   } catch (error) {
     console.error('Stripe PaymentIntent retrieval failed:', error?.message || error);
@@ -5060,23 +5026,8 @@ app.post('/payments/paypal/initiate', (req, res) => {
     });
   }
 
-  if (!allowMockPaymentFallback) {
-    return res.status(503).json({
-      error: 'PayPal ist nicht konfiguriert. Mock-Fallback ist deaktiviert.',
-    });
-  }
-
-  res.status(201).json({
-    item: {
-      provider: 'paypal',
-      mode: 'mock_backend',
-      eventId,
-      hosterId,
-      amount,
-      approvalUrl: `https://paypal.com/mock/approve/${Date.now()}`,
-      token: `mock_token_${Date.now()}`,
-      status: 'approval_pending',
-    },
+  return res.status(503).json({
+    error: 'PayPal ist nicht konfiguriert.',
   });
 });
 
@@ -5163,30 +5114,9 @@ app.post('/payments/confirm', async (req, res) => {
       return;
     }
 
-    if (!allowMockPaymentFallback) {
-      return res.status(503).json({
-        error: 'Zahlungs-Persistenz fehlgeschlagen und Mock-Fallback ist deaktiviert.',
-      });
-    }
-
-    const transaction = {
-      id: generateId('txn'),
-      mode: 'mock_backend',
-      eventId,
-      hosterId,
-      amount,
-      status: normalizedStatus,
-      paymentMethod,
-      providerTransactionRef: providerTransactionRef || null,
-      providerVerified,
-      stripePaymentIntentId: body.stripePaymentIntentId || null,
-      createdAt: nowIso,
-      completedAt: normalizedStatus === 'completed' ? nowIso : null,
-    };
-
-    paymentTransactions.unshift(transaction);
-    await updateEventPaymentDateIfCompleted(transaction);
-    return res.status(201).json({ item: transaction });
+    return res.status(503).json({
+      error: 'Zahlungs-Persistenz fehlgeschlagen.',
+    });
   }
 });
 

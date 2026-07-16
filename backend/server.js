@@ -5318,6 +5318,26 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Parentpeak Backend läuft!' });
 });
 
+// ── Admin: Database Migrations ───────────────────────────────────────────────
+app.post('/admin/migrate-db', async (req, res) => {
+  const token = req.get('Authorization')?.replace('Bearer ', '');
+  if (token !== process.env.BACKEND_API_TOKEN) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // Drop foreign key constraint if it exists
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Event" DROP CONSTRAINT IF EXISTS "Event_hosterId_fkey";
+    `);
+    
+    res.json({ success: true, message: 'Database migrated successfully' });
+  } catch (err) {
+    console.error('Migration error:', err.message);
+    res.status(500).json({ error: `Migration failed: ${err.message}` });
+  }
+});
+
 // ── FCM Device Tokens ────────────────────────────────────────────────────────
 const deviceTokens = new Map(); // userId -> Set<token>
 

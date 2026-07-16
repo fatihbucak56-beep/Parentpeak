@@ -61,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen>
   List<String> _recentTileLabels = const [];
   List<String> _customTileOrderLabels = const [];
   int _newParentMatchesCount = 0;
+  DateTime? _lastParentMatchHapticAt;
   late final AnimationController _attentionController;
   late final Animation<double> _attentionAnimation;
 
@@ -256,7 +257,13 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _openParentMatchQuickAction({
     required bool openNewConnections,
   }) async {
-    await HapticFeedback.lightImpact();
+    final now = DateTime.now();
+    final shouldHaptic = _lastParentMatchHapticAt == null ||
+        now.difference(_lastParentMatchHapticAt!) >= const Duration(seconds: 1);
+    if (shouldHaptic) {
+      await HapticFeedback.lightImpact();
+      _lastParentMatchHapticAt = now;
+    }
     await _storeRecentTileTap('Eltern Match');
     if (!mounted) return;
     await Navigator.push(

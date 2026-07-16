@@ -74,8 +74,7 @@ const requireAuthForWrites =
   (process.env.REQUIRE_AUTH_FOR_WRITES ||
     (process.env.NODE_ENV === 'production' ? '1' : '0')) === '1';
 const disableInMemoryFallbacks =
-  (process.env.DISABLE_IN_MEMORY_FALLBACKS ||
-    (process.env.NODE_ENV === 'production' ? '1' : '0')) === '1';
+  (process.env.DISABLE_IN_MEMORY_FALLBACKS || '1') === '1';
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())

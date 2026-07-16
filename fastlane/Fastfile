@@ -30,6 +30,7 @@ platform :ios do
     # 3. Upload to TestFlight
     upload_to_testflight(
       ipa: "../build/ios/ipa/Parentpeak.ipa",
+      changelog: File.read("./metadata/ios/en-US/release_notes.txt").strip,
       skip_waiting_for_build_processing: true
     )
 
@@ -49,6 +50,8 @@ platform :ios do
 
     deliver(
       ipa: "../build/ios/ipa/Parentpeak.ipa",
+      metadata_path: "./metadata/ios",
+      force: true,
       submit_for_review: false,
       automatic_release: false
     )
@@ -66,8 +69,10 @@ platform :android do
     upload_to_play_store(
       track: "internal",
       aab: "../build/app/outputs/bundle/release/app-release.aab",
+      metadata_path: "./metadata/android",
       skip_upload_apk: true,
       skip_upload_metadata: true,
+      skip_upload_changelogs: false,
       skip_upload_images: true,
       skip_upload_screenshots: true
     )
@@ -82,8 +87,11 @@ platform :android do
       track: "internal",
       track_promote_to: "production",
       aab: "../build/app/outputs/bundle/release/app-release.aab",
+      metadata_path: "./metadata/android",
       skip_upload_apk: true,
+      skip_upload_aab: true,
       skip_upload_metadata: true,
+      skip_upload_changelogs: false,
       skip_upload_images: true,
       skip_upload_screenshots: true
     )

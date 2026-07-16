@@ -86,14 +86,21 @@ const stripeWebhookToleranceSec = Number.parseInt(
   10,
 );
 const stripeSecretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+const allowMockPaymentFallback =
+  (process.env.ALLOW_MOCK_PAYMENT_FALLBACK ||
+    (process.env.NODE_ENV === 'production' ? '0' : '1')) === '1';
 
-// Stripe client — initialized if secret key is available, otherwise mocks are used
+// Stripe client — initialized if secret key is available.
 let stripe = null;
 if (stripeSecretKey) {
   stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-04-10' });
   console.log('✅ Stripe SDK mit echtem API-Schlüssel initialisiert');
 } else {
-  console.warn('⚠️  STRIPE_SECRET_KEY nicht gesetzt — Stripe-Zahlungen nutzen Mock-Modus (Test nur)');
+  if (allowMockPaymentFallback) {
+    console.warn('⚠️  STRIPE_SECRET_KEY nicht gesetzt — Stripe-Zahlungen nutzen Mock-Modus (Test nur)');
+  } else {
+    console.error('❌ STRIPE_SECRET_KEY nicht gesetzt — Mock-Zahlungen sind deaktiviert');
+  }
 }
 const allowClientProviderEvents =
   (process.env.ALLOW_CLIENT_PROVIDER_EVENTS ||
@@ -4931,7 +4938,13 @@ app.post('/payments/stripe/initiate', async (req, res) => {
       });
     }
 
-    // Fallback: mock mode when no Stripe secret key configured
+    if (!allowMockPaymentFallback) {
+      return res.status(503).json({
+        error: 'Stripe ist nicht konfiguriert. Mock-Fallback ist deaktiviert.',
+      });
+    }
+
+    // Dev fallback: mock mode when no Stripe secret key configured
     return res.status(201).json({
       item: {
         provider: 'stripe',
@@ -4972,7 +4985,13 @@ app.get('/payments/stripe/confirm/:intentId', async (req, res) => {
       });
     }
 
-    // Fallback: mock mode
+    if (!allowMockPaymentFallback) {
+      return res.status(503).json({
+        error: 'Stripe ist nicht konfiguriert. Mock-Fallback ist deaktiviert.',
+      });
+    }
+
+    // Dev fallback: mock mode
     return res.json({
       item: {
         id: intentId,
@@ -4998,6 +5017,12 @@ app.post('/payments/paypal/initiate', (req, res) => {
   if (!eventId || !hosterId || amount == null) {
     return res.status(400).json({
       error: 'eventId, hosterId und amount > 0 sind erforderlich',
+    });
+  }
+
+  if (!allowMockPaymentFallback) {
+    return res.status(503).json({
+      error: 'PayPal ist nicht konfiguriert. Mock-Fallback ist deaktiviert.',
     });
   }
 
@@ -5057,8 +5082,14 @@ app.post('/payments/confirm', async (req, res) => {
   try {
     const context = await ensurePaymentContext(eventId, hosterId);
     const stripePaymentIntentId = paymentMethod === 'stripe'
-      ? ((body.stripePaymentIntentId || providerTransactionRef || `pi_mock_${Date.now()}`).toString())
+      ? ((body.stripePaymentIntentId || providerTransactionRef || '').toString())
       : `alt_${paymentMethod}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    if (paymentMethod === 'stripe' && !stripePaymentIntentId) {
+      return res.status(400).json({
+        error: 'stripePaymentIntentId oder providerTransactionRef ist erforderlich',
+      });
+    }
 
     const created = await prisma.paymentTransaction.create({
       data: {
@@ -5072,7 +5103,7 @@ app.post('/payments/confirm', async (req, res) => {
         verifiedAt: providerVerified ? new Date(nowIso) : null,
         verifiedByType: providerVerified ? 'api' : null,
         auditDetails: {
-          mode: 'mock_backend',
+          mode: 'backend_record',
           hosterId: context.hosterId,
           paymentMethod,
           providerTransactionRef: providerTransactionRef || null,
@@ -5088,6 +5119,16 @@ app.post('/payments/confirm', async (req, res) => {
     return res.status(201).json({ item });
   } catch (error) {
     console.error('POST /payments/confirm fallback (in-memory):', error?.message || error);
+    if (respondWithStrictPersistenceError(res, 'POST /payments/confirm', error)) {
+      return;
+    }
+
+    if (!allowMockPaymentFallback) {
+      return res.status(503).json({
+        error: 'Zahlungs-Persistenz fehlgeschlagen und Mock-Fallback ist deaktiviert.',
+      });
+    }
+
     const transaction = {
       id: generateId('txn'),
       mode: 'mock_backend',

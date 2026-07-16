@@ -69,6 +69,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (saved.isEmpty) {
       if (!mounted) return;
       setState(() {
+        _events.clear();
         _syncError = syncError;
       });
 
@@ -328,7 +329,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.check_rounded),
                     label: const Text('Speichern'),
-                    onPressed: () {
+                    onPressed: () async {
                       if (_titleController.text.trim().isEmpty) return;
                       final startDate = DateTime(
                         _selectedDay.year,
@@ -362,16 +363,32 @@ class _CalendarScreenState extends State<CalendarScreen>
                             endMode.contains('Termine') ? endCount : null,
                       );
                       final expanded = _expandRecurrence(base);
+                      try {
+                        for (final e in expanded) {
+                          await _calendarService.addEvent(e.toJson());
+                        }
+                      } catch (_) {
+                        if (!mounted) return;
+                        setState(() {
+                          _syncError = _calendarService.lastSyncError;
+                        });
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              _syncError ?? 'Termin konnte nicht gespeichert werden.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
                       setState(() {
                         _events.addAll(expanded);
-                      });
-                      for (final e in expanded) {
-                        _calendarService.addEvent(e.toJson());
-                      }
-                      setState(() {
                         _syncError = _calendarService.lastSyncError;
                       });
                       _scheduleRemindersFor(expanded);
+                      if (!ctx.mounted) return;
                       Navigator.pop(ctx);
                     },
                   ),

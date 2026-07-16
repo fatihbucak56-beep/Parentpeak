@@ -1,7 +1,3 @@
-import 'dart:convert';
-
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'backend_api_client.dart';
 import 'contracts/calendar_contract.dart';
 
@@ -11,61 +7,36 @@ class CalendarBackendService {
   final BackendApiClient? apiClient;
   String? lastSyncError;
 
-  static const String _storageKey = 'backend.calendar.v1';
-
   Future<List<Map<String, dynamic>>> fetchEvents() async {
     lastSyncError = null;
-    if (apiClient != null) {
-      try {
-        final payload = await apiClient!.getJson(CalendarContract.eventsPath);
-        final events = CalendarContract.parseList(payload);
-        await _persist(events);
-        return events;
-      } catch (e) {
-        lastSyncError =
-            'Server derzeit nicht erreichbar. Kalender läuft im Offline-Modus.';
-      }
+    if (apiClient == null) {
+      lastSyncError = 'Kalender-Backend ist nicht konfiguriert.';
+      return <Map<String, dynamic>>[];
     }
 
-    return _readLocal();
+    try {
+      final payload = await apiClient!.getJson(CalendarContract.eventsPath);
+      return CalendarContract.parseList(payload);
+    } catch (e) {
+      lastSyncError = 'Server derzeit nicht erreichbar.';
+      return <Map<String, dynamic>>[];
+    }
   }
 
   Future<void> addEvent(Map<String, dynamic> event) async {
-    final current = await _readLocal();
-    current.add(event);
-    await _persist(current);
-
-    if (apiClient != null) {
-      try {
-        await apiClient!.postJsonAny(
-          CalendarContract.eventsPath,
-          CalendarContract.buildCreatePayload(event),
-        );
-      } catch (e) {
-        lastSyncError =
-            'Termin lokal gespeichert. Server-Sync wird später erneut versucht.';
-      }
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _readLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw == null || raw.isEmpty) return [];
-
-    final decoded = jsonDecode(raw);
-    if (decoded is List) {
-      return decoded
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
+    lastSyncError = null;
+    if (apiClient == null) {
+      throw StateError('Kalender-Backend ist nicht konfiguriert.');
     }
 
-    return [];
-  }
-
-  Future<void> _persist(List<Map<String, dynamic>> events) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, jsonEncode(events));
+    try {
+      await apiClient!.postJsonAny(
+        CalendarContract.eventsPath,
+        CalendarContract.buildCreatePayload(event),
+      );
+    } catch (e) {
+      lastSyncError = 'Termin konnte nicht gespeichert werden.';
+      rethrow;
+    }
   }
 }

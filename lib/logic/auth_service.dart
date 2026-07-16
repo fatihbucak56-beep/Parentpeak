@@ -177,6 +177,13 @@ class AuthService {
       return;
     }
 
+    if (kReleaseMode) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kUserKey);
+      _currentUser = null;
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kUserKey);
     if (raw == null || raw.isEmpty) {
@@ -256,6 +263,13 @@ class AuthService {
           'Registrierung ist fehlgeschlagen. Bitte versuche es erneut.',
         );
       }
+    }
+
+    if (kReleaseMode) {
+      return AuthResult.fail(
+        AuthErrorCode.networkError,
+        'Login/Registrierung ist derzeit nicht verfuegbar. Bitte spaeter erneut versuchen.',
+      );
     }
 
     final emailError = _validateEmail(email);
@@ -364,6 +378,13 @@ class AuthService {
           'Login ist fehlgeschlagen. Bitte versuche es erneut.',
         );
       }
+    }
+
+    if (kReleaseMode) {
+      return AuthResult.fail(
+        AuthErrorCode.networkError,
+        'Login/Registrierung ist derzeit nicht verfuegbar. Bitte spaeter erneut versuchen.',
+      );
     }
 
     final emailError = _validateEmail(email);

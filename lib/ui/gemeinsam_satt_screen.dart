@@ -41,9 +41,15 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   bool _isLoadingRecipes = false;
   _RecipeFeedMode _recipeFeedMode = _RecipeFeedMode.forYou;
   Set<String> _savedRecipeIds = <String>{};
+    Set<String> _hiddenOfferIds = <String>{};
+    Set<String> _reportedOfferIds = <String>{};
 
   static const String _savedRecipeStoragePrefix =
       'gemeinsam_satt.saved_recipes.v1';
+    static const String _hiddenOfferStoragePrefix =
+      'gemeinsam_satt.hidden_offers.v1';
+    static const String _reportedOfferStoragePrefix =
+      'gemeinsam_satt.reported_offers.v1';
 
   String get _myUserId =>
       AuthService.instance.currentUser?.uid.trim().isNotEmpty == true
@@ -66,6 +72,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     _recipes = [];
     _weekPlan = _buildDemoWeekPlan();
     _loadSavedRecipes();
+    _loadOfferSafetyState();
 
     _loadNearbyFeed();
     // Load recipes from backend
@@ -121,14 +128,18 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
 
       if (!mounted) return;
       setState(() {
-        _posts = mappedOffers;
+        _posts = mappedOffers
+            .where((post) => !_hiddenOfferIds.contains(post.id))
+            .toList();
         _isLoadingNearby = false;
       });
     } catch (e) {
       debugPrint('GemeinsamSattScreen._loadNearbyFeed(): failed: $e');
       if (!mounted) return;
       setState(() {
-        _posts = _buildDemoPosts();
+        _posts = _buildDemoPosts()
+            .where((post) => !_hiddenOfferIds.contains(post.id))
+            .toList();
         _isLoadingNearby = false;
       });
     }
@@ -327,8 +338,32 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     await prefs.setStringList(_savedRecipeStorageKey, _savedRecipeIds.toList());
   }
 
+  Future<void> _loadOfferSafetyState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hidden = prefs.getStringList(_hiddenOfferStorageKey) ?? const <String>[];
+    final reported = prefs.getStringList(_reportedOfferStorageKey) ?? const <String>[];
+    if (!mounted) return;
+    setState(() {
+      _hiddenOfferIds = hidden.toSet();
+      _reportedOfferIds = reported.toSet();
+      _posts = _posts.where((post) => !_hiddenOfferIds.contains(post.id)).toList();
+    });
+  }
+
+  Future<void> _persistOfferSafetyState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_hiddenOfferStorageKey, _hiddenOfferIds.toList());
+    await prefs.setStringList(_reportedOfferStorageKey, _reportedOfferIds.toList());
+  }
+
   String get _savedRecipeStorageKey =>
       '$_savedRecipeStoragePrefix.$_myUserId';
+
+  String get _hiddenOfferStorageKey =>
+      '$_hiddenOfferStoragePrefix.$_myUserId';
+
+  String get _reportedOfferStorageKey =>
+      '$_reportedOfferStoragePrefix.$_myUserId';
 
   RecipeDifficulty _parseDifficulty(dynamic value) {
     final val = value?.toString().toLowerCase() ?? '';
@@ -530,7 +565,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
-    final available = _posts.where((p) => p.isAvailable).toList();
+    final available = _posts
+      .where((p) => !_hiddenOfferIds.contains(p.id))
+      .where((p) => p.isAvailable)
+      .toList();
     if (available.isEmpty) {
       return _buildEmptyState(
         emoji: '🍲',
@@ -551,6 +589,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
           onAbholen: () => _reservePost(available[i].id),
           onComment: () => _showComments(available[i]),
           onReport: () => _reportPost(available[i]),
+          onHide: () => _hidePost(available[i]),
         ),
       ),
     );
@@ -900,7 +939,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   }
 
   Widget _buildMyOffers() {
-    final mine = _posts.where((p) => p.authorId == _myUserId).toList();
+    final mine = _posts
+        .where((p) => !_hiddenOfferIds.contains(p.id))
+        .where((p) => p.authorId == _myUserId)
+        .toList();
     if (mine.isEmpty) {
       return _buildEmptyState(
         emoji: '👩‍🍳',
@@ -1207,12 +1249,56 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     );
     noteController.dispose();
 
+    if (ok) {
+      setState(() {
+        _reportedOfferIds = {..._reportedOfferIds, post.id};
+        _hiddenOfferIds = {..._hiddenOfferIds, post.id};
+        _posts = _posts.where((item) => item.id != post.id).toList();
+      });
+      await _persistOfferSafetyState();
+    }
+
     if (!mounted) return;
     _showSnack(
       ok
           ? 'Danke, wir pruefen diese Meldung.'
           : (_service.lastSyncError ?? 'Meldung konnte nicht gespeichert werden.'),
     );
+  }
+
+  Future<void> _hidePost(FoodSharePost post) async {
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Angebot ausblenden?'),
+        content: const Text(
+          'Dieses Angebot wird nur fuer dich ausgeblendet und spaeter nicht mehr im Feed angezeigt.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Ausblenden'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _hiddenOfferIds = {..._hiddenOfferIds, post.id};
+      _posts = _posts.where((item) => item.id != post.id).toList();
+    });
+    await _persistOfferSafetyState();
+
+    if (!mounted) return;
+    _showSnack('Angebot wurde aus deinem Feed ausgeblendet.');
   }
 
   void _openCreatePost(BuildContext context) {
@@ -1529,6 +1615,7 @@ class _PostCard extends StatefulWidget {
   final VoidCallback onAbholen;
   final VoidCallback onComment;
   final VoidCallback? onReport;
+  final VoidCallback? onHide;
   final bool isOwner;
 
   const _PostCard({
@@ -1538,6 +1625,7 @@ class _PostCard extends StatefulWidget {
     required this.onAbholen,
     required this.onComment,
     this.onReport,
+    this.onHide,
     this.isOwner = false,
   });
 
@@ -1894,10 +1982,17 @@ class _PostCardState extends State<_PostCard>
                           onSelected: (value) {
                             if (value == 'report') {
                               widget.onReport?.call();
+                            } else if (value == 'hide') {
+                              widget.onHide?.call();
                             }
                           },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem<String>(
+                          itemBuilder: (context) => [
+                            if (widget.onHide != null)
+                              const PopupMenuItem<String>(
+                                value: 'hide',
+                                child: Text('Aus Feed ausblenden'),
+                              ),
+                            const PopupMenuItem<String>(
                               value: 'report',
                               child: Text('Angebot melden'),
                             ),

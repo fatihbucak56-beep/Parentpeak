@@ -37,6 +37,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   late List<FoodSharePost> _posts;
   late List<SharedRecipe> _recipes;
   late WeekPlan _weekPlan;
+  bool _isLoadingNearby = false;
   bool _isLoadingRecipes = false;
   _RecipeFeedMode _recipeFeedMode = _RecipeFeedMode.forYou;
   Set<String> _savedRecipeIds = <String>{};
@@ -61,15 +62,86 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _posts = _buildDemoPosts();
+    _posts = [];
     _recipes = [];
     _weekPlan = _buildDemoWeekPlan();
     _loadSavedRecipes();
 
+    _loadNearbyFeed();
     // Load recipes from backend
     _loadRecipes();
     // Load meal plan from API
     _loadWeekMealPlan();
+  }
+
+  Future<void> _loadNearbyFeed() async {
+    setState(() => _isLoadingNearby = true);
+    try {
+      final result = await _service.fetchRecipes(
+        skip: 0,
+        take: 40,
+        sortBy: 'createdAt',
+      );
+
+      final backendRecipes = (result['recipes'] as List?)
+              ?.whereType<backend_service.SharedRecipe>()
+              .toList() ??
+          const <backend_service.SharedRecipe>[];
+
+      final mappedOffers = backendRecipes
+          .where((item) {
+          final lowerTags = item.tags.map((e) => e.toLowerCase()).toList();
+          return item.category.toLowerCase() == 'snack' ||
+            lowerTags.contains('angebot') ||
+            lowerTags.contains('teilen');
+          })
+          .map(_mapBackendRecipeToOfferPost)
+          .where((post) => post.title.trim().isNotEmpty)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _posts = mappedOffers;
+        _isLoadingNearby = false;
+      });
+    } catch (e) {
+      debugPrint('GemeinsamSattScreen._loadNearbyFeed(): failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _posts = _buildDemoPosts();
+        _isLoadingNearby = false;
+      });
+    }
+  }
+
+  FoodSharePost _mapBackendRecipeToOfferPost(backend_service.SharedRecipe item) {
+    final authorId = (item.creatorUserId ?? '').trim();
+    final createdAt = item.createdAt;
+    final portions = item.servings <= 0 ? 1 : item.servings;
+    final minutesAgo = DateTime.now().difference(createdAt).inMinutes;
+    final pickupLabel = minutesAgo <= 120
+        ? 'Abholung heute moeglich'
+        : 'Abholung nach Absprache';
+
+    return FoodSharePost(
+      id: item.id,
+      authorId: authorId.isEmpty ? 'community_parent' : authorId,
+      authorName: _getUserDisplayName(authorId),
+      authorInitials: _getInitials(authorId.isEmpty ? 'community_parent' : authorId),
+      authorColor: _getColorForAuthor(authorId.isEmpty ? item.id : authorId),
+      title: item.title,
+      description: (item.description ?? '').trim().isEmpty
+          ? 'Frisch gekocht und zum Teilen bereit.'
+          : (item.description ?? '').trim(),
+      totalPortions: portions,
+      remainingPortions: portions,
+      pickupWindow: pickupLabel,
+      distanceKm: ((item.id.hashCode.abs() % 25) + 1) / 10,
+      createdAt: createdAt,
+      likedByUserIds: const [],
+      comments: const [],
+      imageEmoji: _getEmojiForCategory(item.category),
+    );
   }
 
   Future<void> _loadWeekMealPlan() async {
@@ -434,6 +506,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   // -------------------------------------------------------
 
   Widget _buildNearbyFeed() {
+    if (_isLoadingNearby) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final available = _posts.where((p) => p.isAvailable).toList();
     if (available.isEmpty) {
       return _buildEmptyState(
@@ -442,15 +518,19 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         subtitle: 'Sei der Erste! Drücke unten auf „Ich habe extra gekocht!"',
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      itemCount: available.length,
-      itemBuilder: (context, i) => _PostCard(
-        post: available[i],
-        myUserId: _myUserId,
-        onLike: () => _toggleLike(available[i].id),
-        onAbholen: () => _reservePost(available[i].id),
-        onComment: () => _showComments(available[i]),
+    return RefreshIndicator(
+      onRefresh: _loadNearbyFeed,
+      color: _brand,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        itemCount: available.length,
+        itemBuilder: (context, i) => _PostCard(
+          post: available[i],
+          myUserId: _myUserId,
+          onLike: () => _toggleLike(available[i].id),
+          onAbholen: () => _reservePost(available[i].id),
+          onComment: () => _showComments(available[i]),
+        ),
       ),
     );
   }
@@ -945,27 +1025,60 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _CreatePostSheet(
-        onSubmit: (title, description, portions, pickupWindow) {
-          final newPost = FoodSharePost(
-            id: 'p-${DateTime.now().millisecondsSinceEpoch}',
-            authorId: _myUserId,
-            authorName: 'Ich (Familie Fatih)',
-            authorInitials: 'FF',
-            authorColor: _brand,
+        onSubmit: (title, description, portions, pickupWindow) async {
+          final created = await _service.createRecipe(
+            userId: _myUserId,
             title: title,
             description: description,
+            category: 'snack',
+            difficulty: 'leicht',
+            prepTimeMinutes: 20,
+            servings: portions,
+            ingredients: [
+              {
+                'name': 'Siehe Beschreibung',
+                'quantity': '',
+                'unit': '',
+              }
+            ],
+            instructions: [
+              'Kontakt aufnehmen und Abholzeit abstimmen: $pickupWindow',
+            ],
+            tags: const ['angebot', 'gemeinsamsatt', 'teilen'],
+          );
+
+          if (!mounted) return false;
+          if (created == null) {
+            _showSnack(_service.lastSyncError ??
+                'Angebot konnte nicht veroeffentlicht werden.');
+            return false;
+          }
+
+          final basePost = _mapBackendRecipeToOfferPost(created);
+          final newPost = FoodSharePost(
+            id: basePost.id,
+            authorId: basePost.authorId,
+            authorName: basePost.authorName,
+            authorInitials: basePost.authorInitials,
+            authorColor: basePost.authorColor,
+            title: basePost.title,
+            description: basePost.description,
             totalPortions: portions,
             remainingPortions: portions,
             pickupWindow: pickupWindow,
-            distanceKm: 0.0,
-            createdAt: DateTime.now(),
-            imageEmoji: '🍲',
+            distanceKm: 0.1,
+            createdAt: basePost.createdAt,
+            likedByUserIds: basePost.likedByUserIds,
+            comments: basePost.comments,
+            imageEmoji: basePost.imageEmoji,
           );
+
           setState(() {
             _posts.insert(0, newPost);
           });
-          _showSnack('Dein Angebot ist jetzt sichtbar für Eltern in der Nähe! 🎉');
-          _tabController.animateTo(1);
+          _showSnack('Dein Angebot ist jetzt fuer Eltern in der Naehe sichtbar!');
+          _tabController.animateTo(0);
+          return true;
         },
       ),
     );
@@ -1940,8 +2053,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 // ============================================================
 
 class _CreatePostSheet extends StatefulWidget {
-  final Function(String title, String description, int portions,
-      String pickupWindow) onSubmit;
+  final Future<bool> Function(
+      String title, String description, int portions, String pickupWindow) onSubmit;
 
   const _CreatePostSheet({required this.onSubmit});
 
@@ -2103,12 +2216,20 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   final title = _titleCtrl.text.trim();
                   final desc = _descCtrl.text.trim();
                   if (title.isEmpty) return;
-                  Navigator.pop(context);
-                  widget.onSubmit(title, desc, _portions, _pickupWindow);
+                  final success = await widget.onSubmit(
+                    title,
+                    desc,
+                    _portions,
+                    _pickupWindow,
+                  );
+                  if (!context.mounted) return;
+                  if (success) {
+                    Navigator.pop(context);
+                  }
                 },
                 child: const Text(
                   'Jetzt teilen 🙌',

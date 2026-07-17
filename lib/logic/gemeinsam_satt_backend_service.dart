@@ -137,11 +137,24 @@ class RecipeRating {
 
 class GemeinsamSattBackendService {
   final String? _apiUrl = APIConfig.getBackendBaseUrl();
+  final String? _apiToken = APIConfig.getBackendApiToken();
   final http.Client _httpClient;
   String? lastSyncError;
 
   GemeinsamSattBackendService({http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
+
+  Map<String, String> _jsonHeaders() {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+
+    final token = _apiToken?.trim();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
 
   /// Get published recipes with pagination, filtering, and sorting
   /// Modern query support: category, difficulty, search, sortBy
@@ -244,7 +257,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders(),
         body: jsonEncode({
           'userId': userId,
           'familyId': familyId,
@@ -304,7 +317,7 @@ class GemeinsamSattBackendService {
 
       final response = await _httpClient.put(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$id'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders(),
         body: jsonEncode(body),
       );
 
@@ -335,8 +348,10 @@ class GemeinsamSattBackendService {
 
     try {
       final response = await _httpClient.delete(
-        Uri.parse('$_apiUrl/api/food-feed/recipes/$id'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse(
+          '$_apiUrl/api/food-feed/recipes/$id?userId=${Uri.encodeQueryComponent(userId)}',
+        ),
+        headers: _jsonHeaders(),
         body: jsonEncode({'userId': userId}),
       );
 
@@ -375,7 +390,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/rate'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders(),
         body: jsonEncode({
           'userId': userId,
           'rating': rating,
@@ -436,7 +451,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/comments'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders(),
         body: jsonEncode({'userId': userId, 'text': text}),
       );
 
@@ -465,7 +480,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/reserve'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _jsonHeaders(),
         body: jsonEncode({
           'userId': userId,
           'portions': portions,
@@ -495,6 +510,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.delete(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/reserve?userId=$userId'),
+        headers: _jsonHeaders(),
       );
 
       if (response.statusCode != 200 && response.statusCode != 204) {

@@ -378,7 +378,7 @@ async function runTests() {
       throw new Error('Current user reservation missing');
     }
 
-    const cancelRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId1}/reserve?userId=${encodeURIComponent(commentUserId)}`);
+    const cancelRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId1}/reserve?userId=${encodeURIComponent(commentUserId)}`, null, BEARER_TOKEN);
     if (cancelRes.status !== 200) {
       throw new Error(`Expected 200, got ${cancelRes.status}: ${JSON.stringify(cancelRes.body)}`);
     }

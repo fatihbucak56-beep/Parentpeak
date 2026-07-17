@@ -317,6 +317,8 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       authorTrustLevel: item.authorTrust?.level ?? 'new',
       authorCompletedShares: item.authorTrust?.completedShares ?? 0,
       authorCompletionRate: item.authorTrust?.completionRate ?? 0,
+      authorReliabilityLevel: item.authorTrust?.reliabilityLevel ?? 'new',
+      authorReliabilityLabel: item.authorTrust?.reliabilityLabel ?? 'Noch wenig Nachweise',
       authorLastSharedAt: item.authorTrust?.lastSharedAt,
     );
   }
@@ -413,6 +415,8 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       authorActiveOffersCount: data.authorTrust?.activeOffersCount ?? 0,
       authorCompletedShares: data.authorTrust?.completedShares ?? 0,
       authorCompletionRate: data.authorTrust?.completionRate ?? 0,
+      authorReliabilityLevel: data.authorTrust?.reliabilityLevel ?? 'new',
+      authorReliabilityLabel: data.authorTrust?.reliabilityLabel ?? 'Noch wenig Nachweise',
       authorLastSharedAt: data.authorTrust?.lastSharedAt,
       averageRating: data.rating,
       ratingCount: data.ratingCount,
@@ -2281,6 +2285,17 @@ class _PostCardState extends State<_PostCard>
                       ),
                     ),
                   ],
+                  if (post.authorReliabilityLevel != 'new') ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      post.authorReliabilityLabel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF475569),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                   if (post.authorLastSharedAt != null) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -3443,6 +3458,9 @@ class _RecipeDetailSheet extends StatelessWidget {
                       if (recipe.authorCompletionRate > 0)
                         _statChip(Icons.check_circle_outline_rounded,
                             '${(recipe.authorCompletionRate * 100).round()}% Abschluss'),
+                      if (recipe.authorReliabilityLevel != 'new')
+                        _statChip(Icons.shield_rounded,
+                            recipe.authorReliabilityLabel),
                       if (recipe.authorLastSharedAt != null)
                         _statChip(Icons.update_rounded,
                             _lastSharedLabelFor(recipe.authorLastSharedAt)),

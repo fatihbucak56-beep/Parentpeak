@@ -7347,6 +7347,8 @@ function buildAuthorTrustSummary(recipes) {
     : 0;
   let level = 'new';
   let label = 'Neu im Teilen';
+  let reliabilityLevel = 'new';
+  let reliabilityLabel = 'Noch wenig Nachweise';
 
   if (publishedRecipesCount >= 3 && averageRating >= 4 && totalReports === 0) {
     level = 'trusted';
@@ -7356,6 +7358,17 @@ function buildAuthorTrustSummary(recipes) {
     label = 'Aktiv in der Community';
   }
 
+  if (totalReports === 0 && completedShares >= 2 && completionRate >= 0.85) {
+    reliabilityLevel = 'strong';
+    reliabilityLabel = 'Sehr verlässlich';
+  } else if (totalReports <= 1 && completedShares >= 1 && completionRate >= 0.6) {
+    reliabilityLevel = 'solid';
+    reliabilityLabel = 'Zuverlässig';
+  } else if (completedShares >= 1 || completionRate > 0) {
+    reliabilityLevel = 'growing';
+    reliabilityLabel = 'Wird verlässlicher';
+  }
+
   return {
     level,
     label,
@@ -7363,6 +7376,8 @@ function buildAuthorTrustSummary(recipes) {
     activeOffersCount,
     completedShares,
     completionRate: Math.round(completionRate * 100) / 100,
+    reliabilityLevel,
+    reliabilityLabel,
     lastSharedAt: lastSharedAt ? lastSharedAt.toISOString() : null,
     averageRating: Math.round(averageRating * 100) / 100,
     totalReports,

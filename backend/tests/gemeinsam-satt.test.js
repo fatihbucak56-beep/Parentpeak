@@ -405,6 +405,11 @@ async function runTests() {
     if (!Number.isFinite(completionRate) || completionRate < 0.99) {
       throw new Error(`Completion rate missing or too low: ${completionRate}`);
     }
+    const reliabilityLevel = String(trustRes.body.recipe?.authorTrust?.reliabilityLevel || '');
+    const reliabilityLabel = String(trustRes.body.recipe?.authorTrust?.reliabilityLabel || '');
+    if (reliabilityLevel === 'new' || !reliabilityLabel.trim()) {
+      throw new Error(`Reliability signal missing: ${reliabilityLevel} / ${reliabilityLabel}`);
+    }
 
     const reserveAgainRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/reserve`, {
       userId: commentUserId,

@@ -26,6 +26,8 @@ class SharedRecipe {
   final int authorActiveOffersCount;
   final int authorCompletedShares;
   final double authorCompletionRate;
+  final String authorReliabilityLevel;
+  final String authorReliabilityLabel;
   final DateTime? authorLastSharedAt;
   final double averageRating;
   final int ratingCount;
@@ -56,6 +58,8 @@ class SharedRecipe {
     this.authorActiveOffersCount = 0,
     this.authorCompletedShares = 0,
     this.authorCompletionRate = 0,
+    this.authorReliabilityLevel = 'new',
+    this.authorReliabilityLabel = 'Noch wenig Nachweise',
     this.authorLastSharedAt,
     this.averageRating = 0,
     this.ratingCount = 0,
@@ -96,6 +100,8 @@ class SharedRecipe {
     int? authorActiveOffersCount,
     int? authorCompletedShares,
     double? authorCompletionRate,
+    String? authorReliabilityLevel,
+    String? authorReliabilityLabel,
     DateTime? authorLastSharedAt,
     double? averageRating,
     int? ratingCount,
@@ -129,6 +135,10 @@ class SharedRecipe {
           authorCompletedShares ?? this.authorCompletedShares,
       authorCompletionRate:
           authorCompletionRate ?? this.authorCompletionRate,
+        authorReliabilityLevel:
+          authorReliabilityLevel ?? this.authorReliabilityLevel,
+        authorReliabilityLabel:
+          authorReliabilityLabel ?? this.authorReliabilityLabel,
       authorLastSharedAt: authorLastSharedAt ?? this.authorLastSharedAt,
       averageRating: averageRating ?? this.averageRating,
       ratingCount: ratingCount ?? this.ratingCount,

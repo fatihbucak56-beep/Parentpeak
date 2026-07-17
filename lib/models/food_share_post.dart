@@ -23,6 +23,8 @@ class FoodSharePost {
   final String authorTrustLevel;
   final int authorCompletedShares;
   final double authorCompletionRate;
+  final String authorReliabilityLevel;
+  final String authorReliabilityLabel;
   final DateTime? authorLastSharedAt;
 
   const FoodSharePost({
@@ -47,6 +49,8 @@ class FoodSharePost {
     this.authorTrustLevel = 'new',
     this.authorCompletedShares = 0,
     this.authorCompletionRate = 0,
+    this.authorReliabilityLevel = 'new',
+    this.authorReliabilityLabel = 'Noch wenig Nachweise',
     this.authorLastSharedAt,
   });
 
@@ -62,6 +66,8 @@ class FoodSharePost {
     String? authorTrustLevel,
     int? authorCompletedShares,
     double? authorCompletionRate,
+    String? authorReliabilityLevel,
+    String? authorReliabilityLabel,
     DateTime? authorLastSharedAt,
   }) {
     return FoodSharePost(
@@ -86,6 +92,8 @@ class FoodSharePost {
       authorTrustLevel: authorTrustLevel ?? this.authorTrustLevel,
       authorCompletedShares: authorCompletedShares ?? this.authorCompletedShares,
       authorCompletionRate: authorCompletionRate ?? this.authorCompletionRate,
+      authorReliabilityLevel: authorReliabilityLevel ?? this.authorReliabilityLevel,
+      authorReliabilityLabel: authorReliabilityLabel ?? this.authorReliabilityLabel,
       authorLastSharedAt: authorLastSharedAt ?? this.authorLastSharedAt,
     );
   }

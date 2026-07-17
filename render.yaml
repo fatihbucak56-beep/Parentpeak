@@ -21,14 +21,18 @@ services:
       - key: WRITE_RATE_LIMIT_MAX
         value: "120"
       - key: WEEKLY_IMPULSE_SCHEMA_PATH
-        value: "/opt/render/project/src/backend/weekly_impulse_schema_year3.json"
+        value: "/opt/render/project/backend/weekly_impulse_schema_year3.json"
+      - key: DISABLE_IN_MEMORY_FALLBACKS
+        value: "1"
       - key: BACKEND_API_TOKEN
         sync: false
       - key: CORS_ALLOWED_ORIGINS
-        sync: false
+        value: "https://parentpeak.onrender.com,https://parentpeak.de"
       - key: INTERNAL_MODERATOR_EMAILS
         sync: false
       - key: INTERNAL_MODERATOR_DOMAINS
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
         sync: false

@@ -570,6 +570,32 @@ class GemeinsamSattBackendService {
     }
   }
 
+  Future<bool> completeOfferShare({
+    required String recipeId,
+    required String userId,
+  }) async {
+    lastSyncError = null;
+
+    try {
+      final response = await _httpClient.post(
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/complete'),
+        headers: _jsonHeaders(),
+        body: jsonEncode({'userId': userId}),
+      );
+
+      if (response.statusCode != 200) {
+        lastSyncError =
+            'Abholung konnte nicht bestaetigt werden: ${response.statusCode}';
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      lastSyncError = 'Fehler beim Bestaetigen der Abholung: $e';
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>?> fetchOfferReservationSummary({
     required String recipeId,
     required String userId,

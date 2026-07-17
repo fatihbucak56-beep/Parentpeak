@@ -355,9 +355,9 @@ async function runTests() {
     failed++;
   }
 
-  // Test 11: Persist offer reservations
+  // Test 11: Persist and complete offer reservations
   try {
-    console.log('\n🙌 Test 11: Persist food-offer reservations');
+    console.log('\n🙌 Test 11: Persist and complete food-offer reservations');
     const reserveRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/reserve`, {
       userId: commentUserId,
       portions: 2,
@@ -377,6 +377,32 @@ async function runTests() {
     }
     if ((summaryRes.body.myReservation?.portions || 0) !== 2) {
       throw new Error('Current user reservation missing');
+    }
+
+    const completeRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/complete`, {
+      userId: commentUserId,
+    }, BEARER_TOKEN);
+    if (completeRes.status !== 200) {
+      throw new Error(`Expected 200, got ${completeRes.status}: ${JSON.stringify(completeRes.body)}`);
+    }
+
+    const afterCompleteRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}/reservations?userId=${encodeURIComponent(commentUserId)}`);
+    if (afterCompleteRes.status !== 200) {
+      throw new Error(`Expected 200, got ${afterCompleteRes.status}: ${JSON.stringify(afterCompleteRes.body)}`);
+    }
+    if ((afterCompleteRes.body.reservedPortions || 0) !== 0) {
+      throw new Error('Completed reservation should no longer count as active');
+    }
+    if (afterCompleteRes.body.myReservation) {
+      throw new Error('Completed reservation should no longer appear as active');
+    }
+
+    const reserveAgainRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/reserve`, {
+      userId: commentUserId,
+      portions: 1,
+    }, BEARER_TOKEN);
+    if (reserveAgainRes.status !== 201 && reserveAgainRes.status !== 200) {
+      throw new Error(`Expected 200/201, got ${reserveAgainRes.status}: ${JSON.stringify(reserveAgainRes.body)}`);
     }
 
     const cancelRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId1}/reserve?userId=${encodeURIComponent(commentUserId)}`, null, BEARER_TOKEN);

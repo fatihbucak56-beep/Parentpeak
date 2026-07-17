@@ -5452,10 +5452,16 @@ app.post('/admin/migrate-db', async (req, res) => {
         "recipeId" TEXT NOT NULL,
         "userId" TEXT NOT NULL,
         "portions" INTEGER NOT NULL DEFAULT 1,
+        "completedAt" TIMESTAMP(3),
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT "FoodOfferReservation_recipeId_fkey" FOREIGN KEY ("recipeId") REFERENCES "SharedRecipe" ("id") ON DELETE CASCADE
       );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "FoodOfferReservation"
+      ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMP(3);
     `);
 
     await prisma.$executeRawUnsafe(`
@@ -6416,7 +6422,7 @@ app.get('/api/food-feed/recipes/:id/reservations', async (req, res) => {
       `
       SELECT COALESCE(SUM("portions"), 0)::int AS "reservedPortions", COUNT(*)::int AS "reservationsCount"
       FROM "FoodOfferReservation"
-      WHERE "recipeId" = $1
+      WHERE "recipeId" = $1 AND "completedAt" IS NULL
       `,
       id,
     );
@@ -6425,9 +6431,9 @@ app.get('/api/food-feed/recipes/:id/reservations', async (req, res) => {
     if (userId) {
       const mine = await prisma.$queryRawUnsafe(
         `
-        SELECT "id", "recipeId", "userId", "portions", "createdAt", "updatedAt"
+        SELECT "id", "recipeId", "userId", "portions", "createdAt", "updatedAt", "completedAt"
         FROM "FoodOfferReservation"
-        WHERE "recipeId" = $1 AND "userId" = $2
+        WHERE "recipeId" = $1 AND "userId" = $2 AND "completedAt" IS NULL
         LIMIT 1
         `,
         id,
@@ -6469,10 +6475,10 @@ app.post('/api/food-feed/recipes/:id/reserve', async (req, res) => {
     const reservationId = generateId('offer_reservation');
     await prisma.$executeRawUnsafe(
       `
-      INSERT INTO "FoodOfferReservation" ("id", "recipeId", "userId", "portions", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO "FoodOfferReservation" ("id", "recipeId", "userId", "portions", "completedAt", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT ("recipeId", "userId")
-      DO UPDATE SET "portions" = EXCLUDED."portions", "updatedAt" = CURRENT_TIMESTAMP
+      DO UPDATE SET "portions" = EXCLUDED."portions", "completedAt" = NULL, "updatedAt" = CURRENT_TIMESTAMP
       `,
       reservationId,
       id,
@@ -6484,7 +6490,7 @@ app.post('/api/food-feed/recipes/:id/reserve', async (req, res) => {
       `
       SELECT COALESCE(SUM("portions"), 0)::int AS "reservedPortions"
       FROM "FoodOfferReservation"
-      WHERE "recipeId" = $1
+      WHERE "recipeId" = $1 AND "completedAt" IS NULL
       `,
       id,
     );
@@ -6516,7 +6522,7 @@ app.delete('/api/food-feed/recipes/:id/reserve', async (req, res) => {
     await prisma.$executeRawUnsafe(
       `
       DELETE FROM "FoodOfferReservation"
-      WHERE "recipeId" = $1 AND "userId" = $2
+      WHERE "recipeId" = $1 AND "userId" = $2 AND "completedAt" IS NULL
       `,
       id,
       userId,
@@ -6526,7 +6532,7 @@ app.delete('/api/food-feed/recipes/:id/reserve', async (req, res) => {
       `
       SELECT COALESCE(SUM("portions"), 0)::int AS "reservedPortions"
       FROM "FoodOfferReservation"
-      WHERE "recipeId" = $1
+      WHERE "recipeId" = $1 AND "completedAt" IS NULL
       `,
       id,
     );
@@ -6535,6 +6541,56 @@ app.delete('/api/food-feed/recipes/:id/reserve', async (req, res) => {
   } catch (err) {
     console.error('❌ Fehler beim Entfernen einer Reservierung:', err);
     return res.status(500).json({ error: 'Reservierung konnte nicht entfernt werden' });
+  }
+});
+
+/**
+ * POST /api/food-feed/recipes/:id/complete
+ * Mark current user's reservation as successfully picked up/completed
+ */
+app.post('/api/food-feed/recipes/:id/complete', async (req, res) => {
+  const { id } = req.params;
+  const userId = String(req.body.userId || '').trim();
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId ist erforderlich' });
+  }
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    const existing = await prisma.$queryRawUnsafe(
+      `
+      SELECT "id"
+      FROM "FoodOfferReservation"
+      WHERE "recipeId" = $1 AND "userId" = $2 AND "completedAt" IS NULL
+      LIMIT 1
+      `,
+      id,
+      userId,
+    );
+
+    if (!Array.isArray(existing) || existing.length === 0) {
+      return res.status(404).json({ error: 'Keine offene Reservierung gefunden' });
+    }
+
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE "FoodOfferReservation"
+      SET "completedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "recipeId" = $1 AND "userId" = $2 AND "completedAt" IS NULL
+      `,
+      id,
+      userId,
+    );
+
+    return res.status(200).json({ success: true, completed: true });
+  } catch (err) {
+    console.error('❌ Fehler beim Abschliessen einer Reservierung:', err);
+    return res.status(500).json({ error: 'Reservierung konnte nicht abgeschlossen werden' });
   }
 });
 
@@ -7272,9 +7328,9 @@ function buildAuthorTrustSummary(recipes) {
     weightedRatingSum += rating * ratingCount;
     ratingWeight += ratingCount;
     totalReports += Number(recipe.reportedCount || 0);
-    completedShares += Number(recipe.reservationCount || 0);
-    const reservationUpdatedAt = recipe.latestReservationUpdatedAt
-      ? new Date(recipe.latestReservationUpdatedAt)
+    completedShares += Number(recipe.completedReservationCount || 0);
+    const reservationUpdatedAt = recipe.latestCompletedAt
+      ? new Date(recipe.latestCompletedAt)
       : null;
     if (reservationUpdatedAt && !Number.isNaN(reservationUpdatedAt.getTime())) {
       if (!lastSharedAt || reservationUpdatedAt > lastSharedAt) {
@@ -7327,17 +7383,15 @@ async function buildAuthorTrustMapForRecipes(recipes) {
       rating: true,
       ratingCount: true,
       reportedCount: true,
-      _count: {
-        select: {
-          offerReservations: true,
-        },
-      },
       offerReservations: {
+        where: {
+          completedAt: { not: null },
+        },
         select: {
-          updatedAt: true,
+          completedAt: true,
         },
         orderBy: {
-          updatedAt: 'desc',
+          completedAt: 'desc',
         },
         take: 1,
       },
@@ -7351,8 +7405,10 @@ async function buildAuthorTrustMapForRecipes(recipes) {
     const items = byAuthor.get(key) || [];
     items.push({
       ...recipe,
-      reservationCount: recipe._count?.offerReservations || 0,
-      latestReservationUpdatedAt: recipe.offerReservations?.[0]?.updatedAt || null,
+      completedReservationCount: Array.isArray(recipe.offerReservations)
+        ? recipe.offerReservations.length
+        : 0,
+      latestCompletedAt: recipe.offerReservations?.[0]?.completedAt || null,
     });
     byAuthor.set(key, items);
   }

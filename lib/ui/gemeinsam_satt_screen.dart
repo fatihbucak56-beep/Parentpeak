@@ -1329,7 +1329,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     final post = _posts[idx];
 
     if (post.isReservedByMe) {
-      _cancelReservation(post, idx);
+      _showReservationActionSheet(post, idx);
       return;
     }
 
@@ -1343,6 +1343,65 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         },
       ),
     );
+  }
+
+  Future<void> _showReservationActionSheet(FoodSharePost post, int index) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Deine Reservierung',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1A2A3A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              post.title,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF516072),
+              ),
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop('complete'),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
+              child: const Text('Abholung bestaetigen'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop('cancel'),
+              child: const Text('Reservierung aufheben'),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Schliessen'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (action == 'complete') {
+      await _completeReservation(post, index);
+    } else if (action == 'cancel') {
+      await _cancelReservation(post, index);
+    }
   }
 
   Future<void> _confirmReservation(FoodSharePost post, int index) async {
@@ -1394,6 +1453,27 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       );
     });
     _showSnack('Reservierung aufgehoben');
+  }
+
+  Future<void> _completeReservation(FoodSharePost post, int index) async {
+    final ok = await _service.completeOfferShare(
+      recipeId: post.id,
+      userId: _myUserId,
+    );
+
+    if (!ok) {
+      _showSnack(_service.lastSyncError ?? 'Abholung konnte nicht bestaetigt werden');
+      return;
+    }
+
+    setState(() {
+      _hiddenOfferIds = {..._hiddenOfferIds, post.id};
+      _posts = _posts.where((item) => item.id != post.id).toList();
+    });
+    await _persistOfferSafetyState();
+
+    if (!mounted) return;
+    _showSnack('Abholung bestaetigt. Danke fuers Teilen!');
   }
 
   Future<void> _showComments(FoodSharePost post) async {

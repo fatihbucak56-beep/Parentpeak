@@ -551,4 +551,40 @@ class GemeinsamSattBackendService {
       return null;
     }
   }
+
+  Future<bool> reportOffer({
+    required String recipeId,
+    required String userId,
+    required String reason,
+    String? note,
+  }) async {
+    lastSyncError = null;
+
+    try {
+      final response = await _httpClient.post(
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/report'),
+        headers: _jsonHeaders(),
+        body: jsonEncode({
+          'reportedById': userId,
+          'reason': reason,
+          if (note != null && note.trim().isNotEmpty) 'details': note.trim(),
+        }),
+      );
+
+      if (response.statusCode == 409) {
+        lastSyncError = 'Dieses Angebot wurde bereits von dir gemeldet';
+        return false;
+      }
+
+      if (response.statusCode != 201) {
+        lastSyncError = 'Meldung konnte nicht gespeichert werden: ${response.statusCode}';
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      lastSyncError = 'Fehler beim Melden des Angebots: $e';
+      return false;
+    }
+  }
 }

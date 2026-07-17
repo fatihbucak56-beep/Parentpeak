@@ -550,6 +550,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
           onLike: () => _toggleLike(available[i].id),
           onAbholen: () => _reservePost(available[i].id),
           onComment: () => _showComments(available[i]),
+          onReport: () => _reportPost(available[i]),
         ),
       ),
     );
@@ -1120,6 +1121,100 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     );
   }
 
+  Future<void> _reportPost(FoodSharePost post) async {
+    if (post.authorId == _myUserId) {
+      _showSnack('Eigene Angebote kannst du nicht melden.');
+      return;
+    }
+
+    String selectedReason = 'Spam oder Irrefuehrung';
+    final noteController = TextEditingController();
+    final reasons = <String>[
+      'Spam oder Irrefuehrung',
+      'Unpassender Inhalt',
+      'Betrug oder Unsicherheit',
+      'Andere Sorge',
+    ];
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Angebot melden'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Hilf uns, den Bereich sicher und hilfreich fuer Eltern zu halten.',
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReason,
+                    items: reasons
+                        .map((reason) => DropdownMenuItem<String>(
+                              value: reason,
+                              child: Text(reason),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null || value.isEmpty) return;
+                      setDialogState(() => selectedReason = value);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: noteController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Optional: kurze Notiz fuer die Moderation',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Abbrechen'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Melden'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      noteController.dispose();
+      return;
+    }
+
+    final ok = await _service.reportOffer(
+      recipeId: post.id,
+      userId: _myUserId,
+      reason: selectedReason,
+      note: noteController.text.trim(),
+    );
+    noteController.dispose();
+
+    if (!mounted) return;
+    _showSnack(
+      ok
+          ? 'Danke, wir pruefen diese Meldung.'
+          : (_service.lastSyncError ?? 'Meldung konnte nicht gespeichert werden.'),
+    );
+  }
+
   void _openCreatePost(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1433,6 +1528,7 @@ class _PostCard extends StatefulWidget {
   final VoidCallback onLike;
   final VoidCallback onAbholen;
   final VoidCallback onComment;
+  final VoidCallback? onReport;
   final bool isOwner;
 
   const _PostCard({
@@ -1441,6 +1537,7 @@ class _PostCard extends StatefulWidget {
     required this.onLike,
     required this.onAbholen,
     required this.onComment,
+    this.onReport,
     this.isOwner = false,
   });
 
@@ -1792,6 +1889,24 @@ class _PostCardState extends State<_PostCard>
                           ),
                         ),
                       ),
+                      if (!widget.isOwner && widget.onReport != null)
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'report') {
+                              widget.onReport?.call();
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem<String>(
+                              value: 'report',
+                              child: Text('Angebot melden'),
+                            ),
+                          ],
+                          icon: const Icon(
+                            Icons.more_horiz_rounded,
+                            color: Color(0xFF8A9AB0),
+                          ),
+                        ),
                   ],
                 ),
               ],

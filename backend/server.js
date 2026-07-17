@@ -6528,6 +6528,189 @@ app.delete('/api/food-feed/recipes/:id/reserve', async (req, res) => {
 });
 
 /**
+ * POST /api/food-feed/recipes/:id/report
+ * Report a recipe-based food offer for moderation
+ */
+app.post('/api/food-feed/recipes/:id/report', async (req, res) => {
+  const { id } = req.params;
+  const reportedById = String(req.body.reportedById || req.body.userId || '').trim();
+  const reason = String(req.body.reason || '').trim();
+  const details = String(req.body.details || req.body.note || '').trim();
+
+  if (!reportedById || !reason) {
+    return res.status(400).json({ error: 'reportedById und reason erforderlich' });
+  }
+
+  if (reason.length < 3 || reason.length > 120) {
+    return res.status(400).json({ error: 'reason muss 3-120 Zeichen lang sein' });
+  }
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    const duplicate = await prisma.recipeReport.findFirst({
+      where: {
+        recipeId: id,
+        reportedById,
+        status: { in: ['pending', 'resolved'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (duplicate) {
+      return res.status(409).json({ error: 'Dieses Angebot wurde von dir bereits gemeldet' });
+    }
+
+    const report = await prisma.recipeReport.create({
+      data: {
+        recipeId: id,
+        reportedById: reportedById.slice(0, 120),
+        reason: reason.slice(0, 120),
+        details: details ? details.slice(0, 1200) : null,
+        status: 'pending',
+      },
+    });
+
+    const recentReportCount = await prisma.recipeReport.count({
+      where: {
+        recipeId: id,
+        createdAt: {
+          gte: new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)),
+        },
+      },
+    });
+
+    const severe = isRecipeReportSevere({ reason, details });
+    let autoAction = 'none';
+
+    if (shouldAutoUnpublishRecipe({ severe, recentReportCount })) {
+      autoAction = severe ? 'unpublished_severe' : 'unpublished_threshold';
+      await prisma.$transaction([
+        prisma.sharedRecipe.update({
+          where: { id },
+          data: {
+            isPublished: false,
+            reportedCount: recentReportCount,
+            lastReportedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        }),
+        prisma.recipeReport.updateMany({
+          where: {
+            recipeId: id,
+            status: 'pending',
+          },
+          data: {
+            status: 'resolved',
+            resolvedAt: new Date(),
+          },
+        }),
+      ]);
+    } else {
+      await prisma.sharedRecipe.update({
+        where: { id },
+        data: {
+          reportedCount: recentReportCount,
+          lastReportedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return res.status(201).json({
+      report,
+      autoModeration: {
+        action: autoAction,
+        recentReportCount,
+      },
+    });
+  } catch (err) {
+    console.error('❌ Food-offer report create error:', err.message);
+    return res.status(500).json({ error: `Failed to create food-offer report: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/food-feed/reports
+ * List food-offer reports (admin token required)
+ */
+app.get('/api/food-feed/reports', async (req, res) => {
+  if (!isAdminTokenAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { status, maxResults = 50, offset = 0 } = req.query;
+
+  try {
+    const reports = await prisma.recipeReport.findMany({
+      where: {
+        ...(status ? { status: String(status) } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(parseInt(maxResults, 10) || 50, 100),
+      skip: parseInt(offset, 10) || 0,
+      include: {
+        recipe: {
+          select: {
+            id: true,
+            title: true,
+            creatorUserId: true,
+            isPublished: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    res.json({ reports, total: reports.length });
+  } catch (err) {
+    console.error('❌ Food-offer report list error:', err.message);
+    res.status(500).json({ error: `Failed to list food-offer reports: ${err.message}` });
+  }
+});
+
+/**
+ * POST /api/food-feed/reports/:reportId/resolve
+ * Resolve or dismiss a food-offer report (admin token required)
+ */
+app.post('/api/food-feed/reports/:reportId/resolve', async (req, res) => {
+  if (!isAdminTokenAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { reportId } = req.params;
+  const { action = 'resolved' } = req.body;
+  const normalizedAction = String(action).trim();
+  const allowedActions = new Set(['resolved', 'dismissed']);
+
+  if (!allowedActions.has(normalizedAction)) {
+    return res.status(400).json({ error: 'action muss resolved oder dismissed sein' });
+  }
+
+  try {
+    const existing = await prisma.recipeReport.findUnique({ where: { id: reportId } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Report nicht gefunden' });
+    }
+
+    const updated = await prisma.recipeReport.update({
+      where: { id: reportId },
+      data: {
+        status: normalizedAction,
+        resolvedAt: new Date(),
+      },
+    });
+
+    return res.json({ report: updated });
+  } catch (err) {
+    console.error('❌ Food-offer report resolve error:', err.message);
+    return res.status(500).json({ error: `Failed to resolve food-offer report: ${err.message}` });
+  }
+});
+
+/**
  * EVENTS & AKTIVITÄTEN - Community Event System
  */
 
@@ -6992,6 +7175,34 @@ function isTreasureReportSevere({ reason, note }) {
 }
 
 function shouldAutoArchiveTreasure({ severe, recentReportCount }) {
+  if (severe) return true;
+  return recentReportCount >= 3;
+}
+
+function normalizeRecipeReportReason(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .slice(0, 120);
+}
+
+function isRecipeReportSevere({ reason, details }) {
+  const text = `${normalizeRecipeReportReason(reason)} ${String(details || '').toLowerCase()}`;
+  const severeKeywords = [
+    'gewalt',
+    'hass',
+    'sex',
+    'nackt',
+    'missbrauch',
+    'betrug',
+    'scam',
+    'drohung',
+  ];
+  return severeKeywords.some(keyword => text.includes(keyword));
+}
+
+function shouldAutoUnpublishRecipe({ severe, recentReportCount }) {
   if (severe) return true;
   return recentReportCount >= 3;
 }

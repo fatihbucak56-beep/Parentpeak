@@ -96,6 +96,7 @@ async function runTests() {
   console.log(`🔐 Auth token: ${BEARER_TOKEN ? 'provided' : 'missing'}\n`);
   
   let recipeId1, recipeId2;
+  let reportId;
   let passed = 0;
   let failed = 0;
   const testUserId = 'test-user-' + Date.now();
@@ -392,6 +393,65 @@ async function runTests() {
     }
 
     console.log('  ✓ Reservation persisted and cancel worked');
+    passed++;
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 12: Report food offer and guard duplicate reports
+  try {
+    console.log('\n🚨 Test 12: Report food offer');
+    const reportRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/report`, {
+      reportedById: `reporter-${Date.now()}`,
+      reason: 'Spam oder Irrefuehrung',
+      details: 'Wirkt nicht wie ein echtes Angebot.',
+    }, BEARER_TOKEN);
+
+    if (reportRes.status !== 201) {
+      throw new Error(`Expected 201, got ${reportRes.status}: ${JSON.stringify(reportRes.body)}`);
+    }
+    reportId = reportRes.body.report?.id;
+    if (!reportId) {
+      throw new Error('Report id missing in response');
+    }
+
+    const duplicateRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/report`, {
+      reportedById: reportRes.body.report.reportedById,
+      reason: 'Spam oder Irrefuehrung',
+    }, BEARER_TOKEN);
+    if (duplicateRes.status !== 409) {
+      throw new Error(`Expected 409 for duplicate report, got ${duplicateRes.status}: ${JSON.stringify(duplicateRes.body)}`);
+    }
+    console.log('  ✓ Report persisted and duplicate guard works');
+    passed++;
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 13: Admin list and resolve food-offer reports
+  try {
+    console.log('\n🛡️  Test 13: Admin list and resolve food-offer reports');
+    const listRes = await makeRequest('GET', '/api/food-feed/reports?maxResults=20', null, BEARER_TOKEN);
+    if (listRes.status !== 200) {
+      throw new Error(`Expected 200, got ${listRes.status}: ${JSON.stringify(listRes.body)}`);
+    }
+    const listed = (listRes.body.reports || []).find(item => item.id === reportId);
+    if (!listed) {
+      throw new Error('Created report missing from admin list');
+    }
+
+    const resolveRes = await makeRequest('POST', `/api/food-feed/reports/${reportId}/resolve`, {
+      action: 'resolved',
+    }, BEARER_TOKEN);
+    if (resolveRes.status !== 200) {
+      throw new Error(`Expected 200, got ${resolveRes.status}: ${JSON.stringify(resolveRes.body)}`);
+    }
+    if (resolveRes.body.report?.status !== 'resolved') {
+      throw new Error('Report was not marked resolved');
+    }
+    console.log('  ✓ Admin list and resolve work');
     passed++;
   } catch (e) {
     console.error(`  ✗ Failed: ${e.message}`);

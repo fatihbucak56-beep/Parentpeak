@@ -7320,6 +7320,7 @@ function buildAuthorTrustSummary(recipes) {
   let ratingWeight = 0;
   let totalReports = 0;
   let completedShares = 0;
+  let pendingReservations = 0;
   let lastSharedAt = null;
 
   for (const recipe of recipes) {
@@ -7329,6 +7330,7 @@ function buildAuthorTrustSummary(recipes) {
     ratingWeight += ratingCount;
     totalReports += Number(recipe.reportedCount || 0);
     completedShares += Number(recipe.completedReservationCount || 0);
+    pendingReservations += Number(recipe.pendingReservationCount || 0);
     const reservationUpdatedAt = recipe.latestCompletedAt
       ? new Date(recipe.latestCompletedAt)
       : null;
@@ -7340,6 +7342,9 @@ function buildAuthorTrustSummary(recipes) {
   }
 
   const averageRating = ratingWeight > 0 ? weightedRatingSum / ratingWeight : 0;
+  const completionRate = completedShares + pendingReservations > 0
+    ? completedShares / (completedShares + pendingReservations)
+    : 0;
   let level = 'new';
   let label = 'Neu im Teilen';
 
@@ -7357,6 +7362,7 @@ function buildAuthorTrustSummary(recipes) {
     publishedRecipesCount,
     activeOffersCount,
     completedShares,
+    completionRate: Math.round(completionRate * 100) / 100,
     lastSharedAt: lastSharedAt ? lastSharedAt.toISOString() : null,
     averageRating: Math.round(averageRating * 100) / 100,
     totalReports,
@@ -7384,16 +7390,12 @@ async function buildAuthorTrustMapForRecipes(recipes) {
       ratingCount: true,
       reportedCount: true,
       offerReservations: {
-        where: {
-          completedAt: { not: null },
-        },
         select: {
           completedAt: true,
         },
         orderBy: {
           completedAt: 'desc',
         },
-        take: 1,
       },
     },
   });
@@ -7402,13 +7404,18 @@ async function buildAuthorTrustMapForRecipes(recipes) {
   for (const recipe of authorRecipes) {
     const key = String(recipe.creatorUserId || '').trim();
     if (!key) continue;
+    const reservations = Array.isArray(recipe.offerReservations) ? recipe.offerReservations : [];
+    const completedReservations = reservations.filter((reservation) => reservation.completedAt);
+    const pendingReservations = reservations.filter((reservation) => !reservation.completedAt);
     const items = byAuthor.get(key) || [];
     items.push({
       ...recipe,
-      completedReservationCount: Array.isArray(recipe.offerReservations)
-        ? recipe.offerReservations.length
-        : 0,
-      latestCompletedAt: recipe.offerReservations?.[0]?.completedAt || null,
+      completedReservationCount: completedReservations.length,
+      pendingReservationCount: pendingReservations.length,
+      latestCompletedAt: completedReservations.reduce((latest, reservation) => {
+        if (!latest) return reservation.completedAt;
+        return reservation.completedAt > latest ? reservation.completedAt : latest;
+      }, null),
     });
     byAuthor.set(key, items);
   }

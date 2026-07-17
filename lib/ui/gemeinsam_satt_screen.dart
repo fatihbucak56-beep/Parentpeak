@@ -316,6 +316,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       authorTrustLabel: item.authorTrust?.label ?? 'Neu im Teilen',
       authorTrustLevel: item.authorTrust?.level ?? 'new',
       authorCompletedShares: item.authorTrust?.completedShares ?? 0,
+      authorCompletionRate: item.authorTrust?.completionRate ?? 0,
       authorLastSharedAt: item.authorTrust?.lastSharedAt,
     );
   }
@@ -411,6 +412,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       authorPublishedRecipesCount: data.authorTrust?.publishedRecipesCount ?? 0,
       authorActiveOffersCount: data.authorTrust?.activeOffersCount ?? 0,
       authorCompletedShares: data.authorTrust?.completedShares ?? 0,
+      authorCompletionRate: data.authorTrust?.completionRate ?? 0,
       authorLastSharedAt: data.authorTrust?.lastSharedAt,
       averageRating: data.rating,
       ratingCount: data.ratingCount,
@@ -2268,6 +2270,17 @@ class _PostCardState extends State<_PostCard>
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (post.authorCompletionRate > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${(post.authorCompletionRate * 100).round()}% Abschlussquote',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                   if (post.authorLastSharedAt != null) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -3427,6 +3440,9 @@ class _RecipeDetailSheet extends StatelessWidget {
                       if (recipe.authorCompletedShares > 0)
                         _statChip(Icons.handshake_rounded,
                             '${recipe.authorCompletedShares} Teilungen'),
+                      if (recipe.authorCompletionRate > 0)
+                        _statChip(Icons.check_circle_outline_rounded,
+                            '${(recipe.authorCompletionRate * 100).round()}% Abschluss'),
                       if (recipe.authorLastSharedAt != null)
                         _statChip(Icons.update_rounded,
                             _lastSharedLabelFor(recipe.authorLastSharedAt)),

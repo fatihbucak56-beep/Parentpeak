@@ -10,6 +10,7 @@ class AuthorTrustSummary {
   final int publishedRecipesCount;
   final int activeOffersCount;
   final int completedShares;
+  final double completionRate;
   final DateTime? lastSharedAt;
   final double averageRating;
   final int totalReports;
@@ -20,6 +21,7 @@ class AuthorTrustSummary {
     required this.publishedRecipesCount,
     required this.activeOffersCount,
     required this.completedShares,
+    required this.completionRate,
     required this.lastSharedAt,
     required this.averageRating,
     required this.totalReports,
@@ -32,6 +34,7 @@ class AuthorTrustSummary {
       publishedRecipesCount: (json['publishedRecipesCount'] as num?)?.toInt() ?? 0,
       activeOffersCount: (json['activeOffersCount'] as num?)?.toInt() ?? 0,
       completedShares: (json['completedShares'] as num?)?.toInt() ?? 0,
+        completionRate: (json['completionRate'] as num?)?.toDouble() ?? 0,
       lastSharedAt: json['lastSharedAt'] != null
           ? DateTime.tryParse(json['lastSharedAt'].toString())
           : null,

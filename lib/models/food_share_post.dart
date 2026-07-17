@@ -22,6 +22,7 @@ class FoodSharePost {
   final String authorTrustLabel;
   final String authorTrustLevel;
   final int authorCompletedShares;
+  final double authorCompletionRate;
   final DateTime? authorLastSharedAt;
 
   const FoodSharePost({
@@ -45,6 +46,7 @@ class FoodSharePost {
     this.authorTrustLabel = 'Neu im Teilen',
     this.authorTrustLevel = 'new',
     this.authorCompletedShares = 0,
+    this.authorCompletionRate = 0,
     this.authorLastSharedAt,
   });
 
@@ -59,6 +61,7 @@ class FoodSharePost {
     String? authorTrustLabel,
     String? authorTrustLevel,
     int? authorCompletedShares,
+    double? authorCompletionRate,
     DateTime? authorLastSharedAt,
   }) {
     return FoodSharePost(
@@ -82,6 +85,7 @@ class FoodSharePost {
       authorTrustLabel: authorTrustLabel ?? this.authorTrustLabel,
       authorTrustLevel: authorTrustLevel ?? this.authorTrustLevel,
       authorCompletedShares: authorCompletedShares ?? this.authorCompletedShares,
+      authorCompletionRate: authorCompletionRate ?? this.authorCompletionRate,
       authorLastSharedAt: authorLastSharedAt ?? this.authorLastSharedAt,
     );
   }

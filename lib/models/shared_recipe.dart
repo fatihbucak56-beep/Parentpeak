@@ -25,6 +25,7 @@ class SharedRecipe {
   final int authorPublishedRecipesCount;
   final int authorActiveOffersCount;
   final int authorCompletedShares;
+  final double authorCompletionRate;
   final DateTime? authorLastSharedAt;
   final double averageRating;
   final int ratingCount;
@@ -54,6 +55,7 @@ class SharedRecipe {
     this.authorPublishedRecipesCount = 0,
     this.authorActiveOffersCount = 0,
     this.authorCompletedShares = 0,
+    this.authorCompletionRate = 0,
     this.authorLastSharedAt,
     this.averageRating = 0,
     this.ratingCount = 0,
@@ -93,6 +95,7 @@ class SharedRecipe {
     int? authorPublishedRecipesCount,
     int? authorActiveOffersCount,
     int? authorCompletedShares,
+    double? authorCompletionRate,
     DateTime? authorLastSharedAt,
     double? averageRating,
     int? ratingCount,
@@ -116,15 +119,17 @@ class SharedRecipe {
       likedByUserIds: likedByUserIds ?? this.likedByUserIds,
       comments: comments ?? this.comments,
       isSavedByMe: isSavedByMe ?? this.isSavedByMe,
-        authorTrustLabel: authorTrustLabel ?? this.authorTrustLabel,
-        authorTrustLevel: authorTrustLevel ?? this.authorTrustLevel,
-        authorPublishedRecipesCount:
+      authorTrustLabel: authorTrustLabel ?? this.authorTrustLabel,
+      authorTrustLevel: authorTrustLevel ?? this.authorTrustLevel,
+      authorPublishedRecipesCount:
           authorPublishedRecipesCount ?? this.authorPublishedRecipesCount,
-        authorActiveOffersCount:
+      authorActiveOffersCount:
           authorActiveOffersCount ?? this.authorActiveOffersCount,
-          authorCompletedShares:
-            authorCompletedShares ?? this.authorCompletedShares,
-          authorLastSharedAt: authorLastSharedAt ?? this.authorLastSharedAt,
+      authorCompletedShares:
+          authorCompletedShares ?? this.authorCompletedShares,
+      authorCompletionRate:
+          authorCompletionRate ?? this.authorCompletionRate,
+      authorLastSharedAt: authorLastSharedAt ?? this.authorLastSharedAt,
       averageRating: averageRating ?? this.averageRating,
       ratingCount: ratingCount ?? this.ratingCount,
       viewCount: viewCount ?? this.viewCount,

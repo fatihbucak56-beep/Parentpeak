@@ -397,6 +397,15 @@ async function runTests() {
       throw new Error('Completed reservation should no longer appear as active');
     }
 
+    const trustRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}`);
+    if (trustRes.status !== 200) {
+      throw new Error(`Expected 200, got ${trustRes.status}: ${JSON.stringify(trustRes.body)}`);
+    }
+    const completionRate = asNumber(trustRes.body.recipe?.authorTrust?.completionRate);
+    if (!Number.isFinite(completionRate) || completionRate < 0.99) {
+      throw new Error(`Completion rate missing or too low: ${completionRate}`);
+    }
+
     const reserveAgainRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/reserve`, {
       userId: commentUserId,
       portions: 1,

@@ -177,6 +177,9 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   late WeekPlan _weekPlan;
   bool _isLoadingNearby = false;
   bool _isLoadingRecipes = false;
+  String? _nearbyLoadError;
+  String? _recipeLoadError;
+  String? _mealPlanLoadError;
   _RecipeFeedMode _recipeFeedMode = _RecipeFeedMode.forYou;
   Set<String> _savedRecipeIds = <String>{};
   Set<String> _hiddenOfferIds = <String>{};
@@ -210,7 +213,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     _tabController = TabController(length: 4, vsync: this);
     _posts = [];
     _recipes = [];
-    _weekPlan = _buildDemoWeekPlan();
+    _weekPlan = _buildEmptyWeekPlan();
     _loadSavedRecipes();
     _loadOfferSafetyState();
 
@@ -267,7 +270,9 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       }
 
       if (!mounted) return;
+      final syncError = _service.lastSyncError;
       setState(() {
+        _nearbyLoadError = syncError;
         _posts = mappedOffers
             .where((post) => !_hiddenOfferIds.contains(post.id))
             .toList();
@@ -277,9 +282,8 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       debugPrint('GemeinsamSattScreen._loadNearbyFeed(): failed: $e');
       if (!mounted) return;
       setState(() {
-        _posts = _buildDemoPosts()
-            .where((post) => !_hiddenOfferIds.contains(post.id))
-            .toList();
+        _nearbyLoadError = _service.lastSyncError ?? 'Angebote konnten nicht geladen werden.';
+        _posts = [];
         _isLoadingNearby = false;
       });
     }
@@ -330,15 +334,24 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         familyId,
         DateTime.now(),
       );
-      
-      if (weekPlan != null && weekPlan.days.isNotEmpty) {
-        setState(() {
+
+      if (!mounted) return;
+      setState(() {
+        if (weekPlan != null && weekPlan.days.isNotEmpty) {
           _weekPlan = weekPlan;
-        });
-      }
+          _mealPlanLoadError = null;
+        } else {
+          _weekPlan = _buildEmptyWeekPlan();
+          _mealPlanLoadError = 'Wochenplan konnte nicht vom Backend geladen werden.';
+        }
+      });
     } catch (e) {
       debugPrint('GemeinsamSattScreen._loadWeekMealPlan(): failed: $e');
-      // Keep using demo data
+      if (!mounted) return;
+      setState(() {
+        _weekPlan = _buildEmptyWeekPlan();
+        _mealPlanLoadError = 'Wochenplan konnte nicht geladen werden.';
+      });
     }
   }
 
@@ -365,7 +378,9 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
           .toList();
 
       if (!mounted) return;
+      final syncError = _service.lastSyncError;
       setState(() {
+        _recipeLoadError = syncError;
         _recipes = recipes;
         _isLoadingRecipes = false;
       });
@@ -373,12 +388,8 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       debugPrint('GemeinsamSattScreen._loadRecipes(): failed: $e');
       if (!mounted) return;
       setState(() {
-        _recipes = _buildDemoRecipes()
-          .map((recipe) =>
-            recipe.copyWith(isSavedByMe: _savedRecipeIds.contains(recipe.id)))
-            .map((recipe) =>
-                recipe.copyWith(relevanceScore: _scoreForCurrentParent(recipe)))
-            .toList();
+        _recipeLoadError = _service.lastSyncError ?? 'Rezepte konnten nicht geladen werden.';
+        _recipes = [];
         _isLoadingRecipes = false;
       });
     }
@@ -722,6 +733,14 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_nearbyLoadError != null && _posts.isEmpty) {
+      return _buildBackendErrorState(
+        title: 'Angebote konnten nicht geladen werden',
+        subtitle: _nearbyLoadError!,
+        onRetry: _loadNearbyFeed,
+      );
+    }
+
     final available = _filteredNearbyPosts;
     if (available.isEmpty) {
       return _buildEmptyState(
@@ -937,6 +956,40 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
             ],
           ),
         ),
+        if (_mealPlanLoadError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFED7AA)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_off_rounded,
+                      size: 18, color: Color(0xFFB45309)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _mealPlanLoadError!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadWeekMealPlan,
+                    child: const Text('Erneut laden'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
@@ -1010,6 +1063,14 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   Widget _buildRecipesFeed() {
     if (_isLoadingRecipes) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_recipeLoadError != null && _recipes.isEmpty) {
+      return _buildBackendErrorState(
+        title: 'Rezepte konnten nicht geladen werden',
+        subtitle: _recipeLoadError!,
+        onRetry: _loadRecipes,
+      );
     }
 
     if (_recipes.isEmpty) {
@@ -1303,6 +1364,55 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
               style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF8A9AB0),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBackendErrorState({
+    required String title,
+    required String subtitle,
+    required Future<void> Function() onRetry,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded,
+                size: 48, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A2A3A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              onPressed: () => onRetry(),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Erneut laden'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brand,
+                foregroundColor: Colors.white,
               ),
             ),
           ],
@@ -1768,230 +1878,16 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     );
   }
 
-  // -------------------------------------------------------
-  // DEMO DATA
-  // -------------------------------------------------------
-
-  WeekPlan _buildDemoWeekPlan() {
+  WeekPlan _buildEmptyWeekPlan() {
     final today = DateTime.now().toDateOnly;
-    final days = <DayPlan>[];
-    for (int i = 0; i < 7; i++) {
-      final date = today.add(Duration(days: i - (today.weekday - 1)));
-      if (i == 0) {
-        days.add(
-          DayPlan(
-            date: date,
-            meals: const [
-              Meal(
-                id: '1',
-                title: 'Müsli mit Joghurt',
-                type: MealType.breakfast,
-                description: 'Mit Beeren und Honig',
-              ),
-              Meal(
-                id: '2',
-                title: 'Pasta Bolognese',
-                type: MealType.lunch,
-                description: 'Hausgemacht, kinderfreundlich',
-                ingredients: ['500g Pasta', '400g Hack', 'Tomaten', 'Zwiebel'],
-              ),
-            ],
-          ),
-        );
-      } else if (i == 2) {
-        days.add(
-          DayPlan(
-            date: date,
-            meals: const [
-              Meal(
-                id: '3',
-                title: 'Pancakes',
-                type: MealType.breakfast,
-              ),
-              Meal(
-                id: '4',
-                title: 'Fischstäbchen mit Kartoffeln',
-                type: MealType.lunch,
-              ),
-              Meal(
-                id: '5',
-                title: 'Obst & Käse',
-                type: MealType.snack,
-              ),
-            ],
-          ),
-        );
-      } else {
-        days.add(DayPlan(date: date));
-      }
-    }
-    return WeekPlan(weekStart: today.subtract(Duration(days: today.weekday - 1)), days: days);
-  }
-
-  List<FoodSharePost> _buildDemoPosts() {
-    return [
-      FoodSharePost(
-        id: 'p-1',
-        authorId: 'mueller',
-        authorName: 'Familie Müller',
-        authorInitials: 'FM',
-        authorColor: const Color(0xFF2563EB),
-        title: 'Selbstgemachte Lasagne 🍝',
-        description:
-            'Heute groß gekocht! Hausgemachte Lasagne mit Gemüse und Hack. Perfekt für Familien mit kleinen Kindern.',
-        totalPortions: 4,
-        remainingPortions: 3,
-        pickupWindow: 'Heute 17:30 – 19:00 Uhr',
-        distanceKm: 0.4,
-        createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-        likedByUserIds: ['kaya', 'nguyen'],
-        comments: [
-          FoodShareComment(
-            id: 'c-1',
-            authorName: 'Familie Kaya',
-            authorInitials: 'FK',
-            authorColor: const Color(0xFF16A34A),
-            text: 'Klingt mega lecker! Ich komme vorbei 😍',
-            createdAt: DateTime.now().subtract(const Duration(minutes: 30)),
-          ),
-        ],
-        imageEmoji: '🍝',
+    final weekStart = today.subtract(Duration(days: today.weekday - 1));
+    return WeekPlan(
+      weekStart: weekStart,
+      days: List.generate(
+        7,
+        (index) => DayPlan(date: weekStart.add(Duration(days: index))),
       ),
-      FoodSharePost(
-        id: 'p-2',
-        authorId: 'kaya',
-        authorName: 'Familie Kaya',
-        authorInitials: 'FK',
-        authorColor: const Color(0xFF16A34A),
-        title: 'Linsensuppe mit Brot 🍲',
-        description:
-            'Türkische Linsensuppe – super nahrhaft für Kinder. Dazu frisches Fladenbrot. Vegan & glutenfrei möglich.',
-        totalPortions: 3,
-        remainingPortions: 2,
-        pickupWindow: 'Heute 18:00 – 20:00 Uhr',
-        distanceKm: 0.7,
-        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-        likedByUserIds: ['mueller', 'mama_fatih', 'nguyen'],
-        comments: [],
-        imageEmoji: '🍲',
-      ),
-      FoodSharePost(
-        id: 'p-3',
-        authorId: 'nguyen',
-        authorName: 'Familie Nguyen',
-        authorInitials: 'FN',
-        authorColor: const Color(0xFF8B5CF6),
-        title: 'Vietnamesische Reisschüssel 🍱',
-        description:
-            'Bunter Gemüsereis mit Tofu – die Kinder lieben es! Heute zu viel gekocht.',
-        totalPortions: 2,
-        remainingPortions: 2,
-        pickupWindow: 'Heute 17:00 – 18:30 Uhr',
-        distanceKm: 1.1,
-        createdAt: DateTime.now().subtract(const Duration(minutes: 45)),
-        likedByUserIds: ['kaya'],
-        comments: [],
-        imageEmoji: '🍱',
-      ),
-    ];
-  }
-
-  List<SharedRecipe> _buildDemoRecipes() {
-    return [
-      SharedRecipe(
-        id: 'rec-1',
-        authorId: 'mueller',
-        authorName: 'Familie Müller',
-        authorInitials: 'FM',
-        authorColor: const Color(0xFF2563EB),
-        title: 'Schnelle Linsensuppe für die ganze Familie',
-        description: 'Super einfach, nahrhaft und die Kinder lieben sie! In 20 Minuten fertig.',
-        imageEmoji: '🍲',
-        durationMinutes: 20,
-        difficulty: RecipeDifficulty.einfach,
-        tags: ['vegan', 'schnell', 'baby-geeignet'],
-        likedByUserIds: ['mama_fatih', 'kaya', 'nguyen'],
-        ingredients: [
-          '200g rote Linsen',
-          '1 Zwiebel, gewürfelt',
-          '2 Karotten, gewürfelt',
-          '1 TL Kurkuma',
-          '800ml Gemüsebrühe',
-          'Etwas Olivenöl, Salz, Pfeffer',
-        ],
-        steps: [
-          'Zwiebeln in Olivenöl glasig anbraten.',
-          'Karotten hinzufügen, 2 Min mitbraten.',
-          'Linsen und Kurkuma einrühren.',
-          'Mit Brühe aufgießen, 15 Min köcheln lassen.',
-          'Mit Stabmixer halb pürieren für cremige Konsistenz.',
-          'Mit Salz und Pfeffer abschmecken – fertig!',
-        ],
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      SharedRecipe(
-        id: 'rec-2',
-        authorId: 'kaya',
-        authorName: 'Familie Kaya',
-        authorInitials: 'FK',
-        authorColor: const Color(0xFF16A34A),
-        title: 'Türkische Menemen – Eier in Tomatensauce',
-        description: 'Unser Familienfrühstück! Kinder lippen ab, super schnell und sättigend.',
-        imageEmoji: '🍳',
-        durationMinutes: 15,
-        difficulty: RecipeDifficulty.einfach,
-        tags: ['vegetarisch', 'frühstück', 'kinderfreundlich'],
-        likedByUserIds: ['mueller'],
-        ingredients: [
-          '4 Eier',
-          '2 reife Tomaten, gewürfelt',
-          '1 grüne Paprika, gewürfelt',
-          '1 Zwiebel',
-          'Olivenöl, Salz, Pfeffer, Paprikapulver',
-          'Fladenbrot zum Servieren',
-        ],
-        steps: [
-          'Zwiebel und Paprika in Öl anbraten.',
-          'Tomaten hinzufügen, 5 Min einkochen lassen.',
-          'Eier direkt in die Pfanne aufschlagen.',
-          'Vorsichtig mit Gemüse verrühren.',
-          'Würzen und bei niedriger Hitze stocken lassen.',
-          'Mit Fladenbrot warm servieren.',
-        ],
-        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-      ),
-      SharedRecipe(
-        id: 'rec-3',
-        authorId: 'nguyen',
-        authorName: 'Familie Nguyen',
-        authorInitials: 'FN',
-        authorColor: const Color(0xFF8B5CF6),
-        title: 'Gebratener Reis mit Gemüse (One-Pan)',
-        description: 'Perfekt um Reisereste zu verwerten! Kinder können beim Kochen helfen.',
-        imageEmoji: '🍱',
-        durationMinutes: 25,
-        difficulty: RecipeDifficulty.mittel,
-        tags: ['vegan', 'one-pan', 'resteverwertung'],
-        likedByUserIds: ['mama_fatih'],
-        ingredients: [
-          '400g vorgekochter Reis (vom Vortag)',
-          '2 Eier',
-          '1 Tasse gefrorene Erbsen',
-          '2 Frühlingszwiebeln',
-          '2 EL Sojasoße',
-          '1 TL Sesamöl',
-        ],
-        steps: [
-          'Pfanne mit Öl stark erhitzen.',
-          'Erbsen und Frühlingszwiebeln kurz anbraten.',
-          'Reis hinzufügen, aufbrechen und braten.',
-          'Eine Mulde machen, Eier hineinschlagen und rühren.',
-          'Alles vermischen, mit Sojasoße würzen.',
-          'Mit Sesamöl abschmecken und servieren.',
-        ],
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-    ];
+    );
   }
 }
 

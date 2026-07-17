@@ -7264,6 +7264,7 @@ function buildAuthorTrustSummary(recipes) {
   let ratingWeight = 0;
   let totalReports = 0;
   let completedShares = 0;
+  let lastSharedAt = null;
 
   for (const recipe of recipes) {
     const ratingCount = Number(recipe.ratingCount || 0);
@@ -7272,6 +7273,14 @@ function buildAuthorTrustSummary(recipes) {
     ratingWeight += ratingCount;
     totalReports += Number(recipe.reportedCount || 0);
     completedShares += Number(recipe.reservationCount || 0);
+    const reservationUpdatedAt = recipe.latestReservationUpdatedAt
+      ? new Date(recipe.latestReservationUpdatedAt)
+      : null;
+    if (reservationUpdatedAt && !Number.isNaN(reservationUpdatedAt.getTime())) {
+      if (!lastSharedAt || reservationUpdatedAt > lastSharedAt) {
+        lastSharedAt = reservationUpdatedAt;
+      }
+    }
   }
 
   const averageRating = ratingWeight > 0 ? weightedRatingSum / ratingWeight : 0;
@@ -7292,6 +7301,7 @@ function buildAuthorTrustSummary(recipes) {
     publishedRecipesCount,
     activeOffersCount,
     completedShares,
+    lastSharedAt: lastSharedAt ? lastSharedAt.toISOString() : null,
     averageRating: Math.round(averageRating * 100) / 100,
     totalReports,
   };
@@ -7322,6 +7332,15 @@ async function buildAuthorTrustMapForRecipes(recipes) {
           offerReservations: true,
         },
       },
+      offerReservations: {
+        select: {
+          updatedAt: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 1,
+      },
     },
   });
 
@@ -7333,6 +7352,7 @@ async function buildAuthorTrustMapForRecipes(recipes) {
     items.push({
       ...recipe,
       reservationCount: recipe._count?.offerReservations || 0,
+      latestReservationUpdatedAt: recipe.offerReservations?.[0]?.updatedAt || null,
     });
     byAuthor.set(key, items);
   }

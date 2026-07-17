@@ -25,6 +25,7 @@ class SharedRecipe {
   final int authorPublishedRecipesCount;
   final int authorActiveOffersCount;
   final int authorCompletedShares;
+  final DateTime? authorLastSharedAt;
   final double averageRating;
   final int ratingCount;
   final int viewCount;
@@ -53,6 +54,7 @@ class SharedRecipe {
     this.authorPublishedRecipesCount = 0,
     this.authorActiveOffersCount = 0,
     this.authorCompletedShares = 0,
+    this.authorLastSharedAt,
     this.averageRating = 0,
     this.ratingCount = 0,
     this.viewCount = 0,
@@ -91,6 +93,7 @@ class SharedRecipe {
     int? authorPublishedRecipesCount,
     int? authorActiveOffersCount,
     int? authorCompletedShares,
+    DateTime? authorLastSharedAt,
     double? averageRating,
     int? ratingCount,
     int? viewCount,
@@ -121,6 +124,7 @@ class SharedRecipe {
           authorActiveOffersCount ?? this.authorActiveOffersCount,
           authorCompletedShares:
             authorCompletedShares ?? this.authorCompletedShares,
+          authorLastSharedAt: authorLastSharedAt ?? this.authorLastSharedAt,
       averageRating: averageRating ?? this.averageRating,
       ratingCount: ratingCount ?? this.ratingCount,
       viewCount: viewCount ?? this.viewCount,

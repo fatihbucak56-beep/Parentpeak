@@ -77,6 +77,18 @@ Widget _buildFoodInfoChip(String tag) {
   );
 }
 
+String _lastSharedLabelFor(DateTime? value) {
+  if (value == null) return 'Noch keine geteilte Historie';
+  final diff = DateTime.now().difference(value);
+  if (diff.inHours < 24) {
+    return 'Zuletzt geteilt: heute';
+  }
+  if (diff.inDays == 1) {
+    return 'Zuletzt geteilt: gestern';
+  }
+  return 'Zuletzt geteilt: vor ${diff.inDays} Tagen';
+}
+
 class GemeinsamSattScreen extends StatefulWidget {
   const GemeinsamSattScreen({super.key});
 
@@ -236,6 +248,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       authorTrustLabel: item.authorTrust?.label ?? 'Neu im Teilen',
       authorTrustLevel: item.authorTrust?.level ?? 'new',
       authorCompletedShares: item.authorTrust?.completedShares ?? 0,
+      authorLastSharedAt: item.authorTrust?.lastSharedAt,
     );
   }
 
@@ -330,6 +343,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       authorPublishedRecipesCount: data.authorTrust?.publishedRecipesCount ?? 0,
       authorActiveOffersCount: data.authorTrust?.activeOffersCount ?? 0,
       authorCompletedShares: data.authorTrust?.completedShares ?? 0,
+      authorLastSharedAt: data.authorTrust?.lastSharedAt,
       averageRating: data.rating,
       ratingCount: data.ratingCount,
       viewCount: data.viewCount,
@@ -2045,6 +2059,17 @@ class _PostCardState extends State<_PostCard>
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (post.authorLastSharedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _lastSharedLabelFor(post.authorLastSharedAt),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
 
                 const SizedBox(height: 12),
@@ -3179,6 +3204,9 @@ class _RecipeDetailSheet extends StatelessWidget {
                       if (recipe.authorCompletedShares > 0)
                         _statChip(Icons.handshake_rounded,
                             '${recipe.authorCompletedShares} Teilungen'),
+                      if (recipe.authorLastSharedAt != null)
+                        _statChip(Icons.update_rounded,
+                            _lastSharedLabelFor(recipe.authorLastSharedAt)),
                     ],
                   ),
                   const SizedBox(height: 12),

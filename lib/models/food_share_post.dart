@@ -22,6 +22,7 @@ class FoodSharePost {
   final String authorTrustLabel;
   final String authorTrustLevel;
   final int authorCompletedShares;
+  final DateTime? authorLastSharedAt;
 
   const FoodSharePost({
     required this.id,
@@ -44,6 +45,7 @@ class FoodSharePost {
     this.authorTrustLabel = 'Neu im Teilen',
     this.authorTrustLevel = 'new',
     this.authorCompletedShares = 0,
+    this.authorLastSharedAt,
   });
 
   bool get isAvailable => remainingPortions > 0;
@@ -57,6 +59,7 @@ class FoodSharePost {
     String? authorTrustLabel,
     String? authorTrustLevel,
     int? authorCompletedShares,
+    DateTime? authorLastSharedAt,
   }) {
     return FoodSharePost(
       id: id,
@@ -79,6 +82,7 @@ class FoodSharePost {
       authorTrustLabel: authorTrustLabel ?? this.authorTrustLabel,
       authorTrustLevel: authorTrustLevel ?? this.authorTrustLevel,
       authorCompletedShares: authorCompletedShares ?? this.authorCompletedShares,
+      authorLastSharedAt: authorLastSharedAt ?? this.authorLastSharedAt,
     );
   }
 }

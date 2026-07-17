@@ -15,10 +15,14 @@ Starten:
 Wichtige .env Variablen:
 - `GEMINI_API_KEY`: API Key fuer den Paedagogik-Chat
 - `BACKEND_BASE_URL`: Basis-URL deines Backends (z. B. `https://api.example.com`)
-- `BACKEND_API_TOKEN`: Bearer Token fuer geschuetzte Endpunkte
+- `BACKEND_API_TOKEN`: Backend-only Bearer Token fuer Service/Admin-Pfade (niemals im App-Bundle ausliefern)
 - `BACKEND_FAMILY_ID`: Familienkontext fuer Requests (z. B. `example-family-001`)
 - `BACKEND_API_VERSION`: Version des Request-Schemas (Standard: `v1`)
 - `BACKEND_TODOS_PATH`, `BACKEND_SHOPPING_PATH`, `BACKEND_CALENDAR_EVENTS_PATH`, `BACKEND_HEALTH_PATH`: optionale Endpoint-Overrides
+
+Auth-Hinweis (Produktion):
+- Mobile/Web Clients sollen fuer Schreibzugriffe einen gueltigen Firebase ID-Token senden.
+- `BACKEND_API_TOKEN` ist nur fuer Backend-zu-Backend/Notfallpfade gedacht und darf nicht in Client-Config oder Frontend-Bundles landen.
 
 Backend Deploy (Anfaenger)
 --------------------------
@@ -163,21 +167,23 @@ Fuer die finale Veroeffentlichung und den Betrieb nach Launch:
 	- `docs/APP_GO_LIVE_OPERATIONS_CHECKLIST.md`
 3. 7-Tage Monitoring und Eskalation nach Launch:
 	- `docs/POST_LAUNCH_7_DAY_MONITORING_PLAN.md`
-4. Kompakte Meeting-Seite fuer Go/No-Go:
+4. Auth-Hardening und Token-Rotation Runbook:
+	- `docs/AUTH_HARDENING_RUNBOOK.md`
+5. Kompakte Meeting-Seite fuer Go/No-Go:
 	- `docs/APP_GO_NO_GO_DECISION_PAGE.md`
-5. Druckbare 1-Seiten Uebersicht fuer Management/Partner:
+6. Druckbare 1-Seiten Uebersicht fuer Management/Partner:
 	- `docs/RELEASE_EXEC_SUMMARY.md`
-6. Ultrakurzer Investor-Brief (DE):
+7. Ultrakurzer Investor-Brief (DE):
 	- `docs/RELEASE_INVESTOR_BRIEF_DE.md`
-7. Ultra-short investor brief (EN):
+8. Ultra-short investor brief (EN):
 	- `docs/RELEASE_INVESTOR_BRIEF_EN.md`
-8. 30-Sekunden Pitch (DE + EN):
+9. 30-Sekunden Pitch (DE + EN):
 	- `docs/RELEASE_30S_PITCH.md`
-9. Konkretes Solo-Release-Entscheidungsprotokoll (GO mit Auflagen):
+10. Konkretes Solo-Release-Entscheidungsprotokoll (GO mit Auflagen):
 	- `docs/RELEASE_DECISION_PROTOCOL_2026-07-14.md`
-10. T+24h Entscheidungs-Card fuer Rollout-Stufe 10% -> 25%:
+11. T+24h Entscheidungs-Card fuer Rollout-Stufe 10% -> 25%:
 	- `docs/T_PLUS_24H_ROLLOUT_DECISION_CARD.md`
-11. Automatisches GO/HOLD/STOP Script:
+12. Automatisches GO/HOLD/STOP Script:
 	- `scripts/t_plus_24h_rollout_gate.sh`
 
 Finale Backend Verkabelung (Android + iOS)

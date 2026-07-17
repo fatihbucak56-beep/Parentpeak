@@ -477,7 +477,7 @@ async function firebaseAuthMiddleware(req, res, next) {
 
 // Middleware
 app.use(firebaseAuthMiddleware);
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   // Baseline hardening headers for API traffic.
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -616,7 +616,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (!isWriteRequest(req)) {
     next();
     return;

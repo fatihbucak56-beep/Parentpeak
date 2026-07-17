@@ -144,6 +144,242 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
     return '$success/${_checks.length} Endpunkte erreichbar • Ø $avg ms';
   }
 
+  Future<void> _showFoodOfferModerationPanel() async {
+    final apiClient = BackendServiceFactory.createApiClient();
+    if (apiClient == null) return;
+
+    List<_FoodOfferReport> reports = const <_FoodOfferReport>[];
+    var isLoading = true;
+    String? errorMessage;
+    String selectedFilter = 'offen';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        Future<void> loadReports(StateSetter setModalState) async {
+          setModalState(() {
+            isLoading = true;
+            errorMessage = null;
+          });
+          try {
+            final payload = await apiClient.getJson('/api/food-feed/reports?maxResults=50');
+            final rawReports = (payload is Map<String, dynamic> ? payload['reports'] : null) as List?;
+            final fetched = (rawReports ?? const [])
+                .whereType<Map>()
+                .map((item) => _FoodOfferReport.fromMap(Map<String, dynamic>.from(item)))
+                .toList();
+            setModalState(() {
+              reports = fetched;
+              isLoading = false;
+            });
+          } catch (e) {
+            setModalState(() {
+              errorMessage = 'Moderationsdaten konnten nicht geladen werden.';
+              isLoading = false;
+            });
+          }
+        }
+
+        Future<void> resolveReport(
+          StateSetter setModalState,
+          _FoodOfferReport report,
+          String action,
+        ) async {
+          try {
+            await apiClient.postJsonAny('/api/food-feed/reports/${report.id}/resolve', {
+              'action': action,
+            });
+            await loadReports(setModalState);
+          } catch (_) {
+            setModalState(() {
+              errorMessage = 'Moderationsaktion konnte nicht gespeichert werden.';
+            });
+          }
+        }
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (isLoading && reports.isEmpty && errorMessage == null) {
+              loadReports(setModalState);
+            }
+
+            final visibleReports = reports.where((report) {
+              switch (selectedFilter) {
+                case 'bearbeitet':
+                  return report.isResolved;
+                default:
+                  return !report.isResolved;
+              }
+            }).toList();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'GemeinsamSatt Moderation',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => loadReports(setModalState),
+                        icon: const Icon(Icons.refresh_rounded),
+                        tooltip: 'Neu laden',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Hier siehst du Meldungen aus dem Versorgungs-Feed und kannst Angebote als bearbeitet oder freigegeben markieren.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Offen'),
+                        selected: selectedFilter == 'offen',
+                        onSelected: (_) => setModalState(() => selectedFilter = 'offen'),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Bearbeitet'),
+                        selected: selectedFilter == 'bearbeitet',
+                        onSelected: (_) => setModalState(() => selectedFilter = 'bearbeitet'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (isLoading && reports.isEmpty)
+                    const Center(child: CircularProgressIndicator())
+                  else if (errorMessage != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(errorMessage!),
+                    )
+                  else if (visibleReports.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        selectedFilter == 'bearbeitet'
+                            ? 'Keine bearbeiteten Meldungen.'
+                            : 'Keine offenen Meldungen.',
+                      ),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 460),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: visibleReports.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final report = visibleReports[index];
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        report.recipeTitle,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: report.isResolved
+                                            ? const Color(0xFFD1FAE5)
+                                            : const Color(0xFFFDE68A),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(report.isResolved ? 'Bearbeitet' : 'Offen'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Meldegrund: ${report.reason}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                if (report.details.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    report.details,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Reporter: ${report.reportedById} • ${report.createdAtLabel}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                if (!report.isResolved) ...[
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    children: [
+                                      OutlinedButton(
+                                        onPressed: () => resolveReport(setModalState, report, 'dismissed'),
+                                        child: const Text('Freigeben'),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      FilledButton(
+                                        onPressed: () => resolveReport(setModalState, report, 'resolved'),
+                                        child: const Text('Als bearbeitet markieren'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -152,6 +388,12 @@ class _BackendStatusScreenState extends State<BackendStatusScreen> {
       appBar: AppBar(
         title: const Text('Backend Status'),
         actions: [
+          if (_hasToken)
+            IconButton(
+              onPressed: _showFoodOfferModerationPanel,
+              icon: const Icon(Icons.gpp_maybe_rounded),
+              tooltip: 'GemeinsamSatt Moderation',
+            ),
           IconButton(
             onPressed: _runChecks,
             icon: const Icon(Icons.refresh_rounded),
@@ -269,4 +511,57 @@ class _EndpointCheck {
     required this.detail,
     required this.latencyMs,
   });
+}
+
+class _FoodOfferReport {
+  final String id;
+  final String recipeTitle;
+  final String reportedById;
+  final String reason;
+  final String details;
+  final String status;
+  final DateTime? createdAt;
+
+  const _FoodOfferReport({
+    required this.id,
+    required this.recipeTitle,
+    required this.reportedById,
+    required this.reason,
+    required this.details,
+    required this.status,
+    required this.createdAt,
+  });
+
+  bool get isResolved => status == 'resolved' || status == 'dismissed';
+
+  String get createdAtLabel {
+    final value = createdAt;
+    if (value == null) return 'unbekannt';
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    final year = value.year.toString();
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$day.$month.$year $hour:$minute';
+  }
+
+  factory _FoodOfferReport.fromMap(Map<String, dynamic> map) {
+    final recipe = map['recipe'] is Map<String, dynamic>
+        ? map['recipe'] as Map<String, dynamic>
+        : map['recipe'] is Map
+            ? Map<String, dynamic>.from(map['recipe'] as Map)
+            : const <String, dynamic>{};
+
+    return _FoodOfferReport(
+      id: (map['id'] ?? '').toString(),
+      recipeTitle: (recipe['title'] ?? 'Unbekanntes Angebot').toString(),
+      reportedById: (map['reportedById'] ?? '').toString(),
+      reason: (map['reason'] ?? '').toString(),
+      details: (map['details'] ?? '').toString(),
+      status: (map['status'] ?? '').toString(),
+      createdAt: map['createdAt'] is String
+          ? DateTime.tryParse(map['createdAt'] as String)
+          : null,
+    );
+  }
 }

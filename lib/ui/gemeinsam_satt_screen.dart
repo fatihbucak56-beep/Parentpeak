@@ -90,6 +90,38 @@ List<String> _visibleFoodInfoTags(List<String> tags) {
   return tags.where(_foodInfoMetaByTag.containsKey).toList();
 }
 
+String? _familyFitSummaryForTags(List<String> tags) {
+  final tagSet = tags.toSet();
+  final parts = <String>[];
+
+  if (tagSet.contains('babyfreundlich')) {
+    parts.add('Gut fuer Babys');
+  } else if (tagSet.contains('kinderfreundlich')) {
+    parts.add('Gut fuer Kinder');
+  }
+
+  if (tagSet.contains('glutenfrei')) {
+    parts.add('glutenfrei');
+  } else if (tagSet.contains('nussfrei')) {
+    parts.add('nussfrei');
+  }
+
+  if (tagSet.contains('nicht_scharf')) {
+    parts.add('mild');
+  } else if (tagSet.contains('scharf')) {
+    parts.add('eher scharf');
+  }
+
+  if (tagSet.contains('vegan')) {
+    parts.add('vegan');
+  } else if (tagSet.contains('vegetarisch')) {
+    parts.add('vegetarisch');
+  }
+
+  if (parts.isEmpty) return null;
+  return parts.join(' · ');
+}
+
 Widget _buildFoodInfoChip(String tag) {
   final meta = _foodInfoMetaByTag[tag];
   if (meta == null) {
@@ -1940,6 +1972,7 @@ class _PostCardState extends State<_PostCard>
     final isLiked = post.likedByUserIds.contains(widget.myUserId);
     final likeCount = post.likedByUserIds.length;
     final visibleInfoTags = _visibleFoodInfoTags(post.tags);
+    final familySummary = _familyFitSummaryForTags(post.tags);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -2121,6 +2154,18 @@ class _PostCardState extends State<_PostCard>
                     height: 1.5,
                   ),
                 ),
+
+                if (familySummary != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    familySummary,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                ],
 
                 if (visibleInfoTags.isNotEmpty) ...[
                   const SizedBox(height: 10),
@@ -2996,6 +3041,7 @@ class _RecipeCardState extends State<_RecipeCard>
     final recipe = widget.recipe;
     final isLiked = recipe.likedByUserIds.contains(widget.myUserId);
     final visibleInfoTags = _visibleFoodInfoTags(recipe.tags);
+    final familySummary = _familyFitSummaryForTags(recipe.tags);
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -3132,6 +3178,18 @@ class _RecipeCardState extends State<_RecipeCard>
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 13, color: Color(0xFF516072), height: 1.4)),
 
+                  if (familySummary != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      familySummary,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ],
+
                   if (visibleInfoTags.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     Wrap(
@@ -3229,6 +3287,7 @@ class _RecipeDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visibleInfoTags = _visibleFoodInfoTags(recipe.tags);
+    final familySummary = _familyFitSummaryForTags(recipe.tags);
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
       decoration: BoxDecoration(
@@ -3321,6 +3380,26 @@ class _RecipeDetailSheet extends StatelessWidget {
 
                   Text(recipe.description,
                       style: const TextStyle(fontSize: 14, color: Color(0xFF516072), height: 1.5)),
+                  if (familySummary != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFD),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Text(
+                        'Kurz fuer Eltern: $familySummary',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   // Ingredients

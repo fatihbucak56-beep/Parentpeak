@@ -3,8 +3,6 @@
  * Tests recipe CRUD, ratings, filtering, and persistence
  */
 
-const http = require('http');
-const https = require('https');
 const API_BASE = process.env.API_BASE || 'https://parentpeak.onrender.com';
 const BEARER_TOKEN =
   process.env.BEARER_TOKEN ||
@@ -54,45 +52,32 @@ const testRecipe2 = {
 
 // Utility: Make HTTP request
 function makeRequest(method, path, body = null, token = null) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(path, API_BASE);
-    const protocol = url.protocol === 'https:' ? https : http;
-    const options = {
-      hostname: url.hostname,
-      port: url.port,
-      path: url.pathname + url.search,
-      method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-      },
-    };
-
-    const req = protocol.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve({
-            status: res.statusCode,
-            body: data ? JSON.parse(data) : null,
-          });
-        } catch (e) {
-          resolve({
-            status: res.statusCode,
-            body: {
-              parseError: e.message,
-              raw: data.slice(0, 300),
-            },
-          });
-        }
-      });
+  const url = new URL(path, API_BASE);
+  return fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+    .then(async (res) => {
+      const data = await res.text();
+      try {
+        return {
+          status: res.status,
+          body: data ? JSON.parse(data) : null,
+        };
+      } catch (e) {
+        return {
+          status: res.status,
+          body: {
+            parseError: e.message,
+            raw: data.slice(0, 300),
+          },
+        };
+      }
     });
-
-    req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
 }
 
 function asNumber(value) {
@@ -320,9 +305,7 @@ async function runTests() {
   // Test 9: Delete recipe
   try {
     console.log('\n🗑️  Test 9: Delete recipe');
-    const deleteRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId2}`, {
-      userId: testUserId,
-    }, BEARER_TOKEN);
+    const deleteRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId2}?userId=${encodeURIComponent(testUserId)}`, null, BEARER_TOKEN);
     
     if (deleteRes.status === 200 && deleteRes.body.success) {
       console.log(`  ✓ Recipe deleted`);

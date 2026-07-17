@@ -69,6 +69,7 @@ class FoodSharePost {
 
 class FoodShareComment {
   final String id;
+  final String authorId;
   final String authorName;
   final String authorInitials;
   final Color authorColor;
@@ -77,6 +78,7 @@ class FoodShareComment {
 
   const FoodShareComment({
     required this.id,
+    this.authorId = '',
     required this.authorName,
     required this.authorInitials,
     required this.authorColor,

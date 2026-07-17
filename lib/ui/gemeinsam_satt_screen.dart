@@ -99,6 +99,26 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
           .where((post) => post.title.trim().isNotEmpty)
           .toList();
 
+      for (final post in mappedOffers) {
+        final summary = await _service.fetchOfferReservationSummary(
+          recipeId: post.id,
+          userId: _myUserId,
+        );
+
+        if (summary == null) continue;
+        final reservedPortions = (summary['reservedPortions'] as num?)?.toInt() ?? 0;
+        final myPortions = ((summary['myReservation'] as Map?)?['portions'] as num?)?.toInt() ?? 0;
+
+        final idx = mappedOffers.indexWhere((item) => item.id == post.id);
+        if (idx == -1) continue;
+
+        final remaining = (mappedOffers[idx].totalPortions - reservedPortions).clamp(0, mappedOffers[idx].totalPortions);
+        mappedOffers[idx] = mappedOffers[idx].copyWith(
+          remainingPortions: remaining,
+          isReservedByMe: myPortions > 0,
+        );
+      }
+
       if (!mounted) return;
       setState(() {
         _posts = mappedOffers;
@@ -962,13 +982,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
     final post = _posts[idx];
 
     if (post.isReservedByMe) {
-      _showSnack('Reservierung aufgehoben 👋');
-      setState(() {
-        _posts[idx] = post.copyWith(
-          isReservedByMe: false,
-          remainingPortions: post.remainingPortions + 1,
-        );
-      });
+      _cancelReservation(post, idx);
       return;
     }
 
@@ -978,42 +992,129 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       builder: (_) => _PickupBottomSheet(
         post: post,
         onConfirm: (message) {
-          setState(() {
-            _posts[idx] = post.copyWith(
-              isReservedByMe: true,
-              remainingPortions: post.remainingPortions - 1,
-            );
-          });
-          _showSnack('Super! ${post.authorName} wurde benachrichtigt 🎉');
+          _confirmReservation(post, idx);
         },
       ),
     );
   }
 
-  void _showComments(FoodSharePost post) {
+  Future<void> _confirmReservation(FoodSharePost post, int index) async {
+    final result = await _service.reserveOffer(
+      recipeId: post.id,
+      userId: _myUserId,
+      portions: 1,
+    );
+
+    if (result == null) {
+      _showSnack(_service.lastSyncError ?? 'Reservierung fehlgeschlagen');
+      return;
+    }
+
+    final reservedPortions = (result['reservedPortions'] as num?)?.toInt() ?? 0;
+    final remaining = (post.totalPortions - reservedPortions).clamp(0, post.totalPortions);
+    if (!mounted) return;
+    setState(() {
+      _posts[index] = post.copyWith(
+        isReservedByMe: true,
+        remainingPortions: remaining,
+      );
+    });
+    _showSnack('Super! ${post.authorName} wurde benachrichtigt');
+  }
+
+  Future<void> _cancelReservation(FoodSharePost post, int index) async {
+    final ok = await _service.cancelOfferReservation(
+      recipeId: post.id,
+      userId: _myUserId,
+    );
+
+    if (!ok) {
+      _showSnack(_service.lastSyncError ?? 'Reservierung konnte nicht aufgehoben werden');
+      return;
+    }
+
+    final summary = await _service.fetchOfferReservationSummary(
+      recipeId: post.id,
+      userId: _myUserId,
+    );
+    final reservedPortions = (summary?['reservedPortions'] as num?)?.toInt() ?? 0;
+    final remaining = (post.totalPortions - reservedPortions).clamp(0, post.totalPortions);
+    if (!mounted) return;
+    setState(() {
+      _posts[index] = post.copyWith(
+        isReservedByMe: false,
+        remainingPortions: remaining,
+      );
+    });
+    _showSnack('Reservierung aufgehoben');
+  }
+
+  Future<void> _showComments(FoodSharePost post) async {
+    final backendComments = await _service.fetchOfferComments(recipeId: post.id);
+    final hydratedComments = backendComments.map((item) {
+      final authorId = (item['userId'] ?? '').toString();
+      return FoodShareComment(
+        id: (item['id'] ?? '').toString(),
+        authorId: authorId,
+        authorName: _getUserDisplayName(authorId),
+        authorInitials: _getInitials(authorId),
+        authorColor: _getColorForAuthor(authorId),
+        text: (item['text'] ?? '').toString(),
+        createdAt: item['createdAt'] is String
+            ? DateTime.tryParse(item['createdAt'] as String) ?? DateTime.now()
+            : DateTime.now(),
+      );
+    }).toList();
+
+    final mergedPost = post.copyWith(comments: hydratedComments);
+    final idx = _posts.indexWhere((p) => p.id == post.id);
+    if (idx != -1 && mounted) {
+      setState(() {
+        _posts[idx] = mergedPost;
+      });
+    }
+
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _CommentsSheet(
-        post: post,
+        post: mergedPost,
         myUserId: _myUserId,
-        onAddComment: (text) {
-          final idx = _posts.indexWhere((p) => p.id == post.id);
-          if (idx == -1) return;
-          final newComment = FoodShareComment(
-            id: 'c-${DateTime.now().millisecondsSinceEpoch}',
-            authorName: 'Ich',
-            authorInitials: 'ME',
-            authorColor: _brand,
+        onAddComment: (text) async {
+          final created = await _service.createOfferComment(
+            recipeId: post.id,
+            userId: _myUserId,
             text: text,
-            createdAt: DateTime.now(),
           );
+
+          if (created == null) {
+            _showSnack(_service.lastSyncError ?? 'Kommentar konnte nicht gespeichert werden');
+            return false;
+          }
+
+          final idx = _posts.indexWhere((p) => p.id == post.id);
+          if (idx == -1) return false;
+          final authorId = (created['userId'] ?? _myUserId).toString();
+          final newComment = FoodShareComment(
+            id: (created['id'] ?? 'c-${DateTime.now().millisecondsSinceEpoch}').toString(),
+            authorId: authorId,
+            authorName: _getUserDisplayName(authorId),
+            authorInitials: _getInitials(authorId),
+            authorColor: _getColorForAuthor(authorId),
+            text: text,
+            createdAt: created['createdAt'] is String
+                ? DateTime.tryParse(created['createdAt'] as String) ?? DateTime.now()
+                : DateTime.now(),
+          );
+          if (!mounted) return false;
           setState(() {
             _posts[idx] = _posts[idx].copyWith(
               comments: [..._posts[idx].comments, newComment],
             );
           });
+          return true;
         },
       ),
     );
@@ -1861,7 +1962,7 @@ class _PickupBottomSheet extends StatelessWidget {
 class _CommentsSheet extends StatefulWidget {
   final FoodSharePost post;
   final String myUserId;
-  final Function(String text) onAddComment;
+  final Future<bool> Function(String text) onAddComment;
 
   const _CommentsSheet({
     required this.post,
@@ -1889,11 +1990,14 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty) return;
+    final persisted = await widget.onAddComment(text);
+    if (!persisted) return;
     final comment = FoodShareComment(
       id: 'c-${DateTime.now().millisecondsSinceEpoch}',
+      authorId: widget.myUserId,
       authorName: 'Ich',
       authorInitials: 'ME',
       authorColor: _brand,
@@ -1904,7 +2008,6 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       _comments.add(comment);
       _ctrl.clear();
     });
-    widget.onAddComment(text);
   }
 
   @override

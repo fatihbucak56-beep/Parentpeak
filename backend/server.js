@@ -6230,7 +6230,7 @@ app.put('/api/food-feed/recipes/:id', async (req, res) => {
  */
 app.delete('/api/food-feed/recipes/:id', async (req, res) => {
   const { id } = req.params;
-  const { userId } = req.body;
+  const userId = String(req.query.userId || req.body?.userId || '').trim();
 
   if (!userId) {
     return res.status(401).json({ error: 'userId erforderlich' });

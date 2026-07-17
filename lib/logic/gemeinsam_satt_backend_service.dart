@@ -395,4 +395,144 @@ class GemeinsamSattBackendService {
       return null;
     }
   }
+
+  Future<List<Map<String, dynamic>>> fetchOfferComments({
+    required String recipeId,
+    int limit = 40,
+  }) async {
+    lastSyncError = null;
+
+    try {
+      final response = await _httpClient.get(
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/comments?limit=$limit'),
+      );
+
+      if (response.statusCode != 200) {
+        lastSyncError =
+            'Kommentare konnten nicht geladen werden: ${response.statusCode}';
+        return const [];
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final comments = (data['comments'] as List?)
+              ?.whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList() ??
+          const <Map<String, dynamic>>[];
+      return comments;
+    } catch (e) {
+      lastSyncError = 'Fehler beim Laden der Kommentare: $e';
+      return const [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> createOfferComment({
+    required String recipeId,
+    required String userId,
+    required String text,
+  }) async {
+    lastSyncError = null;
+
+    try {
+      final response = await _httpClient.post(
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/comments'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': userId, 'text': text}),
+      );
+
+      if (response.statusCode != 201) {
+        lastSyncError =
+            'Kommentar konnte nicht gespeichert werden: ${response.statusCode}';
+        return null;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['comment'] is! Map) return null;
+      return Map<String, dynamic>.from(data['comment'] as Map);
+    } catch (e) {
+      lastSyncError = 'Fehler beim Speichern des Kommentars: $e';
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> reserveOffer({
+    required String recipeId,
+    required String userId,
+    int portions = 1,
+  }) async {
+    lastSyncError = null;
+
+    try {
+      final response = await _httpClient.post(
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/reserve'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': userId,
+          'portions': portions,
+        }),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        lastSyncError =
+            'Reservierung konnte nicht gespeichert werden: ${response.statusCode}';
+        return null;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      lastSyncError = 'Fehler bei der Reservierung: $e';
+      return null;
+    }
+  }
+
+  Future<bool> cancelOfferReservation({
+    required String recipeId,
+    required String userId,
+  }) async {
+    lastSyncError = null;
+
+    try {
+      final response = await _httpClient.delete(
+        Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/reserve?userId=$userId'),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        lastSyncError =
+            'Reservierung konnte nicht entfernt werden: ${response.statusCode}';
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      lastSyncError = 'Fehler beim Entfernen der Reservierung: $e';
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchOfferReservationSummary({
+    required String recipeId,
+    required String userId,
+  }) async {
+    lastSyncError = null;
+
+    try {
+      final response = await _httpClient.get(
+        Uri.parse(
+          '$_apiUrl/api/food-feed/recipes/$recipeId/reservations?userId=$userId',
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        lastSyncError =
+            'Reservierungsstatus konnte nicht geladen werden: ${response.statusCode}';
+        return null;
+      }
+
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (e) {
+      lastSyncError = 'Fehler beim Laden des Reservierungsstatus: $e';
+      return null;
+    }
+  }
 }

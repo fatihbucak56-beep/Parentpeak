@@ -585,6 +585,8 @@ model SharedRecipe {
   ratings               RecipeRating[]
   favorites             RecipeFavorite[]
   reports               RecipeReport[]
+  offerComments         FoodOfferComment[]
+  offerReservations     FoodOfferReservation[]
   
   @@index([familyId])
   @@index([creatorUserId])
@@ -594,6 +596,36 @@ model SharedRecipe {
   @@index([isFeatured])
   @@index([rating])
   @@index([createdAt])
+}
+
+model FoodOfferComment {
+  id                    String   @id @default(cuid())
+
+  recipeId              String
+  recipe                SharedRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  userId                String
+  text                  String
+  createdAt             DateTime @default(now())
+
+  @@index([recipeId])
+  @@index([createdAt])
+}
+
+model FoodOfferReservation {
+  id                    String   @id @default(cuid())
+
+  recipeId              String
+  recipe                SharedRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  userId                String
+  portions              Int      @default(1)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([recipeId, userId])
+  @@index([recipeId])
+  @@index([userId])
 }
 
 model RecipeRating {

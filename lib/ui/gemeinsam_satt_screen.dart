@@ -100,14 +100,15 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   bool _isLoadingRecipes = false;
   _RecipeFeedMode _recipeFeedMode = _RecipeFeedMode.forYou;
   Set<String> _savedRecipeIds = <String>{};
-    Set<String> _hiddenOfferIds = <String>{};
-    Set<String> _reportedOfferIds = <String>{};
+  Set<String> _hiddenOfferIds = <String>{};
+  Set<String> _reportedOfferIds = <String>{};
+  final Set<String> _activeNearbyFilters = {'kinderfreundlich', 'nicht_scharf'};
 
   static const String _savedRecipeStoragePrefix =
       'gemeinsam_satt.saved_recipes.v1';
-    static const String _hiddenOfferStoragePrefix =
+  static const String _hiddenOfferStoragePrefix =
       'gemeinsam_satt.hidden_offers.v1';
-    static const String _reportedOfferStoragePrefix =
+  static const String _reportedOfferStoragePrefix =
       'gemeinsam_satt.reported_offers.v1';
 
   String get _myUserId =>
@@ -632,10 +633,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
-    final available = _posts
-      .where((p) => !_hiddenOfferIds.contains(p.id))
-      .where((p) => p.isAvailable)
-      .toList();
+    final available = _filteredNearbyPosts;
     if (available.isEmpty) {
       return _buildEmptyState(
         emoji: '🍲',
@@ -643,23 +641,131 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
         subtitle: 'Sei der Erste! Drücke unten auf „Ich habe extra gekocht!"',
       );
     }
-    return RefreshIndicator(
-      onRefresh: _loadNearbyFeed,
-      color: _brand,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        itemCount: available.length,
-        itemBuilder: (context, i) => _PostCard(
-          post: available[i],
-          myUserId: _myUserId,
-          onLike: () => _toggleLike(available[i].id),
-          onAbholen: () => _reservePost(available[i].id),
-          onComment: () => _showComments(available[i]),
-          onReport: () => _reportPost(available[i]),
-          onHide: () => _hidePost(available[i]),
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFF2D7D1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${available.length} passende Angebote',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1A2A3A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Sortiert nach Naehe, Frische, Vertrauen und deinen aktiven Hinweisen.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6B778C),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _foodInfoMetaByTag.entries.map((entry) {
+                    final selected = _activeNearbyFilters.contains(entry.key);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(entry.value.label),
+                        selected: selected,
+                        onSelected: (_) {
+                          setState(() {
+                            if (selected) {
+                              _activeNearbyFilters.remove(entry.key);
+                            } else {
+                              _activeNearbyFilters.add(entry.key);
+                            }
+                          });
+                        },
+                        selectedColor: entry.value.tint,
+                        side: BorderSide(
+                          color: selected ? _brand : const Color(0xFFE5E7EB),
+                        ),
+                        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadNearbyFeed,
+            color: _brand,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 100),
+              itemCount: available.length,
+              itemBuilder: (context, i) => _PostCard(
+                post: available[i],
+                myUserId: _myUserId,
+                onLike: () => _toggleLike(available[i].id),
+                onAbholen: () => _reservePost(available[i].id),
+                onComment: () => _showComments(available[i]),
+                onReport: () => _reportPost(available[i]),
+                onHide: () => _hidePost(available[i]),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
+  }
+
+  List<FoodSharePost> get _filteredNearbyPosts {
+    final visible = _posts
+        .where((p) => !_hiddenOfferIds.contains(p.id))
+        .where((p) => p.isAvailable)
+        .toList();
+
+    final filtered = _activeNearbyFilters.isEmpty
+        ? visible
+        : visible.where((post) {
+            final tags = post.tags.toSet();
+            return _activeNearbyFilters.every(tags.contains);
+          }).toList();
+
+    filtered.sort((a, b) => _nearbyOfferScore(b).compareTo(_nearbyOfferScore(a)));
+    return filtered;
+  }
+
+  double _nearbyOfferScore(FoodSharePost post) {
+    final distanceScore = (1 - (post.distanceKm / 5)).clamp(0.0, 1.0);
+    final freshnessHours = DateTime.now().difference(post.createdAt).inHours;
+    final freshnessScore = freshnessHours <= 6
+        ? 1.0
+        : freshnessHours <= 24
+            ? 0.75
+            : freshnessHours <= 72
+                ? 0.45
+                : 0.2;
+    final trustScore = post.authorTrustLevel == 'trusted'
+        ? 1.0
+        : post.authorTrustLevel == 'active'
+            ? 0.7
+            : 0.4;
+    final hintScore = _activeNearbyFilters.isEmpty
+        ? 0.5
+        : _activeNearbyFilters.where(post.tags.contains).length / _activeNearbyFilters.length;
+
+    return (0.35 * distanceScore) +
+        (0.25 * freshnessScore) +
+        (0.25 * trustScore) +
+        (0.15 * hintScore);
   }
 
   // -------------------------------------------------------

@@ -6,7 +6,11 @@
 const http = require('http');
 const https = require('https');
 const API_BASE = process.env.API_BASE || 'https://parentpeak.onrender.com';
-const BEARER_TOKEN = process.env.BEARER_TOKEN || '';
+const BEARER_TOKEN =
+  process.env.BEARER_TOKEN ||
+  process.env.BACKEND_API_TOKEN ||
+  process.env.API_TOKEN ||
+  '';
 
 const testRecipe1 = {
   title: 'Klassischer Kartoffelsalat',
@@ -74,7 +78,13 @@ function makeRequest(method, path, body = null, token = null) {
             body: data ? JSON.parse(data) : null,
           });
         } catch (e) {
-          reject(new Error(`Failed to parse response: ${e.message}`));
+          resolve({
+            status: res.statusCode,
+            body: {
+              parseError: e.message,
+              raw: data.slice(0, 300),
+            },
+          });
         }
       });
     });
@@ -89,18 +99,20 @@ function makeRequest(method, path, body = null, token = null) {
 async function runTests() {
   console.log('\n🍳 Gemeinsam Satt Integration Tests');
   console.log(`📍 API Base: ${API_BASE}\n`);
+  console.log(`🔐 Auth token: ${BEARER_TOKEN ? 'provided' : 'missing'}\n`);
   
   let recipeId1, recipeId2;
   let passed = 0;
   let failed = 0;
   const testUserId = 'test-user-' + Date.now();
+  const commentUserId = `commenter-${Date.now()}`;
 
   // Test 1: Create recipes
   try {
     console.log('✍️  Test 1: Create recipes');
     const res1 = await makeRequest('POST', '/api/food-feed/recipes', {
       ...testRecipe1,
-      creatorUserId: testUserId,
+      userId: testUserId,
       familyId: 'family-1',
     }, BEARER_TOKEN);
     
@@ -117,7 +129,7 @@ async function runTests() {
     
     const res2 = await makeRequest('POST', '/api/food-feed/recipes', {
       ...testRecipe2,
-      creatorUserId: testUserId,
+      userId: testUserId,
       familyId: 'family-1',
     }, BEARER_TOKEN);
     if (res2.status !== 201 && res2.status !== 200) {
@@ -143,6 +155,16 @@ async function runTests() {
     if (Array.isArray(res.body.recipes)) {
       console.log(`  ✓ Found ${res.body.recipes.length} recipe(s)`);
       console.log(`  Total in DB: ${res.body.total}`);
+      const createdRecipe = res.body.recipes.find(r => r.id === recipeId1);
+      if (!createdRecipe) {
+        throw new Error('Created recipe missing from list payload');
+      }
+      if (createdRecipe.creatorUserId !== testUserId) {
+        throw new Error('creatorUserId missing in list payload');
+      }
+      if (!Array.isArray(createdRecipe.tags)) {
+        throw new Error('tags missing in list payload');
+      }
       passed++;
     } else {
       throw new Error('Invalid response format');
@@ -246,7 +268,7 @@ async function runTests() {
   try {
     console.log('\n✏️  Test 7: Update recipe');
     const updateRes = await makeRequest('PUT', `/api/food-feed/recipes/${recipeId1}`, {
-      creatorUserId: testUserId,
+      userId: testUserId,
       title: 'Kartoffelsalat - Südwestdeutsche Variante',
       description: 'Aktualisierte Beschreibung',
     }, BEARER_TOKEN);
@@ -266,7 +288,7 @@ async function runTests() {
   try {
     console.log('\n🔒 Test 8: Ownership verification');
     const unauthorizedRes = await makeRequest('PUT', `/api/food-feed/recipes/${recipeId1}`, {
-      creatorUserId: 'wrong-user',
+      userId: 'wrong-user',
       title: 'Hacked title',
     }, BEARER_TOKEN);
     
@@ -288,7 +310,7 @@ async function runTests() {
   try {
     console.log('\n🗑️  Test 9: Delete recipe');
     const deleteRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId2}`, {
-      creatorUserId: testUserId,
+      userId: testUserId,
     }, BEARER_TOKEN);
     
     if (deleteRes.body.success) {
@@ -305,6 +327,78 @@ async function runTests() {
     } else {
       throw new Error('Delete failed');
     }
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 10: Persist offer comments
+  try {
+    console.log('\n💬 Test 10: Persist food-offer comments');
+    const createCommentRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/comments`, {
+      userId: commentUserId,
+      text: 'Ich koennte heute gegen 18 Uhr abholen.',
+    }, BEARER_TOKEN);
+
+    if (createCommentRes.status !== 201) {
+      throw new Error(`Expected 201, got ${createCommentRes.status}: ${JSON.stringify(createCommentRes.body)}`);
+    }
+
+    const commentsRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}/comments?limit=10`);
+    if (commentsRes.status !== 200) {
+      throw new Error(`Expected 200, got ${commentsRes.status}: ${JSON.stringify(commentsRes.body)}`);
+    }
+
+    const stored = (commentsRes.body.comments || []).find(item => item.userId === commentUserId);
+    if (!stored) {
+      throw new Error('Created comment not found in persisted comments');
+    }
+    console.log('  ✓ Comment persisted and listed');
+    passed++;
+  } catch (e) {
+    console.error(`  ✗ Failed: ${e.message}`);
+    failed++;
+  }
+
+  // Test 11: Persist offer reservations
+  try {
+    console.log('\n🙌 Test 11: Persist food-offer reservations');
+    const reserveRes = await makeRequest('POST', `/api/food-feed/recipes/${recipeId1}/reserve`, {
+      userId: commentUserId,
+      portions: 2,
+    }, BEARER_TOKEN);
+
+    if (reserveRes.status !== 201 && reserveRes.status !== 200) {
+      throw new Error(`Expected 200/201, got ${reserveRes.status}: ${JSON.stringify(reserveRes.body)}`);
+    }
+
+    const summaryRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}/reservations?userId=${encodeURIComponent(commentUserId)}`);
+    if (summaryRes.status !== 200) {
+      throw new Error(`Expected 200, got ${summaryRes.status}: ${JSON.stringify(summaryRes.body)}`);
+    }
+
+    if ((summaryRes.body.reservedPortions || 0) < 2) {
+      throw new Error('Reserved portions summary not updated');
+    }
+    if ((summaryRes.body.myReservation?.portions || 0) !== 2) {
+      throw new Error('Current user reservation missing');
+    }
+
+    const cancelRes = await makeRequest('DELETE', `/api/food-feed/recipes/${recipeId1}/reserve?userId=${encodeURIComponent(commentUserId)}`);
+    if (cancelRes.status !== 200) {
+      throw new Error(`Expected 200, got ${cancelRes.status}: ${JSON.stringify(cancelRes.body)}`);
+    }
+
+    const afterCancelRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}/reservations?userId=${encodeURIComponent(commentUserId)}`);
+    if (afterCancelRes.status !== 200) {
+      throw new Error(`Expected 200, got ${afterCancelRes.status}: ${JSON.stringify(afterCancelRes.body)}`);
+    }
+    if (afterCancelRes.body.myReservation) {
+      throw new Error('Reservation still present after cancel');
+    }
+
+    console.log('  ✓ Reservation persisted and cancel worked');
+    passed++;
   } catch (e) {
     console.error(`  ✗ Failed: ${e.message}`);
     failed++;

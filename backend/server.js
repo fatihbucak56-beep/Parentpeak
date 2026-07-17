@@ -5432,8 +5432,42 @@ app.post('/admin/migrate-db', async (req, res) => {
       CREATE INDEX IF NOT EXISTS "TreasureReport_status_idx" ON "TreasureReport"("status");
       CREATE INDEX IF NOT EXISTS "TreasureReport_createdAt_idx" ON "TreasureReport"("createdAt");
     `);
+
+    // Create FoodOfferComment table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "FoodOfferComment" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "recipeId" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "text" TEXT NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "FoodOfferComment_recipeId_fkey" FOREIGN KEY ("recipeId") REFERENCES "SharedRecipe" ("id") ON DELETE CASCADE
+      );
+    `);
+
+    // Create FoodOfferReservation table if it doesn't exist
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "FoodOfferReservation" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "recipeId" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "portions" INTEGER NOT NULL DEFAULT 1,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "FoodOfferReservation_recipeId_fkey" FOREIGN KEY ("recipeId") REFERENCES "SharedRecipe" ("id") ON DELETE CASCADE
+      );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "FoodOfferReservation_recipeId_userId_key"
+      ON "FoodOfferReservation"("recipeId", "userId");
+      CREATE INDEX IF NOT EXISTS "FoodOfferComment_recipeId_idx" ON "FoodOfferComment"("recipeId");
+      CREATE INDEX IF NOT EXISTS "FoodOfferComment_createdAt_idx" ON "FoodOfferComment"("createdAt");
+      CREATE INDEX IF NOT EXISTS "FoodOfferReservation_recipeId_idx" ON "FoodOfferReservation"("recipeId");
+      CREATE INDEX IF NOT EXISTS "FoodOfferReservation_userId_idx" ON "FoodOfferReservation"("userId");
+    `);
     
-    res.json({ success: true, message: 'Database migrated successfully (Events + Treasures + Reports)' });
+    res.json({ success: true, message: 'Database migrated successfully (Events + Treasures + Reports + Food Offers)' });
   } catch (err) {
     console.error('Migration error:', err.message);
     res.status(500).json({ error: `Migration failed: ${err.message}` });
@@ -6025,17 +6059,23 @@ app.get('/api/food-feed/recipes', async (req, res) => {
       take: Math.min(100, parseInt(take, 10)),
       select: {
         id: true,
+        creatorUserId: true,
+        familyId: true,
         title: true,
         description: true,
         category: true,
         difficulty: true,
         prepTimeMinutes: true,
         servings: true,
+        tags: true,
         imageUrl: true,
         rating: true,
         ratingCount: true,
         viewCount: true,
+        isPublished: true,
+        isFeatured: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -6256,6 +6296,234 @@ app.post('/api/food-feed/recipes/:id/rate', async (req, res) => {
   } catch (err) {
     console.error('❌ Fehler beim Speichern des Ratings:', err);
     res.status(500).json({ error: 'Rating konnte nicht gespeichert werden' });
+  }
+});
+
+/**
+ * GET /api/food-feed/recipes/:id/comments
+ * List persisted comments for recipe-based food offers
+ */
+app.get('/api/food-feed/recipes/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit || '40', 10)));
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    const comments = await prisma.$queryRawUnsafe(
+      `
+      SELECT "id", "recipeId", "userId", "text", "createdAt"
+      FROM "FoodOfferComment"
+      WHERE "recipeId" = $1
+      ORDER BY "createdAt" DESC
+      LIMIT $2
+      `,
+      id,
+      limit,
+    );
+
+    return res.json({ comments });
+  } catch (err) {
+    console.error('❌ Fehler beim Abrufen der Offer-Kommentare:', err);
+    return res.status(500).json({ error: 'Kommentare konnten nicht geladen werden' });
+  }
+});
+
+/**
+ * POST /api/food-feed/recipes/:id/comments
+ * Create a persisted comment for a recipe-based food offer
+ */
+app.post('/api/food-feed/recipes/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  const userId = String(req.body.userId || '').trim();
+  const text = String(req.body.text || '').trim();
+
+  if (!userId || !text) {
+    return res.status(400).json({ error: 'userId und text sind erforderlich' });
+  }
+
+  if (text.length > 600) {
+    return res.status(400).json({ error: 'Kommentar zu lang (max. 600 Zeichen)' });
+  }
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    const comment = {
+      id: generateId('offer_comment'),
+      recipeId: id,
+      userId,
+      text,
+      createdAt: new Date(),
+    };
+
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO "FoodOfferComment" ("id", "recipeId", "userId", "text", "createdAt")
+      VALUES ($1, $2, $3, $4, $5)
+      `,
+      comment.id,
+      comment.recipeId,
+      comment.userId,
+      comment.text,
+      comment.createdAt,
+    );
+
+    return res.status(201).json({
+      comment: {
+        ...comment,
+        createdAt: comment.createdAt.toISOString(),
+      },
+    });
+  } catch (err) {
+    console.error('❌ Fehler beim Speichern des Offer-Kommentars:', err);
+    return res.status(500).json({ error: 'Kommentar konnte nicht gespeichert werden' });
+  }
+});
+
+/**
+ * GET /api/food-feed/recipes/:id/reservations
+ * Get reservation summary and optionally current user's reservation
+ */
+app.get('/api/food-feed/recipes/:id/reservations', async (req, res) => {
+  const { id } = req.params;
+  const userId = String(req.query.userId || '').trim();
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    const [summary] = await prisma.$queryRawUnsafe(
+      `
+      SELECT COALESCE(SUM("portions"), 0)::int AS "reservedPortions", COUNT(*)::int AS "reservationsCount"
+      FROM "FoodOfferReservation"
+      WHERE "recipeId" = $1
+      `,
+      id,
+    );
+
+    let myReservation = null;
+    if (userId) {
+      const mine = await prisma.$queryRawUnsafe(
+        `
+        SELECT "id", "recipeId", "userId", "portions", "createdAt", "updatedAt"
+        FROM "FoodOfferReservation"
+        WHERE "recipeId" = $1 AND "userId" = $2
+        LIMIT 1
+        `,
+        id,
+        userId,
+      );
+      myReservation = Array.isArray(mine) && mine.length > 0 ? mine[0] : null;
+    }
+
+    return res.json({
+      reservedPortions: Number(summary?.reservedPortions || 0),
+      reservationsCount: Number(summary?.reservationsCount || 0),
+      myReservation,
+    });
+  } catch (err) {
+    console.error('❌ Fehler beim Abrufen der Reservierungsdaten:', err);
+    return res.status(500).json({ error: 'Reservierungsdaten konnten nicht geladen werden' });
+  }
+});
+
+/**
+ * POST /api/food-feed/recipes/:id/reserve
+ * Reserve one or more portions for current user
+ */
+app.post('/api/food-feed/recipes/:id/reserve', async (req, res) => {
+  const { id } = req.params;
+  const userId = String(req.body.userId || '').trim();
+  const portions = Math.max(1, Number.parseInt(req.body.portions || '1', 10));
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId ist erforderlich' });
+  }
+
+  try {
+    const recipe = await prisma.sharedRecipe.findUnique({ where: { id } });
+    if (!recipe) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+
+    const reservationId = generateId('offer_reservation');
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO "FoodOfferReservation" ("id", "recipeId", "userId", "portions", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT ("recipeId", "userId")
+      DO UPDATE SET "portions" = EXCLUDED."portions", "updatedAt" = CURRENT_TIMESTAMP
+      `,
+      reservationId,
+      id,
+      userId,
+      portions,
+    );
+
+    const [summary] = await prisma.$queryRawUnsafe(
+      `
+      SELECT COALESCE(SUM("portions"), 0)::int AS "reservedPortions"
+      FROM "FoodOfferReservation"
+      WHERE "recipeId" = $1
+      `,
+      id,
+    );
+
+    return res.status(201).json({
+      success: true,
+      reservedPortions: Number(summary?.reservedPortions || 0),
+      myPortions: portions,
+    });
+  } catch (err) {
+    console.error('❌ Fehler beim Reservieren eines Angebots:', err);
+    return res.status(500).json({ error: 'Reservierung konnte nicht gespeichert werden' });
+  }
+});
+
+/**
+ * DELETE /api/food-feed/recipes/:id/reserve?userId=...
+ * Cancel current user's reservation
+ */
+app.delete('/api/food-feed/recipes/:id/reserve', async (req, res) => {
+  const { id } = req.params;
+  const userId = String(req.query.userId || req.body?.userId || '').trim();
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId ist erforderlich' });
+  }
+
+  try {
+    await prisma.$executeRawUnsafe(
+      `
+      DELETE FROM "FoodOfferReservation"
+      WHERE "recipeId" = $1 AND "userId" = $2
+      `,
+      id,
+      userId,
+    );
+
+    const [summary] = await prisma.$queryRawUnsafe(
+      `
+      SELECT COALESCE(SUM("portions"), 0)::int AS "reservedPortions"
+      FROM "FoodOfferReservation"
+      WHERE "recipeId" = $1
+      `,
+      id,
+    );
+
+    return res.json({ success: true, reservedPortions: Number(summary?.reservedPortions || 0) });
+  } catch (err) {
+    console.error('❌ Fehler beim Entfernen einer Reservierung:', err);
+    return res.status(500).json({ error: 'Reservierung konnte nicht entfernt werden' });
   }
 });
 

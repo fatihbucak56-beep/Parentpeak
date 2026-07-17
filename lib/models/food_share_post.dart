@@ -15,6 +15,7 @@ class FoodSharePost {
   final double distanceKm;
   final DateTime createdAt;
   final List<String> likedByUserIds;
+  final List<String> tags;
   final List<FoodShareComment> comments;
   final String? imageEmoji; // placeholder for real images
   final bool isReservedByMe;
@@ -36,6 +37,7 @@ class FoodSharePost {
     required this.distanceKm,
     required this.createdAt,
     this.likedByUserIds = const [],
+    this.tags = const [],
     this.comments = const [],
     this.imageEmoji,
     this.isReservedByMe = false,
@@ -48,6 +50,7 @@ class FoodSharePost {
 
   FoodSharePost copyWith({
     List<String>? likedByUserIds,
+    List<String>? tags,
     List<FoodShareComment>? comments,
     int? remainingPortions,
     bool? isReservedByMe,
@@ -69,6 +72,7 @@ class FoodSharePost {
       distanceKm: distanceKm,
       createdAt: createdAt,
       likedByUserIds: likedByUserIds ?? this.likedByUserIds,
+      tags: tags ?? this.tags,
       comments: comments ?? this.comments,
       imageEmoji: imageEmoji,
       isReservedByMe: isReservedByMe ?? this.isReservedByMe,

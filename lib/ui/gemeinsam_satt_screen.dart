@@ -18,6 +18,28 @@ const Color _brandLight = Color(0xFFFFF1EE);
 const Color _surface = Color(0xFFF8FAFD);
 const Color _cardBg = Colors.white;
 
+class _FoodInfoMeta {
+  final String label;
+  final Color tint;
+
+  const _FoodInfoMeta(this.label, this.tint);
+}
+
+const Map<String, _FoodInfoMeta> _foodInfoMetaByTag = {
+  'vegetarisch': _FoodInfoMeta('Vegetarisch', Color(0xFFDCFCE7)),
+  'vegan': _FoodInfoMeta('Vegan', Color(0xFFD1FAE5)),
+  'glutenfrei': _FoodInfoMeta('Glutenfrei', Color(0xFFDBEAFE)),
+  'nussfrei': _FoodInfoMeta('Nussfrei', Color(0xFFE0E7FF)),
+  'enthaelt_nuesse': _FoodInfoMeta('Enthaelt Nuesse', Color(0xFFFEE2E2)),
+  'laktosefrei': _FoodInfoMeta('Laktosefrei', Color(0xFFE0F2FE)),
+  'enthaelt_milch': _FoodInfoMeta('Enthaelt Milch', Color(0xFFFFEDD5)),
+  'enthaelt_ei': _FoodInfoMeta('Enthaelt Ei', Color(0xFFFEF3C7)),
+  'babyfreundlich': _FoodInfoMeta('Babyfreundlich', Color(0xFFFCE7F3)),
+  'kinderfreundlich': _FoodInfoMeta('Kinderfreundlich', Color(0xFFEDE9FE)),
+  'nicht_scharf': _FoodInfoMeta('Nicht scharf', Color(0xFFF3F4F6)),
+  'scharf': _FoodInfoMeta('Scharf', Color(0xFFFECACA)),
+};
+
 Color _trustColorForLevel(String level) {
   switch (level) {
     case 'trusted':
@@ -27,6 +49,32 @@ Color _trustColorForLevel(String level) {
     default:
       return const Color(0xFF6B7280);
   }
+}
+
+List<String> _visibleFoodInfoTags(List<String> tags) {
+  return tags.where(_foodInfoMetaByTag.containsKey).toList();
+}
+
+Widget _buildFoodInfoChip(String tag) {
+  final meta = _foodInfoMetaByTag[tag];
+  if (meta == null) {
+    return const SizedBox.shrink();
+  }
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: meta.tint,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      meta.label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF334155),
+      ),
+    ),
+  );
 }
 
 class GemeinsamSattScreen extends StatefulWidget {
@@ -181,6 +229,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       distanceKm: ((item.id.hashCode.abs() % 25) + 1) / 10,
       createdAt: createdAt,
       likedByUserIds: const [],
+      tags: item.tags,
       comments: const [],
       imageEmoji: _getEmojiForCategory(item.category),
       authorTrustLabel: item.authorTrust?.label ?? 'Neu im Teilen',
@@ -1325,7 +1374,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _CreatePostSheet(
-        onSubmit: (title, description, portions, pickupWindow) async {
+        onSubmit: (title, description, portions, pickupWindow, infoTags) async {
           final created = await _service.createRecipe(
             userId: _myUserId,
             title: title,
@@ -1344,7 +1393,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
             instructions: [
               'Kontakt aufnehmen und Abholzeit abstimmen: $pickupWindow',
             ],
-            tags: const ['angebot', 'gemeinsamsatt', 'teilen'],
+            tags: ['angebot', 'gemeinsamsatt', 'teilen', ...infoTags],
           );
 
           if (!mounted) return false;
@@ -1369,6 +1418,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
             distanceKm: 0.1,
             createdAt: basePost.createdAt,
             likedByUserIds: basePost.likedByUserIds,
+            tags: basePost.tags,
             comments: basePost.comments,
             imageEmoji: basePost.imageEmoji,
           );
@@ -1684,6 +1734,7 @@ class _PostCardState extends State<_PostCard>
     final post = widget.post;
     final isLiked = post.likedByUserIds.contains(widget.myUserId);
     final likeCount = post.likedByUserIds.length;
+    final visibleInfoTags = _visibleFoodInfoTags(post.tags);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1865,6 +1916,17 @@ class _PostCardState extends State<_PostCard>
                     height: 1.5,
                   ),
                 ),
+
+                if (visibleInfoTags.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: visibleInfoTags
+                        .map((tag) => _buildFoodInfoChip(tag))
+                        .toList(),
+                  ),
+                ],
 
                 const SizedBox(height: 12),
 
@@ -2401,7 +2463,11 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
 class _CreatePostSheet extends StatefulWidget {
   final Future<bool> Function(
-      String title, String description, int portions, String pickupWindow) onSubmit;
+  String title,
+  String description,
+  int portions,
+  String pickupWindow,
+  List<String> infoTags) onSubmit;
 
   const _CreatePostSheet({required this.onSubmit});
 
@@ -2414,6 +2480,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
   final _descCtrl = TextEditingController();
   int _portions = 2;
   String _pickupWindow = 'Heute 17:00 – 19:00 Uhr';
+  final Set<String> _selectedInfoTags = {'kinderfreundlich', 'nicht_scharf'};
 
   final List<String> _presets = [
     'Heute 12:00 – 13:30 Uhr',
@@ -2520,6 +2587,35 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
             ),
             const SizedBox(height: 14),
 
+            _label('Hinweise fuer Eltern'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _foodInfoMetaByTag.entries.map((entry) {
+                final selected = _selectedInfoTags.contains(entry.key);
+                return FilterChip(
+                  label: Text(entry.value.label),
+                  selected: selected,
+                  onSelected: (_) {
+                    setState(() {
+                      if (selected) {
+                        _selectedInfoTags.remove(entry.key);
+                      } else {
+                        _selectedInfoTags.add(entry.key);
+                      }
+                    });
+                  },
+                  selectedColor: entry.value.tint,
+                  side: BorderSide(
+                    color: selected ? _brand : const Color(0xFFE5E7EB),
+                  ),
+                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+
             _label('Abholzeit'),
             const SizedBox(height: 8),
             Wrap(
@@ -2572,6 +2668,7 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
                     desc,
                     _portions,
                     _pickupWindow,
+                    _selectedInfoTags.toList(),
                   );
                   if (!context.mounted) return;
                   if (success) {
@@ -2670,6 +2767,7 @@ class _RecipeCardState extends State<_RecipeCard>
   Widget build(BuildContext context) {
     final recipe = widget.recipe;
     final isLiked = recipe.likedByUserIds.contains(widget.myUserId);
+    final visibleInfoTags = _visibleFoodInfoTags(recipe.tags);
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -2806,19 +2904,12 @@ class _RecipeCardState extends State<_RecipeCard>
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 13, color: Color(0xFF516072), height: 1.4)),
 
-                  if (recipe.tags.isNotEmpty) ...[
+                  if (visibleInfoTags.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 6,
-                      children: recipe.tags.map((tag) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _brandLight,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text('#$tag',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _brand)),
-                      )).toList(),
+                      runSpacing: 6,
+                      children: visibleInfoTags.map((tag) => _buildFoodInfoChip(tag)).toList(),
                     ),
                   ],
 
@@ -2909,6 +3000,7 @@ class _RecipeDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleInfoTags = _visibleFoodInfoTags(recipe.tags);
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 60, 16, 16),
       decoration: BoxDecoration(
@@ -2968,6 +3060,15 @@ class _RecipeDetailSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
+
+                  if (visibleInfoTags.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: visibleInfoTags.map((tag) => _buildFoodInfoChip(tag)).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   // Stats row
                   Row(
@@ -3127,6 +3228,7 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
   RecipeDifficulty _difficulty = RecipeDifficulty.einfach;
   String _category = 'dinner';
   String _emoji = '🍲';
+  final Set<String> _selectedInfoTags = {'kinderfreundlich'};
 
   final List<String> _emojis = ['🍲', '🍝', '🥗', '🍱', '🥘', '🍜', '🥙', '🫕', '🍛', '🥞'];
 
@@ -3207,6 +3309,35 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
                 setState(() => _category = value);
               },
               decoration: _inputDeco('Kategorie waehlen'),
+            ),
+            const SizedBox(height: 12),
+
+            const Text('Hinweise fuer Eltern', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A2A3A))),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _foodInfoMetaByTag.entries.map((entry) {
+                final selected = _selectedInfoTags.contains(entry.key);
+                return FilterChip(
+                  label: Text(entry.value.label),
+                  selected: selected,
+                  onSelected: (_) {
+                    setState(() {
+                      if (selected) {
+                        _selectedInfoTags.remove(entry.key);
+                      } else {
+                        _selectedInfoTags.add(entry.key);
+                      }
+                    });
+                  },
+                  selectedColor: entry.value.tint,
+                  side: BorderSide(
+                    color: selected ? _brand : const Color(0xFFE5E7EB),
+                  ),
+                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 12),
 
@@ -3345,7 +3476,7 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
                         )
                         .toList(),
                     steps: steps.isEmpty ? ['Zubereitung wird noch ergänzt'] : steps,
-                    tags: _buildDraftTags(_duration, _difficulty, _category),
+                    tags: _buildDraftTags(_duration, _difficulty, _category, _selectedInfoTags),
                   );
 
                   final success = await widget.onSubmit(draft);
@@ -3368,13 +3499,14 @@ class _CreateRecipeSheetState extends State<_CreateRecipeSheet> {
     int duration,
     RecipeDifficulty difficulty,
     String category,
+    Set<String> selectedInfoTags,
   ) {
-    final tags = <String>['familie'];
+    final tags = <String>{'familie', ...selectedInfoTags};
     if (duration <= 30) tags.add('schnell');
     if (difficulty == RecipeDifficulty.einfach) tags.add('kinderfreundlich');
     if (category == 'snack') tags.add('alltagssnack');
     if (category == 'breakfast') tags.add('fruehstueck');
-    return tags;
+    return tags.toList();
   }
 
   InputDecoration _inputDeco(String hint) {

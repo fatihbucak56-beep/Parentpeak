@@ -6080,8 +6080,13 @@ app.get('/api/food-feed/recipes', async (req, res) => {
     });
 
     const total = await prisma.sharedRecipe.count({ where });
+    const authorTrustMap = await buildAuthorTrustMapForRecipes(recipes);
+    const enrichedRecipes = recipes.map((recipe) => ({
+      ...recipe,
+      authorTrust: authorTrustMap.get(String(recipe.creatorUserId || '').trim()) || null,
+    }));
 
-    res.json({ recipes, total, pagination: { skip: parseInt(skip, 10), take: parseInt(take, 10) } });
+    res.json({ recipes: enrichedRecipes, total, pagination: { skip: parseInt(skip, 10), take: parseInt(take, 10) } });
   } catch (err) {
     console.error('❌ Fehler beim Abrufen von Rezepten:', err);
     res.status(500).json({ error: 'Rezepte konnten nicht geladen werden' });
@@ -6111,7 +6116,13 @@ app.get('/api/food-feed/recipes/:id', async (req, res) => {
       data: { viewCount: { increment: 1 } },
     });
 
-    res.json({ recipe });
+    const authorTrustMap = await buildAuthorTrustMapForRecipes([recipe]);
+    res.json({
+      recipe: {
+        ...recipe,
+        authorTrust: authorTrustMap.get(String(recipe.creatorUserId || '').trim()) || null,
+      },
+    });
   } catch (err) {
     console.error('❌ Fehler beim Abrufen des Rezepts:', err);
     res.status(500).json({ error: 'Rezept konnte nicht geladen werden' });
@@ -7220,6 +7231,106 @@ function isTreasureContentSevere({ title, description }) {
     'drohung',
   ];
   return severeKeywords.some(keyword => text.includes(keyword));
+}
+
+function toFiniteNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value?.toNumber === 'function') {
+    try {
+      const parsed = value.toNumber();
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+  return 0;
+}
+
+function buildAuthorTrustSummary(recipes) {
+  const publishedRecipesCount = recipes.length;
+  const activeOffersCount = recipes.filter((recipe) => {
+    const category = String(recipe.category || '').toLowerCase();
+    const tags = Array.isArray(recipe.tags)
+        ? recipe.tags.map((tag) => String(tag).toLowerCase())
+        : [];
+    return category === 'snack' || tags.includes('angebot') || tags.includes('teilen');
+  }).length;
+
+  let weightedRatingSum = 0;
+  let ratingWeight = 0;
+  let totalReports = 0;
+
+  for (const recipe of recipes) {
+    const ratingCount = Number(recipe.ratingCount || 0);
+    const rating = toFiniteNumber(recipe.rating);
+    weightedRatingSum += rating * ratingCount;
+    ratingWeight += ratingCount;
+    totalReports += Number(recipe.reportedCount || 0);
+  }
+
+  const averageRating = ratingWeight > 0 ? weightedRatingSum / ratingWeight : 0;
+  let level = 'new';
+  let label = 'Neu im Teilen';
+
+  if (publishedRecipesCount >= 3 && averageRating >= 4 && totalReports === 0) {
+    level = 'trusted';
+    label = 'Verlaesslich geteilt';
+  } else if (publishedRecipesCount >= 2 || activeOffersCount >= 1) {
+    level = 'active';
+    label = 'Aktiv in der Community';
+  }
+
+  return {
+    level,
+    label,
+    publishedRecipesCount,
+    activeOffersCount,
+    averageRating: Math.round(averageRating * 100) / 100,
+    totalReports,
+  };
+}
+
+async function buildAuthorTrustMapForRecipes(recipes) {
+  const creatorIds = [...new Set(
+    recipes
+      .map((recipe) => String(recipe.creatorUserId || '').trim())
+      .filter(Boolean),
+  )];
+  if (creatorIds.length === 0) return new Map();
+
+  const authorRecipes = await prisma.sharedRecipe.findMany({
+    where: {
+      creatorUserId: { in: creatorIds },
+      isPublished: true,
+    },
+    select: {
+      creatorUserId: true,
+      category: true,
+      tags: true,
+      rating: true,
+      ratingCount: true,
+      reportedCount: true,
+    },
+  });
+
+  const byAuthor = new Map();
+  for (const recipe of authorRecipes) {
+    const key = String(recipe.creatorUserId || '').trim();
+    if (!key) continue;
+    const items = byAuthor.get(key) || [];
+    items.push(recipe);
+    byAuthor.set(key, items);
+  }
+
+  const trustMap = new Map();
+  for (const [creatorUserId, items] of byAuthor.entries()) {
+    trustMap.set(creatorUserId, buildAuthorTrustSummary(items));
+  }
+  return trustMap;
 }
 
 /**

@@ -20,6 +20,10 @@ class SharedRecipe {
   final List<String> likedByUserIds;
   final List<FoodShareComment> comments;
   final bool isSavedByMe;
+  final String authorTrustLabel;
+  final String authorTrustLevel;
+  final int authorPublishedRecipesCount;
+  final int authorActiveOffersCount;
   final double averageRating;
   final int ratingCount;
   final int viewCount;
@@ -43,6 +47,10 @@ class SharedRecipe {
     this.likedByUserIds = const [],
     this.comments = const [],
     this.isSavedByMe = false,
+    this.authorTrustLabel = 'Neu im Teilen',
+    this.authorTrustLevel = 'new',
+    this.authorPublishedRecipesCount = 0,
+    this.authorActiveOffersCount = 0,
     this.averageRating = 0,
     this.ratingCount = 0,
     this.viewCount = 0,
@@ -76,6 +84,10 @@ class SharedRecipe {
     List<String>? likedByUserIds,
     List<FoodShareComment>? comments,
     bool? isSavedByMe,
+    String? authorTrustLabel,
+    String? authorTrustLevel,
+    int? authorPublishedRecipesCount,
+    int? authorActiveOffersCount,
     double? averageRating,
     int? ratingCount,
     int? viewCount,
@@ -98,6 +110,12 @@ class SharedRecipe {
       likedByUserIds: likedByUserIds ?? this.likedByUserIds,
       comments: comments ?? this.comments,
       isSavedByMe: isSavedByMe ?? this.isSavedByMe,
+        authorTrustLabel: authorTrustLabel ?? this.authorTrustLabel,
+        authorTrustLevel: authorTrustLevel ?? this.authorTrustLevel,
+        authorPublishedRecipesCount:
+          authorPublishedRecipesCount ?? this.authorPublishedRecipesCount,
+        authorActiveOffersCount:
+          authorActiveOffersCount ?? this.authorActiveOffersCount,
       averageRating: averageRating ?? this.averageRating,
       ratingCount: ratingCount ?? this.ratingCount,
       viewCount: viewCount ?? this.viewCount,

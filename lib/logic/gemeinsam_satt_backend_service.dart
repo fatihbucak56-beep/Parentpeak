@@ -4,6 +4,35 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:parentpeak/config/api_config.dart';
 
+class AuthorTrustSummary {
+  final String level;
+  final String label;
+  final int publishedRecipesCount;
+  final int activeOffersCount;
+  final double averageRating;
+  final int totalReports;
+
+  const AuthorTrustSummary({
+    required this.level,
+    required this.label,
+    required this.publishedRecipesCount,
+    required this.activeOffersCount,
+    required this.averageRating,
+    required this.totalReports,
+  });
+
+  factory AuthorTrustSummary.fromJson(Map<String, dynamic> json) {
+    return AuthorTrustSummary(
+      level: (json['level'] ?? 'new').toString(),
+      label: (json['label'] ?? 'Neu im Teilen').toString(),
+      publishedRecipesCount: (json['publishedRecipesCount'] as num?)?.toInt() ?? 0,
+      activeOffersCount: (json['activeOffersCount'] as num?)?.toInt() ?? 0,
+      averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0,
+      totalReports: (json['totalReports'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class SharedRecipe {
   final String id;
   final String? creatorUserId;
@@ -23,6 +52,7 @@ class SharedRecipe {
   final int viewCount;
   final bool isPublished;
   final bool isFeatured;
+  final AuthorTrustSummary? authorTrust;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -45,6 +75,7 @@ class SharedRecipe {
     required this.viewCount,
     required this.isPublished,
     required this.isFeatured,
+    this.authorTrust,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -87,6 +118,11 @@ class SharedRecipe {
       viewCount: json['viewCount'] ?? 0,
       isPublished: json['isPublished'] ?? true,
       isFeatured: json['isFeatured'] ?? false,
+      authorTrust: json['authorTrust'] is Map<String, dynamic>
+          ? AuthorTrustSummary.fromJson(json['authorTrust'] as Map<String, dynamic>)
+          : json['authorTrust'] is Map
+              ? AuthorTrustSummary.fromJson(Map<String, dynamic>.from(json['authorTrust'] as Map))
+              : null,
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt'].toString()) : DateTime.now(),
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'].toString()) : DateTime.now(),
     );

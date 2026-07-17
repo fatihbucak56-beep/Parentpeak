@@ -18,6 +18,9 @@ class FoodSharePost {
   final List<FoodShareComment> comments;
   final String? imageEmoji; // placeholder for real images
   final bool isReservedByMe;
+  final String authorTrustLabel;
+  final String authorTrustLevel;
+  final int authorCompletedShares;
 
   const FoodSharePost({
     required this.id,
@@ -36,6 +39,9 @@ class FoodSharePost {
     this.comments = const [],
     this.imageEmoji,
     this.isReservedByMe = false,
+    this.authorTrustLabel = 'Neu im Teilen',
+    this.authorTrustLevel = 'new',
+    this.authorCompletedShares = 0,
   });
 
   bool get isAvailable => remainingPortions > 0;
@@ -45,6 +51,9 @@ class FoodSharePost {
     List<FoodShareComment>? comments,
     int? remainingPortions,
     bool? isReservedByMe,
+    String? authorTrustLabel,
+    String? authorTrustLevel,
+    int? authorCompletedShares,
   }) {
     return FoodSharePost(
       id: id,
@@ -63,6 +72,9 @@ class FoodSharePost {
       comments: comments ?? this.comments,
       imageEmoji: imageEmoji,
       isReservedByMe: isReservedByMe ?? this.isReservedByMe,
+      authorTrustLabel: authorTrustLabel ?? this.authorTrustLabel,
+      authorTrustLevel: authorTrustLevel ?? this.authorTrustLevel,
+      authorCompletedShares: authorCompletedShares ?? this.authorCompletedShares,
     );
   }
 }

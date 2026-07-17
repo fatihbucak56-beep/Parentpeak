@@ -18,6 +18,17 @@ const Color _brandLight = Color(0xFFFFF1EE);
 const Color _surface = Color(0xFFF8FAFD);
 const Color _cardBg = Colors.white;
 
+Color _trustColorForLevel(String level) {
+  switch (level) {
+    case 'trusted':
+      return const Color(0xFF0F766E);
+    case 'active':
+      return const Color(0xFF1D4ED8);
+    default:
+      return const Color(0xFF6B7280);
+  }
+}
+
 class GemeinsamSattScreen extends StatefulWidget {
   const GemeinsamSattScreen({super.key});
 
@@ -172,6 +183,9 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       likedByUserIds: const [],
       comments: const [],
       imageEmoji: _getEmojiForCategory(item.category),
+      authorTrustLabel: item.authorTrust?.label ?? 'Neu im Teilen',
+      authorTrustLevel: item.authorTrust?.level ?? 'new',
+      authorCompletedShares: item.authorTrust?.activeOffersCount ?? 0,
     );
   }
 
@@ -261,6 +275,10 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       likedByUserIds: data.rating > 0 ? ['seed_like'] : const [],
       ingredients: ingredients,
       steps: data.instructions,
+      authorTrustLabel: data.authorTrust?.label ?? 'Neu im Teilen',
+      authorTrustLevel: data.authorTrust?.level ?? 'new',
+      authorPublishedRecipesCount: data.authorTrust?.publishedRecipesCount ?? 0,
+      authorActiveOffersCount: data.authorTrust?.activeOffersCount ?? 0,
       averageRating: data.rating,
       ratingCount: data.ratingCount,
       viewCount: data.viewCount,
@@ -1798,6 +1816,22 @@ class _PostCardState extends State<_PostCard>
                               color: Color(0xFF1A2A3A),
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _trustColorForLevel(post.authorTrustLevel).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              post.authorTrustLabel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _trustColorForLevel(post.authorTrustLevel),
+                              ),
+                            ),
+                          ),
                           Text(
                             _timeAgo(post.createdAt),
                             style: const TextStyle(
@@ -2726,6 +2760,22 @@ class _RecipeCardState extends State<_RecipeCard>
                       const SizedBox(width: 8),
                       Text(recipe.authorName,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF516072))),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _trustColorForLevel(recipe.authorTrustLevel).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          recipe.authorTrustLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: _trustColorForLevel(recipe.authorTrustLevel),
+                          ),
+                        ),
+                      ),
                       const Spacer(),
                       if (recipe.ratingCount > 0)
                         Container(
@@ -2903,6 +2953,20 @@ class _RecipeDetailSheet extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text('von ${recipe.authorName}',
                       style: const TextStyle(color: Color(0xFF8A9AB0), fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _statChip(Icons.verified_user_rounded, recipe.authorTrustLabel),
+                      if (recipe.authorPublishedRecipesCount > 0)
+                        _statChip(Icons.menu_book_rounded,
+                            '${recipe.authorPublishedRecipesCount} Rezepte'),
+                      if (recipe.authorActiveOffersCount > 0)
+                        _statChip(Icons.favorite_rounded,
+                            '${recipe.authorActiveOffersCount} Angebote'),
+                    ],
+                  ),
                   const SizedBox(height: 12),
 
                   // Stats row

@@ -496,7 +496,7 @@ app.use(
 
       if (allowedOrigins.length === 0) {
         if (isProduction) {
-          callback(new Error('CORS allowlist missing in production'));
+          callback(null, false);
           return;
         }
         callback(null, true);
@@ -508,7 +508,7 @@ app.use(
         return;
       }
 
-      callback(new Error('Origin not allowed by CORS'));
+      callback(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

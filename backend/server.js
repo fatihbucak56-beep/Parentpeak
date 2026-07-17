@@ -85,6 +85,7 @@ const stripeWebhookToleranceSec = Number.parseInt(
   10,
 );
 const stripeSecretKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Stripe client — initialized if secret key is available.
 let stripe = null;
@@ -494,6 +495,10 @@ app.use(
       }
 
       if (allowedOrigins.length === 0) {
+        if (isProduction) {
+          callback(new Error('CORS allowlist missing in production'));
+          return;
+        }
         callback(null, true);
         return;
       }
@@ -586,7 +591,7 @@ app.post('/payments/stripe/webhook', express.raw({ type: 'application/json' }), 
 
 app.use(express.json({ limit: '1mb' }));
 
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (!isWriteRequest(req)) {
     next();
     return;
@@ -622,19 +627,29 @@ app.use((req, res, next) => {
     return;
   }
 
-  if (!backendApiToken) {
-    res.status(503).json({ error: 'Server-Konfiguration unvollständig (BACKEND_API_TOKEN fehlt).' });
-    return;
-  }
-
   const authHeader = req.headers.authorization || '';
-  const expected = `Bearer ${backendApiToken}`;
-  if (authHeader !== expected) {
-    res.status(401).json({ error: 'Unauthorized' });
+  const hasBearer = authHeader.startsWith('Bearer ');
+
+  if (backendApiToken && authHeader === `Bearer ${backendApiToken}`) {
+    next();
     return;
   }
 
-  next();
+  if (hasBearer && firebaseAdmin) {
+    const { uid, verified } = await verifyFirebaseIdToken(req);
+    if (verified) {
+      req.firebaseUid = uid;
+      next();
+      return;
+    }
+  }
+
+  if (!backendApiToken && !firebaseAdmin) {
+    res.status(503).json({ error: 'Server-Konfiguration unvollstaendig (Auth nicht konfiguriert).' });
+    return;
+  }
+
+  res.status(401).json({ error: 'Unauthorized' });
 });
 
 // Providers-Daten aus JSON laden
@@ -7762,6 +7777,8 @@ app.delete('/api/treasures/:id', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   if (allowedOrigins.length > 0) {
     console.log(`🌐 CORS allowlist aktiv (${allowedOrigins.length} Origin(s))`);
+  } else if (isProduction) {
+    console.warn('⚠️ CORS allowlist fehlt in Produktion; Browser-Origin-Requests werden blockiert');
   } else {
     console.log('🌐 CORS allowlist nicht gesetzt, alle Origins erlaubt');
   }

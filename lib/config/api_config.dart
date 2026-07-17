@@ -65,11 +65,6 @@ class APIConfig {
       missing.add('GEMINI_API_KEY');
     }
 
-    final backendToken = getBackendApiToken();
-    if (backendToken == null || backendToken.isEmpty) {
-      missing.add('BACKEND_API_TOKEN');
-    }
-
     return missing;
   }
 

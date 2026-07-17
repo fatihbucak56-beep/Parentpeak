@@ -8,20 +8,48 @@ class BackendApiClient {
   BackendApiClient({
     required this.baseUrl,
     this.authToken,
+    this.authTokenProvider,
     http.Client? httpClient,
   }) : _httpClient = httpClient ?? http.Client();
 
   final String baseUrl;
   final String? authToken;
+  final Future<String?> Function()? authTokenProvider;
   final http.Client _httpClient;
 
-  Map<String, String> get _headers {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
-    if (authToken != null && authToken!.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $authToken';
+  Future<String?> _resolveAuthToken() async {
+    final staticToken = authToken?.trim();
+    if (staticToken != null && staticToken.isNotEmpty) {
+      return staticToken;
     }
+
+    if (authTokenProvider == null) {
+      return null;
+    }
+
+    try {
+      final dynamicToken = await authTokenProvider!();
+      final normalized = dynamicToken?.trim();
+      if (normalized != null && normalized.isNotEmpty) {
+        return normalized;
+      }
+    } catch (e) {
+      debugPrint('BackendApiClient._resolveAuthToken(): token provider failed: $e');
+    }
+
+    return null;
+  }
+
+  Future<Map<String, String>> _headers({bool includeContentType = true}) async {
+    final headers = <String, String>{
+      if (includeContentType) 'Content-Type': 'application/json',
+    };
+
+    final resolvedToken = await _resolveAuthToken();
+    if (resolvedToken != null && resolvedToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $resolvedToken';
+    }
+
     return headers;
   }
 
@@ -31,8 +59,9 @@ class BackendApiClient {
   }
 
   Future<dynamic> getJson(String path) async {
+    final headers = await _headers();
     final response = await _httpClient
-        .get(_uri(path), headers: _headers)
+      .get(_uri(path), headers: headers)
         .timeout(const Duration(seconds: 8));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -65,10 +94,11 @@ class BackendApiClient {
     String path,
     Map<String, dynamic> body,
   ) async {
+    final headers = await _headers();
     final response = await _httpClient
         .post(
           _uri(path),
-          headers: _headers,
+          headers: headers,
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 8));
@@ -81,10 +111,11 @@ class BackendApiClient {
   }
 
   Future<dynamic> putJson(String path, Map<String, dynamic> body) async {
+    final headers = await _headers();
     final response = await _httpClient
         .put(
           _uri(path),
-          headers: _headers,
+          headers: headers,
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 8));
@@ -97,10 +128,11 @@ class BackendApiClient {
   }
 
   Future<void> delete(String path) async {
+    final headers = await _headers();
     final response = await _httpClient
         .delete(
           _uri(path),
-          headers: _headers,
+          headers: headers,
         )
         .timeout(const Duration(seconds: 8));
 
@@ -110,10 +142,11 @@ class BackendApiClient {
   }
 
   Future<dynamic> deleteJson(String path, Map<String, dynamic> body) async {
+    final headers = await _headers();
     final response = await _httpClient
         .delete(
           _uri(path),
-          headers: _headers,
+          headers: headers,
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 8));
@@ -133,8 +166,7 @@ class BackendApiClient {
   ) async {
     final uri = _uri(path);
     final request = http.MultipartRequest('POST', uri);
-    final uploadHeaders = Map<String, String>.from(_headers)
-      ..remove('Content-Type');
+    final uploadHeaders = await _headers(includeContentType: false);
     request.headers.addAll(uploadHeaders);
     request.files.add(await http.MultipartFile.fromPath('image', file.path));
     final streamed = await request.send().timeout(const Duration(seconds: 30));
@@ -164,10 +196,11 @@ class BackendApiClient {
     required String userId,
     required String token,
   }) async {
+    final headers = await _headers();
     final response = await _httpClient
         .delete(
           _uri('/devices/register-token'),
-          headers: _headers,
+          headers: headers,
           body: jsonEncode({'userId': userId, 'token': token}),
         )
         .timeout(const Duration(seconds: 8));

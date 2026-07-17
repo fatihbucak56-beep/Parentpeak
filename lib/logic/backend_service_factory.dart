@@ -1,4 +1,5 @@
 import 'package:parentpeak/config/api_config.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'backend_api_client.dart';
 import 'calendar_backend_service.dart';
@@ -21,7 +22,8 @@ class BackendServiceFactory {
 
     return BackendApiClient(
       baseUrl: baseUrl,
-      authToken: APIConfig.getBackendApiToken(),
+      authTokenProvider: () async =>
+          FirebaseAuth.instance.currentUser?.getIdToken(),
     );
   }
 

@@ -2,6 +2,7 @@
 /// Modern, secure recipe sharing with Postgres persistence
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:parentpeak/config/api_config.dart';
 
 class AuthorTrustSummary {
@@ -197,12 +198,13 @@ class GemeinsamSattBackendService {
   GemeinsamSattBackendService({http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
 
-  Map<String, String> _jsonHeaders() {
+  Future<Map<String, String>> _jsonHeaders() async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
 
-    final token = _apiToken?.trim();
+    final firebaseToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    final token = (firebaseToken ?? _apiToken)?.trim();
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -310,7 +312,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode({
           'userId': userId,
           'familyId': familyId,
@@ -370,7 +372,7 @@ class GemeinsamSattBackendService {
 
       final response = await _httpClient.put(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$id'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode(body),
       );
 
@@ -404,7 +406,7 @@ class GemeinsamSattBackendService {
         Uri.parse(
           '$_apiUrl/api/food-feed/recipes/$id?userId=${Uri.encodeQueryComponent(userId)}',
         ),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode({'userId': userId}),
       );
 
@@ -443,7 +445,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/rate'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode({
           'userId': userId,
           'rating': rating,
@@ -504,7 +506,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/comments'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode({'userId': userId, 'text': text}),
       );
 
@@ -533,7 +535,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/reserve'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode({
           'userId': userId,
           'portions': portions,
@@ -563,7 +565,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.delete(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/reserve?userId=$userId'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
       );
 
       if (response.statusCode != 200 && response.statusCode != 204) {
@@ -588,7 +590,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/complete'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode({'userId': userId}),
       );
 
@@ -642,7 +644,7 @@ class GemeinsamSattBackendService {
     try {
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/api/food-feed/recipes/$recipeId/report'),
-        headers: _jsonHeaders(),
+        headers: await _jsonHeaders(),
         body: jsonEncode({
           'reportedById': userId,
           'reason': reason,

@@ -9,7 +9,7 @@ const http = require('http');
 const https = require('https');
 
 // Environment
-const BEARER_TOKEN = process.env.BEARER_TOKEN || 'pp_live_2026_q7N4mP2xK9aVtR8z';
+const BEARER_TOKEN = process.env.BEARER_TOKEN || '';
 const API_BASE = process.env.API_BASE || 'https://parentpeak.onrender.com';
 
 let passed = 0;

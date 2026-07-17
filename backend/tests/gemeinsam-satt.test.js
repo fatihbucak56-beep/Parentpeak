@@ -16,7 +16,7 @@ const testRecipe1 = {
   title: 'Klassischer Kartoffelsalat',
   description: 'Traditioneller Kartoffelsalat mit Fleischbrühe und Essig',
   category: 'Salat',
-  difficulty: 'einfach',
+  difficulty: 'leicht',
   prepTimeMinutes: 30,
   servings: 4,
   ingredients: [
@@ -93,6 +93,15 @@ function makeRequest(method, path, body = null, token = null) {
     if (body) req.write(JSON.stringify(body));
     req.end();
   });
+}
+
+function asNumber(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+  return NaN;
 }
 
 // Test Suite
@@ -227,7 +236,8 @@ async function runTests() {
     
     // Verify rating was saved
     const recipeRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}`);
-    console.log(`  Average rating: ${recipeRes.body.recipe.rating.toFixed(1)}`);
+    const averageRating = asNumber(recipeRes.body.recipe.rating);
+    console.log(`  Average rating: ${averageRating.toFixed(1)}`);
     console.log(`  Rating count: ${recipeRes.body.recipe.ratingCount}`);
     
     if (recipeRes.body.recipe.ratingCount > 0) {
@@ -255,9 +265,10 @@ async function runTests() {
     
     const recipeRes = await makeRequest('GET', `/api/food-feed/recipes/${recipeId1}`);
     const expectedAvg = (5 + 4 + 5) / 3;
+    const storedAvg = asNumber(recipeRes.body.recipe.rating);
     console.log(`  ✓ Multiple ratings: 5, 4, 5`);
     console.log(`  Calculated average: ${expectedAvg.toFixed(2)}`);
-    console.log(`  Stored average: ${recipeRes.body.recipe.rating.toFixed(2)}`);
+    console.log(`  Stored average: ${storedAvg.toFixed(2)}`);
     passed++;
   } catch (e) {
     console.error(`  ✗ Failed: ${e.message}`);
@@ -313,7 +324,7 @@ async function runTests() {
       userId: testUserId,
     }, BEARER_TOKEN);
     
-    if (deleteRes.body.success) {
+    if (deleteRes.status === 200 && deleteRes.body.success) {
       console.log(`  ✓ Recipe deleted`);
       
       // Verify it's gone
@@ -325,7 +336,7 @@ async function runTests() {
         throw new Error('Recipe still exists after deletion');
       }
     } else {
-      throw new Error('Delete failed');
+      throw new Error(`Delete failed: ${JSON.stringify(deleteRes.body)}`);
     }
   } catch (e) {
     console.error(`  ✗ Failed: ${e.message}`);

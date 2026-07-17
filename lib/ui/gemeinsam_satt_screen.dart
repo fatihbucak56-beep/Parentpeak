@@ -25,6 +25,18 @@ class _FoodInfoMeta {
   const _FoodInfoMeta(this.label, this.tint);
 }
 
+class _NearbyFilterPreset {
+  final String id;
+  final String label;
+  final List<String> tags;
+
+  const _NearbyFilterPreset({
+    required this.id,
+    required this.label,
+    required this.tags,
+  });
+}
+
 const Map<String, _FoodInfoMeta> _foodInfoMetaByTag = {
   'vegetarisch': _FoodInfoMeta('Vegetarisch', Color(0xFFDCFCE7)),
   'vegan': _FoodInfoMeta('Vegan', Color(0xFFD1FAE5)),
@@ -39,6 +51,29 @@ const Map<String, _FoodInfoMeta> _foodInfoMetaByTag = {
   'nicht_scharf': _FoodInfoMeta('Nicht scharf', Color(0xFFF3F4F6)),
   'scharf': _FoodInfoMeta('Scharf', Color(0xFFFECACA)),
 };
+
+const List<_NearbyFilterPreset> _nearbyFilterPresets = [
+  _NearbyFilterPreset(
+    id: 'baby_mild',
+    label: 'Baby + mild',
+    tags: ['babyfreundlich', 'nicht_scharf'],
+  ),
+  _NearbyFilterPreset(
+    id: 'glutenfrei_mild',
+    label: 'Glutenfrei + mild',
+    tags: ['glutenfrei', 'nicht_scharf'],
+  ),
+  _NearbyFilterPreset(
+    id: 'veggie_kids',
+    label: 'Veggie fuer Kinder',
+    tags: ['vegetarisch', 'kinderfreundlich'],
+  ),
+  _NearbyFilterPreset(
+    id: 'nussfrei',
+    label: 'Nussfrei',
+    tags: ['nussfrei'],
+  ),
+];
 
 Color _trustColorForLevel(String level) {
   switch (level) {
@@ -115,6 +150,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
   Set<String> _hiddenOfferIds = <String>{};
   Set<String> _reportedOfferIds = <String>{};
   final Set<String> _activeNearbyFilters = {'kinderfreundlich', 'nicht_scharf'};
+  String? _selectedNearbyPresetId;
 
   static const String _savedRecipeStoragePrefix =
       'gemeinsam_satt.saved_recipes.v1';
@@ -689,6 +725,53 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
+                  children: [
+                    ..._nearbyFilterPresets.map((preset) {
+                      final selected = _selectedNearbyPresetId == preset.id;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(preset.label),
+                          selected: selected,
+                          onSelected: (_) {
+                            setState(() {
+                              if (selected) {
+                                _selectedNearbyPresetId = null;
+                                _activeNearbyFilters.clear();
+                              } else {
+                                _selectedNearbyPresetId = preset.id;
+                                _activeNearbyFilters
+                                  ..clear()
+                                  ..addAll(preset.tags);
+                              }
+                            });
+                          },
+                          selectedColor: const Color(0xFFFED7CC),
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                            color: selected ? _brand : const Color(0xFF516072),
+                          ),
+                        ),
+                      );
+                    }),
+                    if (_activeNearbyFilters.isNotEmpty)
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedNearbyPresetId = null;
+                            _activeNearbyFilters.clear();
+                          });
+                        },
+                        child: const Text('Reset'),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: _foodInfoMetaByTag.entries.map((entry) {
                     final selected = _activeNearbyFilters.contains(entry.key);
                     return Padding(
@@ -703,6 +786,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
                             } else {
                               _activeNearbyFilters.add(entry.key);
                             }
+                            _selectedNearbyPresetId = null;
                           });
                         },
                         selectedColor: entry.value.tint,

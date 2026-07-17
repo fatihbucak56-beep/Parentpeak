@@ -7263,6 +7263,7 @@ function buildAuthorTrustSummary(recipes) {
   let weightedRatingSum = 0;
   let ratingWeight = 0;
   let totalReports = 0;
+  let completedShares = 0;
 
   for (const recipe of recipes) {
     const ratingCount = Number(recipe.ratingCount || 0);
@@ -7270,6 +7271,7 @@ function buildAuthorTrustSummary(recipes) {
     weightedRatingSum += rating * ratingCount;
     ratingWeight += ratingCount;
     totalReports += Number(recipe.reportedCount || 0);
+    completedShares += Number(recipe.reservationCount || 0);
   }
 
   const averageRating = ratingWeight > 0 ? weightedRatingSum / ratingWeight : 0;
@@ -7289,6 +7291,7 @@ function buildAuthorTrustSummary(recipes) {
     label,
     publishedRecipesCount,
     activeOffersCount,
+    completedShares,
     averageRating: Math.round(averageRating * 100) / 100,
     totalReports,
   };
@@ -7314,6 +7317,11 @@ async function buildAuthorTrustMapForRecipes(recipes) {
       rating: true,
       ratingCount: true,
       reportedCount: true,
+      _count: {
+        select: {
+          offerReservations: true,
+        },
+      },
     },
   });
 
@@ -7322,7 +7330,10 @@ async function buildAuthorTrustMapForRecipes(recipes) {
     const key = String(recipe.creatorUserId || '').trim();
     if (!key) continue;
     const items = byAuthor.get(key) || [];
-    items.push(recipe);
+    items.push({
+      ...recipe,
+      reservationCount: recipe._count?.offerReservations || 0,
+    });
     byAuthor.set(key, items);
   }
 

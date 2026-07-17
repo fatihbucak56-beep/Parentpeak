@@ -9,6 +9,7 @@ class AuthorTrustSummary {
   final String label;
   final int publishedRecipesCount;
   final int activeOffersCount;
+  final int completedShares;
   final double averageRating;
   final int totalReports;
 
@@ -17,6 +18,7 @@ class AuthorTrustSummary {
     required this.label,
     required this.publishedRecipesCount,
     required this.activeOffersCount,
+    required this.completedShares,
     required this.averageRating,
     required this.totalReports,
   });
@@ -27,6 +29,7 @@ class AuthorTrustSummary {
       label: (json['label'] ?? 'Neu im Teilen').toString(),
       publishedRecipesCount: (json['publishedRecipesCount'] as num?)?.toInt() ?? 0,
       activeOffersCount: (json['activeOffersCount'] as num?)?.toInt() ?? 0,
+      completedShares: (json['completedShares'] as num?)?.toInt() ?? 0,
       averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0,
       totalReports: (json['totalReports'] as num?)?.toInt() ?? 0,
     );

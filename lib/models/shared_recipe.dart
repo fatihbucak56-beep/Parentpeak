@@ -24,6 +24,7 @@ class SharedRecipe {
   final String authorTrustLevel;
   final int authorPublishedRecipesCount;
   final int authorActiveOffersCount;
+  final int authorCompletedShares;
   final double averageRating;
   final int ratingCount;
   final int viewCount;
@@ -51,6 +52,7 @@ class SharedRecipe {
     this.authorTrustLevel = 'new',
     this.authorPublishedRecipesCount = 0,
     this.authorActiveOffersCount = 0,
+    this.authorCompletedShares = 0,
     this.averageRating = 0,
     this.ratingCount = 0,
     this.viewCount = 0,
@@ -88,6 +90,7 @@ class SharedRecipe {
     String? authorTrustLevel,
     int? authorPublishedRecipesCount,
     int? authorActiveOffersCount,
+    int? authorCompletedShares,
     double? averageRating,
     int? ratingCount,
     int? viewCount,
@@ -116,6 +119,8 @@ class SharedRecipe {
           authorPublishedRecipesCount ?? this.authorPublishedRecipesCount,
         authorActiveOffersCount:
           authorActiveOffersCount ?? this.authorActiveOffersCount,
+          authorCompletedShares:
+            authorCompletedShares ?? this.authorCompletedShares,
       averageRating: averageRating ?? this.averageRating,
       ratingCount: ratingCount ?? this.ratingCount,
       viewCount: viewCount ?? this.viewCount,

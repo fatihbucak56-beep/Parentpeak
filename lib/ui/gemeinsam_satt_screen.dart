@@ -235,7 +235,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       imageEmoji: _getEmojiForCategory(item.category),
       authorTrustLabel: item.authorTrust?.label ?? 'Neu im Teilen',
       authorTrustLevel: item.authorTrust?.level ?? 'new',
-      authorCompletedShares: item.authorTrust?.activeOffersCount ?? 0,
+      authorCompletedShares: item.authorTrust?.completedShares ?? 0,
     );
   }
 
@@ -329,6 +329,7 @@ class _GemeinsamSattScreenState extends State<GemeinsamSattScreen>
       authorTrustLevel: data.authorTrust?.level ?? 'new',
       authorPublishedRecipesCount: data.authorTrust?.publishedRecipesCount ?? 0,
       authorActiveOffersCount: data.authorTrust?.activeOffersCount ?? 0,
+      authorCompletedShares: data.authorTrust?.completedShares ?? 0,
       averageRating: data.rating,
       ratingCount: data.ratingCount,
       viewCount: data.viewCount,
@@ -2034,6 +2035,18 @@ class _PostCardState extends State<_PostCard>
                   ),
                 ],
 
+                if (post.authorCompletedShares > 0) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    '${post.authorCompletedShares} erfolgreiche Teilungen bisher',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 12),
 
                 // Pickup time
@@ -3163,6 +3176,9 @@ class _RecipeDetailSheet extends StatelessWidget {
                       if (recipe.authorActiveOffersCount > 0)
                         _statChip(Icons.favorite_rounded,
                             '${recipe.authorActiveOffersCount} Angebote'),
+                      if (recipe.authorCompletedShares > 0)
+                        _statChip(Icons.handshake_rounded,
+                            '${recipe.authorCompletedShares} Teilungen'),
                     ],
                   ),
                   const SizedBox(height: 12),

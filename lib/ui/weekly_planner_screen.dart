@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
 import 'package:parentpeak/logic/weekly_planner_controller.dart';
@@ -39,7 +40,7 @@ class _WeeklyPlannerScreenState extends State<WeeklyPlannerScreen> {
     super.initState();
     _storage = BackendServiceFactory.createWeeklyPlannerStorageService();
     _controller = WeeklyPlannerController(
-      initialRecipes: _demoRecipes,
+      initialRecipes: kDebugMode ? _demoRecipes : const <Recipe>[],
       weekStart: _startOfWeek(DateTime.now()),
     );
 

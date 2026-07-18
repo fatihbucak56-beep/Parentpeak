@@ -155,7 +155,7 @@ class PaywallScreen extends StatelessWidget {
   }
 
   Future<void> _activatePremium(BuildContext context) async {
-    // Stub: In Produktion hier In-App Purchase Flow starten
+    // Aktiviert Premium ueber serverseitige Entitlement-Validierung.
     final success = await AuthService.instance.activatePremium();
     if (!success) {
       if (context.mounted) {

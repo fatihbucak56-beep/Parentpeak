@@ -24,12 +24,12 @@ services:
         value: "/opt/render/project/backend/weekly_impulse_schema_year3.json"
       - key: DISABLE_IN_MEMORY_FALLBACKS
         value: "1"
+      - key: ALLOW_DEMO_BOOTSTRAP
+        value: "0"
       - key: BACKEND_API_TOKEN
         sync: false
       - key: CORS_ALLOWED_ORIGINS
         value: "https://parentpeak.onrender.com,https://parentpeak.de"
-      - key: BACKEND_API_TOKEN
-        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: INTERNAL_MODERATOR_EMAILS

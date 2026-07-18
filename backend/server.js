@@ -682,6 +682,93 @@ function saveProviders(providers) {
   }
 }
 
+let providerReviewSchemaEnsured = false;
+
+async function ensureProviderReviewSchemaReady() {
+  if (providerReviewSchemaEnsured) {
+    return;
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ProviderReview" (
+      "id" TEXT PRIMARY KEY,
+      "providerId" TEXT NOT NULL,
+      "rating" INTEGER NOT NULL,
+      "comment" TEXT,
+      "parentName" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "ProviderReview_providerId_idx"
+    ON "ProviderReview"("providerId");
+  `);
+
+  providerReviewSchemaEnsured = true;
+}
+
+async function getProviderReviewStatsMap() {
+  await ensureProviderReviewSchemaReady();
+
+  const rows = await prisma.$queryRawUnsafe(`
+    SELECT
+      "providerId",
+      COUNT(*)::INT AS "reviewCount",
+      AVG("rating")::FLOAT8 AS "averageRating"
+    FROM "ProviderReview"
+    GROUP BY "providerId";
+  `);
+
+  const stats = new Map();
+  for (const row of rows) {
+    const providerId = (row.providerId || '').toString();
+    if (!providerId) continue;
+    stats.set(providerId, {
+      reviewCount: Number(row.reviewCount || 0),
+      averageRating: Number(row.averageRating || 0),
+    });
+  }
+
+  return stats;
+}
+
+function mergeProviderWithReviewStats(provider, reviewStats) {
+  const stats = reviewStats.get(provider.id);
+  if (!stats) {
+    return provider;
+  }
+
+  const baseReviews = Number(provider.reviews || 0);
+  const baseRating = Number(provider.rating || 0);
+  const dbReviews = Number(stats.reviewCount || 0);
+  const dbRating = Number(stats.averageRating || 0);
+  const mergedReviewCount = baseReviews + dbReviews;
+
+  if (mergedReviewCount <= 0) {
+    return provider;
+  }
+
+  const mergedRating = ((baseRating * baseReviews) + (dbRating * dbReviews)) / mergedReviewCount;
+
+  return {
+    ...provider,
+    reviews: mergedReviewCount,
+    rating: Math.round(mergedRating * 10) / 10,
+  };
+}
+
+async function getProvidersWithReviewStats() {
+  const providers = getProviders();
+  try {
+    const reviewStats = await getProviderReviewStatsMap();
+    return providers.map(provider => mergeProviderWithReviewStats(provider, reviewStats));
+  } catch (error) {
+    console.error('Provider review stats konnten nicht geladen werden:', error?.message || error);
+    return providers;
+  }
+}
+
 function getWeeklyImpulseSchema() {
   for (const schemaPath of weeklyImpulseSchemaPathCandidates) {
     try {
@@ -2815,23 +2902,23 @@ app.post('/api/weekly-impulse/community/posts/:postId/moderation-visibility', (r
 });
 
 // 1. Alle Anbieter abrufen
-app.get('/api/providers', (req, res) => {
-  const providers = getProviders();
+app.get('/api/providers', async (req, res) => {
+  const providers = await getProvidersWithReviewStats();
   res.json(providers);
 });
 
 // 2. Anbieter nach Kategorie filtern
-app.get('/api/providers/category/:category', (req, res) => {
+app.get('/api/providers/category/:category', async (req, res) => {
   const { category } = req.params;
-  const providers = getProviders();
+  const providers = await getProvidersWithReviewStats();
   const filtered = providers.filter(p => p.category === category || p.subcategory === category);
   res.json(filtered);
 });
 
 // 3. Anbieter nach ID abrufen
-app.get('/api/providers/:id', (req, res) => {
+app.get('/api/providers/:id', async (req, res) => {
   const { id } = req.params;
-  const providers = getProviders();
+  const providers = await getProvidersWithReviewStats();
   const provider = providers.find(p => p.id === id);
   
   if (!provider) {
@@ -2842,14 +2929,14 @@ app.get('/api/providers/:id', (req, res) => {
 });
 
 // 4. Suche nach Name
-app.get('/api/search', (req, res) => {
+app.get('/api/search', async (req, res) => {
   const { q } = req.query;
   
   if (!q) {
     return res.status(400).json({ error: 'Suchtext erforderlich' });
   }
   
-  const providers = getProviders();
+  const providers = await getProvidersWithReviewStats();
   const filtered = providers.filter(p => 
     p.name.toLowerCase().includes(q.toLowerCase()) ||
     p.category.toLowerCase().includes(q.toLowerCase()) ||
@@ -2860,14 +2947,14 @@ app.get('/api/search', (req, res) => {
 });
 
 // 5. Alle Kategorien abrufen
-app.get('/api/categories', (req, res) => {
-  const providers = getProviders();
+app.get('/api/categories', async (req, res) => {
+  const providers = await getProvidersWithReviewStats();
   const categories = [...new Set(providers.map(p => p.category))];
   res.json(categories);
 });
 
-// 6. Neue Bewertung hinzufügen (Mock - speichert nicht wirklich)
-app.post('/api/providers/:id/review', (req, res) => {
+// 6. Neue Bewertung hinzufügen (dateibasiert persistiert)
+app.post('/api/providers/:id/review', async (req, res) => {
   const { id } = req.params;
   const { rating, comment, parentName } = req.body;
   
@@ -2881,24 +2968,52 @@ app.post('/api/providers/:id/review', (req, res) => {
   if (!provider) {
     return res.status(404).json({ error: 'Anbieter nicht gefunden' });
   }
-  
-  // Mock: Aktualisiere Rating
+
+  const normalizedRating = Number(rating);
+  const normalizedComment = (comment || '').toString().trim();
+  const normalizedParentName = (parentName || 'Anonym').toString().trim();
+  provider.reviewEntries = Array.isArray(provider.reviewEntries) ? provider.reviewEntries : [];
+  provider.reviewEntries.unshift({
+    id: `review-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    rating: normalizedRating,
+    comment: normalizedComment,
+    parentName: normalizedParentName,
+    createdAt: new Date().toISOString(),
+  });
+
+  // Aktualisiere aggregiertes Rating und Reviews-Zaehler dateibasiert persistent.
   provider.reviews += 1;
-  provider.rating = ((provider.rating * (provider.reviews - 1)) + rating) / provider.reviews;
-  
-  saveProviders(providers);
+  provider.rating = ((provider.rating * (provider.reviews - 1)) + normalizedRating) / provider.reviews;
+
+  let persistedToDatabase = false;
+  try {
+    await ensureProviderReviewSchemaReady();
+    await prisma.$executeRaw`
+      INSERT INTO "ProviderReview" ("id", "providerId", "rating", "comment", "parentName", "createdAt")
+      VALUES (${`review-${Date.now()}-${Math.floor(Math.random() * 1000)}`}, ${id}, ${Math.round(normalizedRating)}, ${normalizedComment || null}, ${normalizedParentName || null}, ${new Date()})
+    `;
+    persistedToDatabase = true;
+  } catch (error) {
+    console.error('ProviderReview konnte nicht in DB gespeichert werden:', error?.message || error);
+  }
+
+  const saved = saveProviders(providers);
+  if (!saved) {
+    return res.status(500).json({ error: 'Bewertung konnte nicht gespeichert werden' });
+  }
   
   res.json({
     message: 'Bewertung hinzugefügt',
+    persistedToDatabase,
     provider: provider
   });
 });
 
 // 7. Filter nach Kriterien
-app.post('/api/providers/filter', (req, res) => {
+app.post('/api/providers/filter', async (req, res) => {
   const { categories, maxPrice, minRating } = req.body;
   
-  let providers = getProviders();
+  let providers = await getProvidersWithReviewStats();
   
   if (categories && categories.length > 0) {
     providers = providers.filter(p => categories.includes(p.category));

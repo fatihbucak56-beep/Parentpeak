@@ -89,6 +89,11 @@ class MarketplaceService {
 
   static bool get _isBackendEnabled => _apiClient != null;
 
+  static Never _throwReleaseUnavailable(String context, [Object? error]) {
+    final details = error == null ? '' : ' ($error)';
+    throw StateError('$context derzeit nicht verfuegbar$details');
+  }
+
   static String _inferCategoryGroup(Map<String, dynamic> json) {
     final explicit = json['categoryGroup']?.toString();
     if (explicit != null && explicit.isNotEmpty) return explicit;
@@ -671,8 +676,16 @@ class MarketplaceService {
     ),
   ];
 
-  /// Alle Anbieter abrufen (Mock)
+  /// Alle Anbieter abrufen (Release: backend-only, Debug: Mock-Fallback)
   static Future<List<Provider>> getAllProviders() async {
+    if (!_isBackendEnabled) {
+      if (kReleaseMode) {
+        _throwReleaseUnavailable('Marktplatz');
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+      return _mockProviders;
+    }
+
     if (_isBackendEnabled) {
       try {
         final payload = await _apiClient.getJson(APIConfig.getBackendProvidersPath());
@@ -682,8 +695,14 @@ class MarketplaceService {
               .map((item) => _normalizeProvider(Map<String, dynamic>.from(item)))
               .toList();
         }
+        if (kReleaseMode) {
+          _throwReleaseUnavailable('Marktplatz', 'ungueltige Backend-Antwort');
+        }
       } catch (e) {
         debugPrint('MarketplaceService.getAllProviders fallback: $e');
+        if (kReleaseMode) {
+          _throwReleaseUnavailable('Marktplatz', e);
+        }
       }
     }
 
@@ -699,6 +718,7 @@ class MarketplaceService {
 
   /// Anbieter nach detaillierter Kategorie filtern
   static Future<List<Provider>> getProvidersByCategory(String category) async {
+    final providers = await getAllProviders();
     if (_isBackendEnabled) {
       try {
         final payload = await _apiClient.getJson(
@@ -712,10 +732,12 @@ class MarketplaceService {
         }
       } catch (e) {
         debugPrint('MarketplaceService.getProvidersByCategory fallback: $e');
+        if (kReleaseMode) {
+          _throwReleaseUnavailable('Marktplatz Kategorie', e);
+        }
       }
     }
 
-    final providers = await getAllProviders();
     return providers
         .where((p) => p.category == category || p.subcategory == category)
         .toList();
@@ -741,8 +763,22 @@ class MarketplaceService {
     return categories.toList()..sort();
   }
 
-  /// Suche nach Text (Mock)
+  /// Suche nach Text (Release: backend-only, Debug: Mock-Fallback)
   static Future<List<Provider>> search(String query) async {
+    if (!_isBackendEnabled) {
+      if (kReleaseMode) {
+        _throwReleaseUnavailable('Marktplatz Suche');
+      }
+      await Future.delayed(const Duration(milliseconds: 300));
+      final q = query.toLowerCase();
+      return _mockProviders
+          .where((p) =>
+              p.name.toLowerCase().contains(q) ||
+              p.category.toLowerCase().contains(q) ||
+              p.description.toLowerCase().contains(q))
+          .toList();
+    }
+
     if (_isBackendEnabled) {
       try {
         final payload = await _apiClient.getJson(
@@ -756,6 +792,9 @@ class MarketplaceService {
         }
       } catch (e) {
         debugPrint('MarketplaceService.search fallback: $e');
+        if (kReleaseMode) {
+          _throwReleaseUnavailable('Marktplatz Suche', e);
+        }
       }
     }
 
@@ -769,13 +808,21 @@ class MarketplaceService {
         .toList();
   }
 
-  /// Bewertung hinzufügen (Mock)
+  /// Bewertung hinzufügen (Release: backend-only)
   static Future<void> addReview({
     required String providerId,
     required double rating,
     required String comment,
     required String parentName,
   }) async {
+    if (!_isBackendEnabled) {
+      if (kReleaseMode) {
+        _throwReleaseUnavailable('Bewertungen');
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+      return;
+    }
+
     if (_isBackendEnabled) {
       try {
         await _apiClient.postJsonAny(
@@ -789,19 +836,53 @@ class MarketplaceService {
         return;
       } catch (e) {
         debugPrint('MarketplaceService.addReview fallback: $e');
+        if (kReleaseMode) {
+          _throwReleaseUnavailable('Bewertungen', e);
+        }
       }
     }
 
     await Future.delayed(const Duration(milliseconds: 500));
   }
 
-  /// Erweiterte Filter (Mock)
+  /// Erweiterte Filter (Release: backend-only, Debug: Mock-Fallback)
   static Future<List<Provider>> filterProviders({
     List<String>? categories,
     double? maxPrice,
     double? minRating,
     String? categoryGroup,
   }) async {
+    if (!_isBackendEnabled) {
+      if (kReleaseMode) {
+        _throwReleaseUnavailable('Marktplatz Filter');
+      }
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      var filtered = _mockProviders;
+
+      if (categoryGroup != null) {
+        filtered = filtered
+            .where((p) => p.categoryGroup == categoryGroup)
+            .toList();
+      }
+
+      if (categories != null && categories.isNotEmpty) {
+        filtered = filtered
+            .where((p) => categories.contains(p.category))
+            .toList();
+      }
+
+      if (maxPrice != null && maxPrice > 0) {
+        filtered = filtered.where((p) => p.price <= maxPrice).toList();
+      }
+
+      if (minRating != null) {
+        filtered = filtered.where((p) => p.rating >= minRating).toList();
+      }
+
+      return filtered;
+    }
+
     if (_isBackendEnabled) {
       try {
         final payload = await _apiClient.postJsonAny(
@@ -824,6 +905,9 @@ class MarketplaceService {
         }
       } catch (e) {
         debugPrint('MarketplaceService.filterProviders fallback: $e');
+        if (kReleaseMode) {
+          _throwReleaseUnavailable('Marktplatz Filter', e);
+        }
       }
     }
 

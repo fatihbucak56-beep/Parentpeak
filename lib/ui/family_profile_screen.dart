@@ -12,7 +12,6 @@ import 'package:parentpeak/l10n/app_localizations_all.dart';
 import 'package:parentpeak/logic/account_data_cleanup_service.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/models/trusted_device.dart';
-import 'package:parentpeak/ui/auth/login_screen.dart';
 import 'package:parentpeak/ui/legal_info_screen.dart';
 import 'package:parentpeak/ui/privacy_settings_screen.dart';
 import 'package:parentpeak/widgets/ala_rengin_flag_painter.dart';
@@ -31,26 +30,26 @@ class FamilyProfileScreen extends StatefulWidget {
 class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
   static const String _prefsFamilyMembersKey = 'family_profile.members.v1';
   static const String _prefsSelectedInterestsKey =
-    'family_profile.selected_interests.v1';
+      'family_profile.selected_interests.v1';
   static const String _prefsNotificationsKey =
-    'family_profile.notifications_enabled.v1';
+      'family_profile.notifications_enabled.v1';
   static const String _prefsNotifyEmergenciesKey =
-    'family_profile.notify_emergencies.v1';
+      'family_profile.notify_emergencies.v1';
   static const String _prefsNotifyRemindersKey =
-    'family_profile.notify_reminders.v1';
+      'family_profile.notify_reminders.v1';
   static const String _prefsNotifyUpdatesKey =
-    'family_profile.notify_updates.v1';
+      'family_profile.notify_updates.v1';
   static const String _prefsPrivacyModeKey =
-    'family_profile.privacy_mode_enabled.v1';
+      'family_profile.privacy_mode_enabled.v1';
   static const String _prefsActiveRoleKey = 'family_profile.active_role.v1';
   static const String _prefsActiveMemberNameKey =
-    'family_profile.active_member_name.v1';
+      'family_profile.active_member_name.v1';
   static const String _prefsLastBackupAtKey =
-    'family_profile.backup_last_saved_at.v1';
+      'family_profile.backup_last_saved_at.v1';
   static const String _prefsSignedBackupEnabledKey =
-    'family_profile.backup_signed_enabled.v1';
+      'family_profile.backup_signed_enabled.v1';
   static const String _backupSignatureKey =
-    'parentpeak.family.backup.signature.v1';
+      'parentpeak.family.backup.signature.v1';
   static const int _backupVersion = 3;
   static const int _qrChunkMaxChars = 350;
   static const List<String> _memberRoles = [
@@ -765,7 +764,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
         final fallbackName = _familyMembers.first.name;
         final hasImportedMember = importedMemberName != null &&
             _familyMembers.any((m) => m.name == importedMemberName);
-        _activeMemberName = hasImportedMember ? importedMemberName : fallbackName;
+        _activeMemberName =
+            hasImportedMember ? importedMemberName : fallbackName;
       });
 
       await _persistAllProfileSettings();
@@ -814,8 +814,6 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     }
   }
 
-
-
   Future<void> _loadProfilePreferences() async {
     final prefs = await SharedPreferences.getInstance();
     final storedMembers =
@@ -837,7 +835,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               parsedMembers.add(_FamilyMember.fromMap(decoded));
             }
           } catch (e) {
-            debugPrint('FamilyProfileScreen._loadProfilePreferences(): skipping broken member entry: $e');
+            debugPrint(
+                'FamilyProfileScreen._loadProfilePreferences(): skipping broken member entry: $e');
             // Ignore broken legacy entries and keep defaults.
           }
         }
@@ -860,8 +859,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
       _activeMemberName = prefs.getString(_prefsActiveMemberNameKey) ?? 'Emma';
       _signedBackupEnabled =
           prefs.getBool(_prefsSignedBackupEnabledKey) ?? false;
-        final backupMillis = prefs.getInt(_prefsLastBackupAtKey);
-        _lastBackupAt = backupMillis == null
+      final backupMillis = prefs.getInt(_prefsLastBackupAtKey);
+      _lastBackupAt = backupMillis == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(backupMillis);
 
@@ -997,9 +996,11 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               DropdownButtonFormField<String>(
                 initialValue: selectedRole,
                 items: const [
-                  DropdownMenuItem(value: 'Elternteil', child: Text('Elternteil')),
+                  DropdownMenuItem(
+                      value: 'Elternteil', child: Text('Elternteil')),
                   DropdownMenuItem(value: 'Kind', child: Text('Kind')),
-                  DropdownMenuItem(value: 'Bezugsperson', child: Text('Bezugsperson')),
+                  DropdownMenuItem(
+                      value: 'Bezugsperson', child: Text('Bezugsperson')),
                 ],
                 onChanged: (value) {
                   if (value == null) {
@@ -1149,9 +1150,11 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               DropdownButtonFormField<String>(
                 initialValue: selectedRole,
                 items: const [
-                  DropdownMenuItem(value: 'Elternteil', child: Text('Elternteil')),
+                  DropdownMenuItem(
+                      value: 'Elternteil', child: Text('Elternteil')),
                   DropdownMenuItem(value: 'Kind', child: Text('Kind')),
-                  DropdownMenuItem(value: 'Bezugsperson', child: Text('Bezugsperson')),
+                  DropdownMenuItem(
+                      value: 'Bezugsperson', child: Text('Bezugsperson')),
                 ],
                 onChanged: canEditRole
                     ? (value) {
@@ -1210,8 +1213,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   Navigator.pop(context, false);
                   _removeFamilyMember(member);
                 },
-                style: TextButton.styleFrom(
-                    foregroundColor: Colors.red),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text('Entfernen'),
               ),
             const Spacer(),
@@ -1303,7 +1305,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Mitglied entfernen?'),
-            content: Text('${member.name} wird aus dem Familienprofil entfernt.'),
+            content:
+                Text('${member.name} wird aus dem Familienprofil entfernt.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -1509,6 +1512,22 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     );
   }
 
+  // ── Kontoaktionen – modernes Design ─────────────────────────────────────────
+
+  Widget _buildAccountActionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Abmelden ─────────────────────────────────────────────────────────
+        _LogoutButton(onTap: _logout),
+        const SizedBox(height: 12),
+        // ── Konto löschen (bewusst kleiner + dezenter) ────────────────────────
+        _DeleteAccountButton(onTap: _showDeleteAccountConfirmation),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1539,15 +1558,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     if (confirmed != true) return;
     await AuthService.instance.logout();
     if (!mounted) return;
+    // Komplette Widget-Tree ersetzen — AuthGate erkennt currentUser == null
+    // und zeigt automatisch LoginScreen an.
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(onLoginSuccess: () {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const DemoApp()),
-            (route) => false,
-          );
-        }),
-      ),
+      MaterialPageRoute(builder: (_) => const DemoApp()),
       (route) => false,
     );
   }
@@ -1627,25 +1641,20 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 debugPrint('Error deleting Firebase account: $e');
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Fehler beim Löschen des Kontos: $e')),
+                    SnackBar(
+                        content: Text('Fehler beim Löschen des Kontos: $e')),
                   );
                 }
                 return;
               }
-              // Clear all local data
+              // Alle lokalen Daten löschen
               final prefs = await SharedPreferences.getInstance();
               await prefs.clear();
               await AuthService.instance.logout();
               if (!mounted) return;
+              // Komplette Widget-Tree ersetzen
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => LoginScreen(onLoginSuccess: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const DemoApp()),
-                      (route) => false,
-                    );
-                  }),
-                ),
+                MaterialPageRoute(builder: (_) => const DemoApp()),
                 (route) => false,
               );
             },
@@ -1742,7 +1751,8 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                   runSpacing: 10,
                   alignment: WrapAlignment.center,
                   children: [
-                    _buildHeaderStat('Mitglieder', _familyMembers.length.toString()),
+                    _buildHeaderStat(
+                        'Mitglieder', _familyMembers.length.toString()),
                     _buildHeaderStat('Kinder', childrenCount.toString()),
                     _buildHeaderStat('Erwachsene', adultCount.toString()),
                   ],
@@ -2123,8 +2133,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                 decoration: BoxDecoration(
                   color: primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
-                  border:
-                      Border.all(color: primary.withValues(alpha: 0.25)),
+                  border: Border.all(color: primary.withValues(alpha: 0.25)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2302,10 +2311,12 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                         else
                           Text(
                             'Tippen zum Wechseln',
-                            style:
-                                Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: Colors.black38,
-                                    ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: Colors.black38,
+                                ),
                           ),
                       ],
                     ),
@@ -2447,113 +2458,113 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             'Profil & Sichtbarkeit',
             'Sprache, Darstellung, Hinweise und Datenschutz fuer euren Familienraum.',
             [
-                _buildActionTile(
-                  leading: Builder(
-                    builder: (context) {
-                      final currentLang = _languages
-                          .firstWhere((l) => l['code'] == _currentLanguage);
-                      final code = currentLang['code']!;
-                      if (code == 'ku' || code == 'ckb') {
-                        return const AlaRenginFlag(width: 24, height: 15);
-                      }
-                      final flagValue = currentLang['flag']!;
-                      return Text(flagValue,
-                          style: const TextStyle(fontSize: 20));
-                    },
-                  ),
-                  title: _t('language'),
-                  subtitle: 'Aktive Sprache im Familienbereich wechseln',
-                  status: _languages.firstWhere(
-                          (l) => l['code'] == _currentLanguage)['nativeName'] ??
-                      '',
-                  onTap: _showLanguageSelector,
-                ),
-                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
-                SwitchListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  secondary:
-                      const Icon(Icons.dark_mode, color: Color(0xFFBDB2FF)),
-                  title: Text(_t('dark_mode')),
-                  value: _isDarkMode,
-                  onChanged: (value) async {
-                    setState(() => _isDarkMode = value);
-                    await themeService.setDarkMode(value);
-                    DemoApp.setThemeMode(
-                        value ? ThemeMode.dark : ThemeMode.light);
+              _buildActionTile(
+                leading: Builder(
+                  builder: (context) {
+                    final currentLang = _languages
+                        .firstWhere((l) => l['code'] == _currentLanguage);
+                    final code = currentLang['code']!;
+                    if (code == 'ku' || code == 'ckb') {
+                      return const AlaRenginFlag(width: 24, height: 15);
+                    }
+                    final flagValue = currentLang['flag']!;
+                    return Text(flagValue,
+                        style: const TextStyle(fontSize: 20));
                   },
                 ),
-                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
+                title: _t('language'),
+                subtitle: 'Aktive Sprache im Familienbereich wechseln',
+                status: _languages.firstWhere(
+                        (l) => l['code'] == _currentLanguage)['nativeName'] ??
+                    '',
+                onTap: _showLanguageSelector,
+              ),
+              Divider(height: 1, color: primary.withValues(alpha: 0.1)),
+              SwitchListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                secondary:
+                    const Icon(Icons.dark_mode, color: Color(0xFFBDB2FF)),
+                title: Text(_t('dark_mode')),
+                value: _isDarkMode,
+                onChanged: (value) async {
+                  setState(() => _isDarkMode = value);
+                  await themeService.setDarkMode(value);
+                  DemoApp.setThemeMode(
+                      value ? ThemeMode.dark : ThemeMode.light);
+                },
+              ),
+              Divider(height: 1, color: primary.withValues(alpha: 0.1)),
+              SwitchListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                secondary:
+                    const Icon(Icons.notifications, color: Color(0xFFBDB2FF)),
+                title: Text(_t('notifications')),
+                value: _notificationsEnabled,
+                onChanged: _toggleAllNotifications,
+              ),
+              if (_notificationsEnabled) ...[
+                Divider(height: 1, color: primary.withValues(alpha: 0.08)),
                 SwitchListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  secondary:
-                      const Icon(Icons.notifications, color: Color(0xFFBDB2FF)),
-                  title: Text(_t('notifications')),
-                  value: _notificationsEnabled,
-                  onChanged: _toggleAllNotifications,
+                  contentPadding: const EdgeInsets.only(
+                    left: 52,
+                    right: 20,
+                    top: 6,
+                    bottom: 6,
+                  ),
+                  title: const Text('Notfaelle'),
+                  subtitle: const Text('Sofortige Benachrichtigungen'),
+                  value: _notifyEmergencies,
+                  onChanged: (value) =>
+                      _updateGranularNotifications(emergencies: value),
                 ),
-                if (_notificationsEnabled) ...[
-                  Divider(height: 1, color: primary.withValues(alpha: 0.08)),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.only(
-                      left: 52,
-                      right: 20,
-                      top: 6,
-                      bottom: 6,
-                    ),
-                    title: const Text('Notfaelle'),
-                    subtitle: const Text('Sofortige Benachrichtigungen'),
-                    value: _notifyEmergencies,
-                    onChanged: (value) =>
-                        _updateGranularNotifications(emergencies: value),
+                Divider(height: 1, color: primary.withValues(alpha: 0.08)),
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.only(
+                    left: 52,
+                    right: 20,
+                    top: 6,
+                    bottom: 6,
                   ),
-                  Divider(height: 1, color: primary.withValues(alpha: 0.08)),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.only(
-                      left: 52,
-                      right: 20,
-                      top: 6,
-                      bottom: 6,
-                    ),
-                    title: const Text('Erinnerungen'),
-                    subtitle: const Text('Termine und Aufgaben'),
-                    value: _notifyReminders,
-                    onChanged: (value) =>
-                        _updateGranularNotifications(reminders: value),
-                  ),
-                  Divider(height: 1, color: primary.withValues(alpha: 0.08)),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.only(
-                      left: 52,
-                      right: 20,
-                      top: 6,
-                      bottom: 6,
-                    ),
-                    title: const Text('Produkt-Updates'),
-                    subtitle: const Text('Neue Funktionen und Hinweise'),
-                    value: _notifyUpdates,
-                    onChanged: (value) =>
-                        _updateGranularNotifications(updates: value),
-                  ),
-                ],
-                Divider(height: 1, color: primary.withValues(alpha: 0.1)),
-                _buildActionTile(
-                  leading:
-                      const Icon(Icons.privacy_tip, color: Color(0xFFBDB2FF)),
-                  title: _t('privacy'),
-                  subtitle: _privacyModeEnabled
-                      ? 'Schuetzt sensible Familieninfos im Alltag'
-                      : 'Mehr Infos sind im Familienkreis sichtbar',
-                  status: _privacyModeEnabled ? 'Geschuetzt' : 'Offener',
-                  statusColor: _privacyModeEnabled
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFFFEDD5),
-                  statusTextColor: _privacyModeEnabled
-                      ? const Color(0xFF166534)
-                      : const Color(0xFF9A3412),
-                  onTap: _openPrivacySettings,
+                  title: const Text('Erinnerungen'),
+                  subtitle: const Text('Termine und Aufgaben'),
+                  value: _notifyReminders,
+                  onChanged: (value) =>
+                      _updateGranularNotifications(reminders: value),
                 ),
+                Divider(height: 1, color: primary.withValues(alpha: 0.08)),
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.only(
+                    left: 52,
+                    right: 20,
+                    top: 6,
+                    bottom: 6,
+                  ),
+                  title: const Text('Produkt-Updates'),
+                  subtitle: const Text('Neue Funktionen und Hinweise'),
+                  value: _notifyUpdates,
+                  onChanged: (value) =>
+                      _updateGranularNotifications(updates: value),
+                ),
+              ],
+              Divider(height: 1, color: primary.withValues(alpha: 0.1)),
+              _buildActionTile(
+                leading:
+                    const Icon(Icons.privacy_tip, color: Color(0xFFBDB2FF)),
+                title: _t('privacy'),
+                subtitle: _privacyModeEnabled
+                    ? 'Schuetzt sensible Familieninfos im Alltag'
+                    : 'Mehr Infos sind im Familienkreis sichtbar',
+                status: _privacyModeEnabled ? 'Geschuetzt' : 'Offener',
+                statusColor: _privacyModeEnabled
+                    ? const Color(0xFFDCFCE7)
+                    : const Color(0xFFFFEDD5),
+                statusTextColor: _privacyModeEnabled
+                    ? const Color(0xFF166534)
+                    : const Color(0xFF9A3412),
+                onTap: _openPrivacySettings,
+              ),
             ],
           ),
         ],
@@ -2580,26 +2591,27 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             'Vertrauen & Orientierung',
             'Was eure Familie ueber Verantwortung, Leitplanken und Zusammenarbeit wissen sollte.',
             [
-                _buildActionTile(
-                  leading: const Icon(Icons.star, color: Color(0xFFBDB2FF)),
-                  title: _t('engagement'),
-                  subtitle: _t('engagement_subtitle'),
-                  status: 'Einblick',
-                  statusColor: const Color(0xFFFAE8FF),
-                  statusTextColor: const Color(0xFF86198F),
-                  onTap: _showEngagementInfo,
-                ),
-                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
-                _buildActionTile(
-                  leading:
-                      const Icon(Icons.description, color: Color(0xFFBDB2FF)),
-                  title: _t('legal'),
-                  subtitle: 'Leitplanken fuer faire und sichere Nutzung im Familienalltag',
-                  status: 'Wichtig',
-                  statusColor: const Color(0xFFDBEAFE),
-                  statusTextColor: const Color(0xFF1D4ED8),
-                  onTap: _showLegalInfo,
-                ),
+              _buildActionTile(
+                leading: const Icon(Icons.star, color: Color(0xFFBDB2FF)),
+                title: _t('engagement'),
+                subtitle: _t('engagement_subtitle'),
+                status: 'Einblick',
+                statusColor: const Color(0xFFFAE8FF),
+                statusTextColor: const Color(0xFF86198F),
+                onTap: _showEngagementInfo,
+              ),
+              Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
+              _buildActionTile(
+                leading:
+                    const Icon(Icons.description, color: Color(0xFFBDB2FF)),
+                title: _t('legal'),
+                subtitle:
+                    'Leitplanken fuer faire und sichere Nutzung im Familienalltag',
+                status: 'Wichtig',
+                statusColor: const Color(0xFFDBEAFE),
+                statusTextColor: const Color(0xFF1D4ED8),
+                onTap: _showLegalInfo,
+              ),
             ],
           ),
           _buildSectionCard(
@@ -2607,87 +2619,224 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
             'Sicherheit & Wiederherstellung',
             'Backups, Signaturen und Wiederherstellung fuer euren geschuetzten Familienraum.',
             [
-                _buildActionTile(
-                  leading: const Icon(Icons.copy_all, color: Color(0xFFBDB2FF)),
-                  title: 'Backup exportieren',
-                  subtitle: _lastBackupAt == null
-                      ? 'Noch kein Backup erstellt'
-                      : 'Letztes Backup: ${_lastBackupAt!.day.toString().padLeft(2, '0')}.${_lastBackupAt!.month.toString().padLeft(2, '0')}.${_lastBackupAt!.year}',
-                  status: 'v$_backupVersion',
-                  onTap: _exportProfileBackup,
-                ),
-                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
-                SwitchListTile.adaptive(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  secondary: const Icon(Icons.verified_user, color: Color(0xFFBDB2FF)),
-                  title: const Text('Signierte Backups'),
-                  subtitle: const Text('Fügt eine HMAC-Signatur zur Integritätsprüfung hinzu'),
-                  value: _signedBackupEnabled,
-                  onChanged: _canManageMembers
-                      ? (value) async {
-                          setState(() {
-                            _signedBackupEnabled = value;
-                          });
-                          await _persistSignedBackupSetting();
-                        }
-                      : null,
-                ),
-                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
-                _buildActionTile(
-                  leading: const Icon(Icons.qr_code_2, color: Color(0xFFBDB2FF)),
-                  title: 'Backup als QR anzeigen',
-                  subtitle: 'Direkter Transfer auf ein zweites Geraet ohne Teilen-Dialog',
-                  status: 'QR',
-                  statusColor: const Color(0xFFE0F2FE),
-                  statusTextColor: const Color(0xFF0369A1),
-                  onTap: _showBackupQrDialog,
-                ),
-                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
-                _buildActionTile(
-                  leading: const Icon(Icons.upload_file, color: Color(0xFFBDB2FF)),
-                  title: 'Backup importieren',
-                  subtitle: 'Gespeichertes Profil aus JSON oder QR wiederherstellen',
-                  status: _signedBackupEnabled ? 'Signatur an' : 'Standard',
-                  statusColor: _signedBackupEnabled
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFF1F5F9),
-                  statusTextColor: _signedBackupEnabled
-                      ? const Color(0xFF166534)
-                      : const Color(0xFF334155),
-                  onTap: _canManageMembers
-                      ? _importProfileBackup
-                      : _showPermissionDeniedMessage,
-                ),
+              _buildActionTile(
+                leading: const Icon(Icons.copy_all, color: Color(0xFFBDB2FF)),
+                title: 'Backup exportieren',
+                subtitle: _lastBackupAt == null
+                    ? 'Noch kein Backup erstellt'
+                    : 'Letztes Backup: ${_lastBackupAt!.day.toString().padLeft(2, '0')}.${_lastBackupAt!.month.toString().padLeft(2, '0')}.${_lastBackupAt!.year}',
+                status: 'v$_backupVersion',
+                onTap: _exportProfileBackup,
+              ),
+              Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
+              SwitchListTile.adaptive(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                secondary:
+                    const Icon(Icons.verified_user, color: Color(0xFFBDB2FF)),
+                title: const Text('Signierte Backups'),
+                subtitle: const Text(
+                    'Fügt eine HMAC-Signatur zur Integritätsprüfung hinzu'),
+                value: _signedBackupEnabled,
+                onChanged: _canManageMembers
+                    ? (value) async {
+                        setState(() {
+                          _signedBackupEnabled = value;
+                        });
+                        await _persistSignedBackupSetting();
+                      }
+                    : null,
+              ),
+              Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
+              _buildActionTile(
+                leading: const Icon(Icons.qr_code_2, color: Color(0xFFBDB2FF)),
+                title: 'Backup als QR anzeigen',
+                subtitle:
+                    'Direkter Transfer auf ein zweites Geraet ohne Teilen-Dialog',
+                status: 'QR',
+                statusColor: const Color(0xFFE0F2FE),
+                statusTextColor: const Color(0xFF0369A1),
+                onTap: _showBackupQrDialog,
+              ),
+              Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
+              _buildActionTile(
+                leading:
+                    const Icon(Icons.upload_file, color: Color(0xFFBDB2FF)),
+                title: 'Backup importieren',
+                subtitle:
+                    'Gespeichertes Profil aus JSON oder QR wiederherstellen',
+                status: _signedBackupEnabled ? 'Signatur an' : 'Standard',
+                statusColor: _signedBackupEnabled
+                    ? const Color(0xFFDCFCE7)
+                    : const Color(0xFFF1F5F9),
+                statusTextColor: _signedBackupEnabled
+                    ? const Color(0xFF166534)
+                    : const Color(0xFF334155),
+                onTap: _canManageMembers
+                    ? _importProfileBackup
+                    : _showPermissionDeniedMessage,
+              ),
             ],
           ),
-          _buildSectionCard(
-            primaryColor,
-            'Kontoaktionen',
-            'Direkte Aktionen rund um euren Zugriff und die Verwaltung des Kontos.',
-            [
-                _buildActionTile(
-                  leading: const Icon(Icons.logout, color: Colors.orange),
-                  title: _t('logout'),
-                  subtitle: 'Sitzung beenden und den Zugriff auf diesem Geraet verlassen',
-                  status: 'Abmelden',
-                  statusColor: const Color(0xFFFFEDD5),
-                  statusTextColor: const Color(0xFF9A3412),
-                  onTap: _logout,
-                ),
-                Divider(height: 1, color: primaryColor.withValues(alpha: 0.1)),
-                _buildActionTile(
-                  leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  title: _t('delete_account'),
-                  subtitle: 'Nur nutzen, wenn ihr den gesamten Parentpeak-Bereich wirklich entfernen wollt',
-                  status: 'Achtung',
-                  statusColor: const Color(0xFFFEE2E2),
-                  statusTextColor: const Color(0xFFB91C1C),
-                  onTap: _showDeleteAccountConfirmation,
-                ),
-            ],
-          ),
+          _buildAccountActionsSection(),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Abmelden Button ──────────────────────────────────────────────────────────
+
+class _LogoutButton extends StatefulWidget {
+  const _LogoutButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  State<_LogoutButton> createState() => _LogoutButtonState();
+}
+
+class _LogoutButtonState extends State<_LogoutButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFF7ED), Color(0xFFFFF3E0)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(
+              color: const Color(0xFFFED7AA),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFEA580C).withValues(alpha: 0.10),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: Color(0xFFEA580C),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Abmelden',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF7C2D12),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Sitzung auf diesem Gerät beenden',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF9A3412).withValues(alpha: 0.75),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 15,
+                color: Color(0xFFEA580C),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Konto löschen Button (bewusst kleiner + dezenter) ───────────────────────
+
+class _DeleteAccountButton extends StatefulWidget {
+  const _DeleteAccountButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  State<_DeleteAccountButton> createState() => _DeleteAccountButtonState();
+}
+
+class _DeleteAccountButtonState extends State<_DeleteAccountButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedOpacity(
+        opacity: _pressed ? 0.7 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: const Color(0xFFFFF5F5),
+            border: Border.all(
+              color: const Color(0xFFFFCDD2),
+              width: 1.2,
+            ),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFE53935),
+                size: 16,
+              ),
+              SizedBox(width: 7),
+              Text(
+                'Konto löschen',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFE53935),
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2707,7 +2856,7 @@ class _FamilyMember {
   Map<String, dynamic> toMap() => {
         'name': name,
         'role': role,
-      'avatar': avatar,
+        'avatar': avatar,
       };
 
   factory _FamilyMember.fromMap(Map<String, dynamic> map) {

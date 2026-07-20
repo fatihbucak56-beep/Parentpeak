@@ -71,7 +71,8 @@ void main() {
         details.stack ?? StackTrace.current,
       );
     };
-    PlatformDispatcher.instance.onError = (Object error, StackTrace stackTrace) {
+    PlatformDispatcher.instance.onError =
+        (Object error, StackTrace stackTrace) {
       _reportAppError('PlatformDispatcher.onError', error, stackTrace);
       return true;
     };
@@ -126,7 +127,9 @@ Future<void> _startApp() async {
   // Stripe publishable key (from .env or compile-time dart-define).
   final stripeKey = APIConfig.getStripePublishableKey()?.trim();
   final stripeSupported = APIConfig.isStripePaymentSheetSupportedPlatform();
-  if (!kIsWeb && stripeSupported && APIConfig.isStripePublishableKeyConfigured()) {
+  if (!kIsWeb &&
+      stripeSupported &&
+      APIConfig.isStripePublishableKeyConfigured()) {
     try {
       Stripe.publishableKey = stripeKey!;
       await Stripe.instance.applySettings();
@@ -293,37 +296,10 @@ class DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    const storage = FlutterSecureStorageAdapter();
-    final backendToken = APIConfig.getBackendApiToken();
-    if (backendToken != null && backendToken.isNotEmpty) {
-      storage.write(key: 'ABACUS_API_TOKEN', value: backendToken);
-    } else if (kDebugMode) {
-      // Keep demo token behavior only in debug builds.
-      storage.write(key: 'ABACUS_API_TOKEN', value: 'demo-token');
-    }
     final backendBaseUrl = APIConfig.getBackendBaseUrl() ?? '';
-    final service = RevocationServiceImpl(
-        baseUrl: backendBaseUrl, secureStorage: storage);
-
-    final mockDevices = [
-      TrustedDevice(
-          deviceUuid: 'uuid-1',
-          deviceName: 'Mamas iPhone',
-          status: DeviceStatus.active),
-      TrustedDevice(
-          deviceUuid: 'uuid-2',
-          deviceName: 'Papas Pixel',
-          status: DeviceStatus.active),
-      TrustedDevice(
-          deviceUuid: 'fail-uuid',
-          deviceName: 'Test Fail Device',
-          status: DeviceStatus.active),
-      TrustedDevice(
-          deviceUuid: 'uuid-removed',
-          deviceName: 'Altes iPad',
-          status: DeviceStatus.revoked,
-          revokedAt: DateTime.now().subtract(const Duration(days: 3))),
-    ];
+    const storage = FlutterSecureStorageAdapter();
+    final service =
+        RevocationServiceImpl(baseUrl: backendBaseUrl, secureStorage: storage);
 
     return MaterialApp(
       title: 'Parentpeak',
@@ -339,11 +315,11 @@ class DemoAppState extends State<DemoApp> with WidgetsBindingObserver {
       supportedLocales: AppLocalizations.supportedLocales,
       home: LanguageProviderWrapper(
         child: AuthGate(
-          devices: mockDevices,
+          devices: const [],
           startupInviteInput: widget.startupInviteInput,
           onRevoke: (uuid, name) async {
             try {
-              return await service.revokeDevice(uuid, 'Demo Revoke');
+              return await service.revokeDevice(uuid, 'Revoke');
             } catch (e) {
               return false;
             }

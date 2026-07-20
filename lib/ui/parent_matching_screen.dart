@@ -123,9 +123,10 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     }
 
     if (!mounted) return false;
-    _profileNameController.text = AuthService.instance.currentUser?.displayName.trim().isNotEmpty == true
-        ? AuthService.instance.currentUser!.displayName.trim()
-        : 'Elternteil';
+    _profileNameController.text =
+        AuthService.instance.currentUser?.displayName.trim().isNotEmpty == true
+            ? AuthService.instance.currentUser!.displayName.trim()
+            : 'Elternteil';
     setState(() {
       _requiresProfileSetup = true;
       _isRestoring = false;
@@ -137,13 +138,14 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     try {
       // Use new smart matching algorithm
       final matchResults = await _service.findMatches(userId: _effectiveUserId);
-      
+
       // Convert MatchResult objects to internal _ParentProfile format
       final profiles = matchResults.map((result) {
         final profile = result.profile;
         // Convert breakdown map values to doubles
         final breakdownAsDoubles = result.breakdown.map(
-          (key, value) => MapEntry(key, (value is num) ? value.toDouble() : 0.0),
+          (key, value) =>
+              MapEntry(key, (value is num) ? value.toDouble() : 0.0),
         );
         final age = profile.age;
         final familyForm = profile.familyForm;
@@ -164,7 +166,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
           breakdown: breakdownAsDoubles,
         );
       }).toList();
-      
+
       if (!mounted) return;
       setState(() {
         _allProfiles
@@ -323,19 +325,21 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     try {
       // Fetch latest matches using smart algorithm
       final matchResults = await _service.findMatches(userId: _effectiveUserId);
-      
+
       // Get connected profile IDs from backend
-      final connectedIds = await _service.fetchConnectedProfileIds(userId: _effectiveUserId);
+      final connectedIds =
+          await _service.fetchConnectedProfileIds(userId: _effectiveUserId);
       final newlyConfirmedIds = connectedIds.difference(_seenMatchedProfileIds);
 
       if (!mounted) return;
-      
+
       // Update both all profiles and matched profiles
       final profiles = matchResults.map((result) {
         final profile = result.profile;
         // Convert breakdown map values to doubles
         final breakdownAsDoubles = result.breakdown.map(
-          (key, value) => MapEntry(key, (value is num) ? value.toDouble() : 0.0),
+          (key, value) =>
+              MapEntry(key, (value is num) ? value.toDouble() : 0.0),
         );
         final age = profile.age;
         final familyForm = profile.familyForm;
@@ -361,7 +365,7 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
         _allProfiles
           ..clear()
           ..addAll(profiles);
-        
+
         _matchedProfiles
           ..clear()
           ..addAll(_allProfiles.where((p) => connectedIds.contains(p.id)));
@@ -756,10 +760,10 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
     }
 
     setState(() => _isSavingProfile = true);
-    
+
     // Get city coordinates
     final cityCenter = _cityCenters[_homeCity] ?? _cityCenters['Berlin']!;
-    
+
     final saved = await _service.createProfile(
       userId: _effectiveUserId,
       name: name,
@@ -782,7 +786,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _service.lastSyncError ?? 'Matching-Profil konnte nicht gespeichert werden.',
+            _service.lastSyncError ??
+                'Matching-Profil konnte nicht gespeichert werden.',
           ),
         ),
       );
@@ -892,7 +897,8 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.check_rounded),
-              label: Text(_isSavingProfile ? 'Speichern...' : 'Profil speichern'),
+              label:
+                  Text(_isSavingProfile ? 'Speichern...' : 'Profil speichern'),
             ),
           ],
         ),
@@ -1430,98 +1436,123 @@ class _ParentMatchingScreenState extends State<ParentMatchingScreen> {
                       });
                       _persistState();
                     })
-                  : _ProfileCard(
-                      profile: profile,
-                      compatibility: _compatibility(profile),
-                      distanceKm: _distanceKm(profile),
-                      quality: _matchQuality(profile),
-                      reasons: _whyMatch(profile),
-                      onReport: _reportCurrent,
-                      onBlock: _blockCurrent,
-                    ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: profile == null ? null : _skipCurrent,
-                    icon: const Icon(Icons.close_rounded),
-                    label: const Text('Weiter'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: profile == null ? null : _likeCurrent,
-                    icon: const Icon(Icons.handshake_rounded),
-                    label: const Text('Verbinden'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (_pendingProfiles.isNotEmpty)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.tertiaryContainer
-                      .withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ausstehende Anfragen',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _pendingProfiles
-                          .map((p) => Chip(
-                                avatar: const Icon(
-                                  Icons.hourglass_top_rounded,
-                                  size: 16,
-                                ),
-                                label: Text(p.name),
-                              ))
-                          .toList(),
-                    ),
-                  ],
-                ),
-              ),
-            if (_matchedProfiles.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color:
-                      theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _matchedProfiles
-                      .map((p) => Chip(
-                            avatar: CircleAvatar(
-                              child: Text(_safeInitial(p.name)),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: _ProfileCard(
+                            profile: profile,
+                            compatibility: _compatibility(profile),
+                            distanceKm: _distanceKm(profile),
+                            quality: _matchQuality(profile),
+                            reasons: _whyMatch(profile),
+                            onReport: _reportCurrent,
+                            onBlock: _blockCurrent,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _skipCurrent,
+                                icon: const Icon(Icons.close_rounded),
+                                label: const Text('Weiter'),
+                              ),
                             ),
-                            label: Text(p.name),
-                            onDeleted: () => _openMatchChat(p),
-                            deleteIcon:
-                                const Icon(Icons.chat_bubble_outline_rounded),
-                          ))
-                      .toList(),
-                ),
-              ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: _likeCurrent,
+                                icon: const Icon(Icons.handshake_rounded),
+                                label: const Text('Verbinden'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_pendingProfiles.isNotEmpty ||
+                            _matchedProfiles.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 120),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  if (_pendingProfiles.isNotEmpty)
+                                    Container(
+                                      width: double.infinity,
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme.tertiaryContainer
+                                            .withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Ausstehende Anfragen',
+                                            style: theme.textTheme.labelLarge
+                                                ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: _pendingProfiles
+                                                .map((p) => Chip(
+                                                      avatar: const Icon(
+                                                        Icons
+                                                            .hourglass_top_rounded,
+                                                        size: 16,
+                                                      ),
+                                                      label: Text(p.name),
+                                                    ))
+                                                .toList(),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (_matchedProfiles.isNotEmpty)
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme.primaryContainer
+                                            .withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: _matchedProfiles
+                                            .map((p) => Chip(
+                                                  avatar: CircleAvatar(
+                                                    child: Text(
+                                                        _safeInitial(p.name)),
+                                                  ),
+                                                  label: Text(p.name),
+                                                  onDeleted: () =>
+                                                      _openMatchChat(p),
+                                                  deleteIcon: const Icon(Icons
+                                                      .chat_bubble_outline_rounded),
+                                                ))
+                                            .toList(),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+            ),
           ],
         ),
       ),
@@ -1912,4 +1943,3 @@ class _VerificationBadge extends StatelessWidget {
     );
   }
 }
-

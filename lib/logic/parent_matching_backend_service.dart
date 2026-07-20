@@ -2,12 +2,13 @@
 /// Uses geographic proximity + interests + child compatibility scoring
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:parentpeak/config/api_config.dart';
 
 class ParentMatchActionResult {
   final bool connected;
   final String matchState;
-  
+
   const ParentMatchActionResult({
     required this.connected,
     required this.matchState,
@@ -52,8 +53,12 @@ class ParentMatchingProfile {
       name: json['name'] ?? '',
       age: json['age'],
       city: json['city'] ?? '',
-      latitude: json['latitude'] != null ? double.parse(json['latitude'].toString()) : null,
-      longitude: json['longitude'] != null ? double.parse(json['longitude'].toString()) : null,
+      latitude: json['latitude'] != null
+          ? double.parse(json['latitude'].toString())
+          : null,
+      longitude: json['longitude'] != null
+          ? double.parse(json['longitude'].toString())
+          : null,
       bio: json['bio'],
       interests: List<String>.from(json['interests'] ?? []),
       languages: List<String>.from(json['languages'] ?? []),
@@ -64,19 +69,19 @@ class ParentMatchingProfile {
   }
 
   Map<String, dynamic> toJson() => {
-    'userId': userId,
-    'name': name,
-    'age': age,
-    'city': city,
-    'latitude': latitude,
-    'longitude': longitude,
-    'bio': bio,
-    'interests': interests,
-    'languages': languages,
-    'valuesFocus': valuesFocus,
-    'childAges': childAges,
-    'familyForm': familyForm,
-  };
+        'userId': userId,
+        'name': name,
+        'age': age,
+        'city': city,
+        'latitude': latitude,
+        'longitude': longitude,
+        'bio': bio,
+        'interests': interests,
+        'languages': languages,
+        'valuesFocus': valuesFocus,
+        'childAges': childAges,
+        'familyForm': familyForm,
+      };
 }
 
 class MatchResult {
@@ -103,7 +108,7 @@ class ParentMatchingBackendService {
   final String? _apiUrl = APIConfig.getBackendBaseUrl();
   final http.Client _httpClient;
   String? lastSyncError;
-  
+
   // Backward compatibility: accept old apiClient parameter
   final dynamic apiClient;
 
@@ -111,6 +116,28 @@ class ParentMatchingBackendService {
     http.Client? httpClient,
     this.apiClient,
   }) : _httpClient = httpClient ?? http.Client();
+
+  /// Holt den Firebase ID-Token des aktuell eingeloggten Nutzers.
+  /// Gibt null zurück wenn kein Nutzer eingeloggt ist.
+  Future<String?> _getIdToken() async {
+    try {
+      return await FirebaseAuth.instance.currentUser?.getIdToken();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Baut HTTP-Header mit Firebase ID-Token auf.
+  /// Alle schreibenden und lesenden Requests nutzen diese Header.
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await _getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  // ── Profile ────────────────────────────────────────────────────────────────
 
   /// Backward compatibility: Create or update user's matching profile
   /// with interests and child compatibility info
@@ -129,16 +156,17 @@ class ParentMatchingBackendService {
     String? bio,
   }) async {
     lastSyncError = null;
-    
+
     if (_apiUrl == null) {
       lastSyncError = 'Backend-URL nicht konfiguriert';
       return null;
     }
-    
+
     try {
+      final headers = await _authHeaders();
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/parent-matching/profiles'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode({
           'userId': userId,
           'name': name,
@@ -156,7 +184,8 @@ class ParentMatchingBackendService {
       );
 
       if (response.statusCode != 200) {
-        lastSyncError = 'Profil-Speicherung fehlgeschlagen: ${response.statusCode}';
+        lastSyncError =
+            'Profil-Speicherung fehlgeschlagen: ${response.statusCode}';
         return null;
       }
 
@@ -287,7 +316,8 @@ class ParentMatchingBackendService {
       );
       return ParentMatchActionResult(
         connected: result,
-        matchState: result ? 'matched' : (action == 'like' ? 'pending' : 'none'),
+        matchState:
+            result ? 'matched' : (action == 'like' ? 'pending' : 'none'),
       );
     } catch (e) {
       lastSyncError = 'Aktion konnte nicht gespeichert werden: $e';
@@ -309,17 +339,22 @@ class ParentMatchingBackendService {
     double maxDistanceKm = 25,
   }) async {
     lastSyncError = null;
-    
+
     if (_apiUrl == null) {
       lastSyncError = 'Backend-URL nicht konfiguriert';
       return [];
     }
-    
+
     try {
+      final headers = await _authHeaders();
+      // GET-Requests haben keinen Body — Authorization Header wird in den Headers gesetzt
+      final getHeaders = Map<String, String>.from(headers)
+        ..remove('Content-Type');
       final response = await _httpClient.get(
         Uri.parse(
           '$_apiUrl/parent-matching/find?userId=$userId&limit=$limit&maxDistanceKm=$maxDistanceKm',
         ),
+        headers: getHeaders,
       );
 
       if (response.statusCode == 404) {
@@ -333,7 +368,8 @@ class ParentMatchingBackendService {
 
       final data = jsonDecode(response.body);
       final matches = List<MatchResult>.from(
-        (data['matches'] as List? ?? []).map((m) => MatchResult.fromJson(m as Map<String, dynamic>)),
+        (data['matches'] as List? ?? [])
+            .map((m) => MatchResult.fromJson(m as Map<String, dynamic>)),
       );
 
       return matches;
@@ -352,16 +388,17 @@ class ParentMatchingBackendService {
     String? familyId,
   }) async {
     lastSyncError = null;
-    
+
     if (_apiUrl == null) {
       lastSyncError = 'Backend-URL nicht konfiguriert';
       return false;
     }
-    
+
     try {
+      final headers = await _authHeaders();
       final response = await _httpClient.post(
         Uri.parse('$_apiUrl/parent-matching/record-action'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode({
           'userId': userId,
           'matchedProfileId': matchedProfileId,
@@ -371,7 +408,8 @@ class ParentMatchingBackendService {
       );
 
       if (response.statusCode != 201) {
-        lastSyncError = 'Aktion konnte nicht gespeichert werden: ${response.statusCode}';
+        lastSyncError =
+            'Aktion konnte nicht gespeichert werden: ${response.statusCode}';
         return false;
       }
 

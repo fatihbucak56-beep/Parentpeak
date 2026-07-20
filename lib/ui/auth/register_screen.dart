@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:parentpeak/config/api_config.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -40,8 +43,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (!_agreedToTerms) {
-      setState(() =>
-          _errorMessage = 'Bitte akzeptiere die Nutzungsbedingungen.');
+      setState(
+          () => _errorMessage = 'Bitte akzeptiere die Nutzungsbedingungen.');
       return;
     }
 
@@ -137,7 +140,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           border: Border.all(color: const Color(0xFFDCE9E6)),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF103A35).withValues(alpha: 0.08),
+                              color: const Color(0xFF103A35)
+                                  .withValues(alpha: 0.08),
                               blurRadius: 24,
                               offset: const Offset(0, 12),
                             ),
@@ -260,7 +264,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               prefixIcon: const Icon(Icons.person_outline_rounded),
             ),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Name ist erforderlich.';
+              if (v == null || v.trim().isEmpty) {
+                return 'Name ist erforderlich.';
+              }
               return null;
             },
           ),
@@ -279,7 +285,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               prefixIcon: const Icon(Icons.email_outlined),
             ),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'E-Mail ist erforderlich.';
+              if (v == null || v.trim().isEmpty) {
+                return 'E-Mail ist erforderlich.';
+              }
               if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
                 return 'Bitte gib eine gültige E-Mail-Adresse ein.';
               }
@@ -299,8 +307,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 icon: Icon(_obscurePass
                     ? Icons.visibility_outlined
                     : Icons.visibility_off_outlined),
-                onPressed: () =>
-                    setState(() => _obscurePass = !_obscurePass),
+                onPressed: () => setState(() => _obscurePass = !_obscurePass),
               ),
             ),
             validator: (v) {
@@ -410,7 +417,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           Checkbox(
             value: _agreedToTerms,
             onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
             activeColor: const Color(0xFF166A61),
           ),
           const SizedBox(width: 4),
@@ -422,24 +430,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF546663),
                   ),
-                  children: const [
-                    TextSpan(text: 'Ich akzeptiere die '),
+                  children: [
+                    const TextSpan(text: 'Ich akzeptiere die '),
                     TextSpan(
                       text: 'Nutzungsbedingungen',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Color(0xFF145D55),
                         fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
                       ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap =
+                            () => _openUrl(APIConfig.getTermsOfServiceUrl()),
                     ),
-                    TextSpan(text: ' und '),
+                    const TextSpan(text: ' und '),
                     TextSpan(
                       text: 'Datenschutzrichtlinie',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Color(0xFF145D55),
                         fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
                       ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap =
+                            () => _openUrl(APIConfig.getPrivacyPolicyUrl()),
                     ),
-                    TextSpan(text: ' von Parentpeak.'),
+                    const TextSpan(text: ' von Parentpeak.'),
                   ],
                 ),
               ),
@@ -448,6 +464,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openUrl(String? rawUrl) async {
+    final urlStr = (rawUrl ?? '').trim();
+    if (urlStr.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('URL noch nicht konfiguriert.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    final uri = Uri.tryParse(urlStr);
+    if (uri == null || !await canLaunchUrl(uri)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Konnte $urlStr nicht öffnen.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Widget _buildRegisterButton(ThemeData theme) {
@@ -506,8 +550,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Row(
                 children: [
                   const Icon(Icons.check_circle_outline_rounded,
-                      size: 16,
-                      color: Color(0xFF5E6F6B)),
+                      size: 16, color: Color(0xFF5E6F6B)),
                   const SizedBox(width: 8),
                   Text(hint, style: theme.textTheme.bodySmall),
                 ],

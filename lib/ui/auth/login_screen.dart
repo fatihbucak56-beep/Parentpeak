@@ -62,7 +62,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Technischer Fehler beim Login. Bitte erneut versuchen.';
+        _errorMessage =
+            'Technischer Fehler beim Login. Bitte erneut versuchen.';
       });
     }
   }
@@ -126,7 +127,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF103A35).withValues(alpha: 0.08),
+                              color: const Color(0xFF103A35)
+                                  .withValues(alpha: 0.08),
                               blurRadius: 24,
                               offset: const Offset(0, 12),
                             ),
@@ -154,9 +156,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             _buildForm(theme),
                             const SizedBox(height: 12),
                             if (_errorMessage != null) _buildError(theme),
-                            if (_errorMessage != null) const SizedBox(height: 12),
+                            if (_errorMessage != null)
+                              const SizedBox(height: 12),
                             _buildLoginButton(theme),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 4),
+                            _buildForgotPassword(theme),
+                            const SizedBox(height: 10),
                             _buildDivider(theme),
                             const SizedBox(height: 14),
                             _buildSocialButtons(theme),
@@ -277,7 +282,9 @@ class _LoginScreenState extends State<LoginScreen> {
               prefixIcon: const Icon(Icons.email_outlined),
             ),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'E-Mail ist erforderlich.';
+              if (v == null || v.trim().isEmpty) {
+                return 'E-Mail ist erforderlich.';
+              }
               if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
                 return 'Bitte gib eine gültige E-Mail-Adresse ein.';
               }
@@ -396,6 +403,199 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // ── Passwort vergessen ────────────────────────────────────────────────────
+
+  Widget _buildForgotPassword(ThemeData theme) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: _showPasswordResetDialog,
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF135D55),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Text(
+          'Passwort vergessen?',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: const Color(0xFF135D55),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPasswordResetDialog() async {
+    final resetEmailCtrl = TextEditingController(text: _emailCtrl.text.trim());
+    final formKey = GlobalKey<FormState>();
+    bool isSending = false;
+    String? successMsg;
+    String? errorMsg;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !isSending,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text(
+                'Passwort zurücksetzen',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              ),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Gib deine E-Mail-Adresse ein. Wir senden dir einen Link zum Zurücksetzen.',
+                      style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF5A6B68),
+                            height: 1.4,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: resetEmailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      textCapitalization: TextCapitalization.none,
+                      enabled: !isSending,
+                      decoration: InputDecoration(
+                        labelText: 'E-Mail-Adresse',
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        filled: true,
+                        fillColor: const Color(0xFFF7FAF9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFD6E3E0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF1F7A71), width: 1.4),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'E-Mail ist erforderlich.';
+                        }
+                        if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                            .hasMatch(v.trim())) {
+                          return 'Bitte eine gültige E-Mail eingeben.';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (errorMsg != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF4F1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFFD1C3)),
+                        ),
+                        child: Text(
+                          errorMsg!,
+                          style: const TextStyle(
+                              color: Color(0xFF8C3E28), fontSize: 13),
+                        ),
+                      ),
+                    ],
+                    if (successMsg != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FBF8),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFB2DED6)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle_outline_rounded,
+                                color: Color(0xFF166A61), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                successMsg!,
+                                style: const TextStyle(
+                                    color: Color(0xFF14524A), fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSending ? null : () => Navigator.pop(ctx),
+                  child: const Text('Abbrechen'),
+                ),
+                FilledButton(
+                  onPressed: isSending || successMsg != null
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() {
+                            isSending = true;
+                            errorMsg = null;
+                          });
+                          final err =
+                              await AuthService.instance.sendPasswordReset(
+                            resetEmailCtrl.text.trim(),
+                          );
+                          setDialogState(() {
+                            isSending = false;
+                            if (err == null) {
+                              successMsg =
+                                  'E-Mail gesendet! Prüfe deinen Posteingang.';
+                            } else {
+                              errorMsg = err;
+                            }
+                          });
+                        },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF166A61),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isSending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Link senden'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    resetEmailCtrl.dispose();
+  }
+
   Widget _buildDivider(ThemeData theme) {
     return Row(
       children: [
@@ -455,7 +655,7 @@ class _LoginScreenState extends State<LoginScreen> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
-            'Noch kein Konto? ',
+            'Neu bei Parentpeak? ',
             style: theme.textTheme.bodyMedium,
           ),
           GestureDetector(
@@ -467,7 +667,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             child: Text(
-              'Kostenlos testen',
+              'Jetzt Konto erstellen',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: const Color(0xFF135D55),
                 fontWeight: FontWeight.w800,

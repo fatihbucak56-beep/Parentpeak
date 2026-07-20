@@ -196,6 +196,8 @@ PODS:
     - StripeUICore (= 25.15.0)
   - StripeUICore (25.15.0):
     - StripeCore (= 25.15.0)
+  - url_launcher_ios (0.0.1):
+    - Flutter
   - video_player_avfoundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -216,6 +218,7 @@ DEPENDENCIES:
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - stripe_ios (from `.symlinks/plugins/stripe_ios/ios`)
+  - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
   - video_player_avfoundation (from `.symlinks/plugins/video_player_avfoundation/darwin`)
 
 SPEC REPOS:
@@ -280,6 +283,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   stripe_ios:
     :path: ".symlinks/plugins/stripe_ios/ios"
+  url_launcher_ios:
+    :path: ".symlinks/plugins/url_launcher_ios/ios"
   video_player_avfoundation:
     :path: ".symlinks/plugins/video_player_avfoundation/darwin"
 
@@ -327,6 +332,7 @@ SPEC CHECKSUMS:
   StripePaymentSheet: d706de7ac354470ada1d1e0fa82de2be3e08ba1d
   StripePaymentsUI: 260125f3da77ba8010dcc89319da8549f94e7bd4
   StripeUICore: dd9ff37d3236763162914d8f19edd0c0c3f54861
+  url_launcher_ios: bb13df5870e8c4234ca12609d04010a21be43dfa
   video_player_avfoundation: e54d03b3b19f64f2c557354f72ce538387541ba6
 
 PODFILE CHECKSUM: e6cfb2876303cbf59db5a73c89367f4a0cec277c

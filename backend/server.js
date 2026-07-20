@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -34,20 +35,9 @@ try {
   console.warn('⚠️  Firebase Admin SDK nicht verfügbar:', err.message);
 }
 
-// Multer for image uploads — stored under uploads/ (create if missing)
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-const multerStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
-  },
-});
+// Multer für Image-Uploads — memoryStorage (kein Disk), Buffer direkt an Firebase Storage.
 const upload = multer({
-  storage: multerStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (_req, file, cb) => {
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
@@ -58,6 +48,57 @@ const upload = multer({
     }
   },
 });
+
+// Firebase Storage Bucket — aus FIREBASE_STORAGE_BUCKET env oder aus dem
+// Service-Account-JSON abgeleitet (Format: <projectId>.firebasestorage.app).
+function getStorageBucket() {
+  const explicit = (process.env.FIREBASE_STORAGE_BUCKET || '').trim();
+  if (explicit) return explicit;
+
+  // Aus Service-Account-JSON ableiten wenn vorhanden
+  const saJson = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+  if (saJson) {
+    try {
+      const sa = JSON.parse(saJson);
+      const projectId = sa.project_id || '';
+      if (projectId) return `${projectId}.firebasestorage.app`;
+    } catch (_) { /* ignore */ }
+  }
+  return '';
+}
+
+/**
+ * Lädt einen Buffer in Firebase Storage hoch und gibt die öffentliche URL zurück.
+ * Wirft einen Fehler wenn Firebase Admin nicht initialisiert ist.
+ */
+async function uploadBufferToFirebaseStorage({ buffer, filename, mimetype, folder = 'uploads' }) {
+  if (!firebaseAdmin) {
+    throw new Error('Firebase Admin nicht initialisiert — FIREBASE_SERVICE_ACCOUNT_JSON setzen.');
+  }
+
+  const bucketName = getStorageBucket();
+  if (!bucketName) {
+    throw new Error(
+      'FIREBASE_STORAGE_BUCKET nicht konfiguriert. ' +
+      'Setze FIREBASE_STORAGE_BUCKET=<projectId>.firebasestorage.app in den Umgebungsvariablen.'
+    );
+  }
+
+  const bucket = firebaseAdmin.storage().bucket(bucketName);
+  const destination = `${folder}/${filename}`;
+  const file = bucket.file(destination);
+
+  await file.save(buffer, {
+    metadata: { contentType: mimetype },
+    resumable: false,
+  });
+
+  // Datei öffentlich lesbar machen
+  await file.makePublic();
+
+  const publicUrl = `https://storage.googleapis.com/${bucketName}/${destination}`;
+  return publicUrl;
+}
 
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
 const useDatabaseSsl = /render\.com/i.test(databaseUrl);
@@ -461,7 +502,8 @@ async function verifyFirebaseIdToken(req) {
 
 // Middleware: if FIREBASE_REQUIRE_AUTH=1 AND Firebase Admin is configured,
 // reject write requests whose token does not match the acting userId.
-const firebaseRequireAuth = (process.env.FIREBASE_REQUIRE_AUTH || '0') === '1';
+// Default is '1' (auth enforced) — set FIREBASE_REQUIRE_AUTH=0 only for local dev without Firebase.
+const firebaseRequireAuth = (process.env.FIREBASE_REQUIRE_AUTH || '1') === '1';
 
 async function firebaseAuthMiddleware(req, res, next) {
   if (!firebaseRequireAuth || !firebaseAdmin || !WRITE_METHODS.has(req.method)) {
@@ -477,14 +519,15 @@ async function firebaseAuthMiddleware(req, res, next) {
 
 // Middleware
 app.use(firebaseAuthMiddleware);
-app.use(async (req, res, next) => {
-  // Baseline hardening headers for API traffic.
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  next();
-});
+
+// Security headers via helmet (HSTS, CSP, X-Content-Type-Options, etc.)
+// Content-Security-Policy ist für eine reine JSON-API irrelevant — abschalten.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 app.use(
   cors({
@@ -5689,11 +5732,10 @@ async function sendPushToUser(userId, { title, body, data = {} }) {
   }
 }
 
-// ── Image Upload ─────────────────────────────────────────────────────────────
-app.use('/uploads', express.static(uploadsDir));
+// ── Image Upload → Firebase Storage ─────────────────────────────────────────
 
 app.post('/uploads/image', (req, res) => {
-  upload.single('image')(req, res, err => {
+  upload.single('image')(req, res, async err => {
     if (err) {
       return res.status(400).json({ error: err.message || 'Bild-Upload fehlgeschlagen' });
     }
@@ -5702,11 +5744,24 @@ app.post('/uploads/image', (req, res) => {
       return res.status(400).json({ error: 'Kein Bild empfangen' });
     }
 
-    const publicBase = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/$/, '');
-    const relPath = `/uploads/${req.file.filename}`;
-    const url = publicBase ? `${publicBase}${relPath}` : relPath;
+    try {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
 
-    return res.status(201).json({ url, filename: req.file.filename, size: req.file.size });
+      const url = await uploadBufferToFirebaseStorage({
+        buffer: req.file.buffer,
+        filename,
+        mimetype: req.file.mimetype,
+        folder: 'uploads',
+      });
+
+      return res.status(201).json({ url, filename, size: req.file.size });
+    } catch (uploadErr) {
+      console.error('Firebase Storage Upload fehlgeschlagen:', uploadErr?.message || uploadErr);
+      return res.status(503).json({
+        error: 'Bild-Upload fehlgeschlagen. Bitte später erneut versuchen.',
+      });
+    }
   });
 });
 

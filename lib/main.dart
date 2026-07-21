@@ -21,7 +21,10 @@ import 'package:parentpeak/ui/finance_budget_screen.dart';
 import 'package:parentpeak/ui/kettenbrecher_dashboard.dart';
 import 'package:parentpeak/ui/auth/login_screen.dart';
 import 'package:parentpeak/ui/auth/paywall_screen.dart';
+import 'package:parentpeak/ui/onboarding/onboarding_screen.dart';
 import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/config/feature_flags.dart';
+import 'package:parentpeak/logic/entitlement_service.dart';
 import 'package:parentpeak/logic/theme_service.dart';
 import 'package:parentpeak/logic/language_service.dart';
 import 'package:parentpeak/widgets/language_aware_widget.dart';
@@ -123,6 +126,8 @@ Future<void> _startApp() async {
   await BackgroundSyncManager.initialize();
   await NotificationService.instance.initialize();
   await AuthService.instance.initialize();
+  await FeatureFlagService.instance.initialize();
+  await EntitlementService.instance.initialize();
 
   // Stripe publishable key (from .env or compile-time dart-define).
   final stripeKey = APIConfig.getStripePublishableKey()?.trim();
@@ -441,11 +446,20 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _isRefreshingEntitlements = false;
+  bool? _onboardingCompleted;
 
   @override
   void initState() {
     super.initState();
     _syncEntitlements();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final completed = await OnboardingScreen.isCompleted();
+    if (mounted) {
+      setState(() => _onboardingCompleted = completed);
+    }
   }
 
   Future<void> _syncEntitlements() async {
@@ -502,6 +516,16 @@ class _AuthGateState extends State<AuthGate> {
             break;
         }
       }
+
+      // Auch im Debug-Modus Onboarding zeigen wenn noch nicht abgeschlossen
+      if (_onboardingCompleted == false) {
+        return OnboardingScreen(
+          onComplete: () {
+            setState(() => _onboardingCompleted = true);
+          },
+        );
+      }
+
       return ParentpeakAppShell(
         devices: widget.devices,
         onRevoke: widget.onRevoke,
@@ -523,6 +547,15 @@ class _AuthGateState extends State<AuthGate> {
       return PaywallScreen(
         onSubscribed: () {
           _refresh();
+        },
+      );
+    }
+
+    // Onboarding noch nicht abgeschlossen → Onboarding zeigen
+    if (_onboardingCompleted == false) {
+      return OnboardingScreen(
+        onComplete: () {
+          setState(() => _onboardingCompleted = true);
         },
       );
     }

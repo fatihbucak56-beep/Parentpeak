@@ -3,15 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/event_discovery_agent.dart';
-import 'package:parentpeak/logic/product_metrics_service.dart';
 import 'package:parentpeak/logic/event_service.dart';
 import 'package:parentpeak/models/event_invitation.dart';
 import 'package:parentpeak/models/discovered_event.dart';
 import 'package:parentpeak/models/meetup_event.dart';
-import 'package:parentpeak/ui/calendar_screen.dart';
-import 'package:parentpeak/ui/chat_screen.dart';
 import 'package:parentpeak/ui/create_event_screen.dart';
-import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
 import 'package:parentpeak/ui/event_detail_screen.dart';
 import 'package:parentpeak/ui/event_invitations_screen.dart';
 
@@ -23,12 +19,14 @@ class EventsActivitiesScreen extends StatefulWidget {
 }
 
 enum _FeedSource { ai, community }
+
 enum _TimeWindowFilter { all, today, weekend }
 
 class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
   final EventDiscoveryAgent _agent = EventDiscoveryAgent.instance;
   final EventService _eventService = EventService();
-  final TextEditingController _cityController = TextEditingController(text: 'Berlin');
+  final TextEditingController _cityController =
+      TextEditingController(text: 'Berlin');
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -90,7 +88,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
         childAges: _selectedAgeGroups.map(_ageGroupLabel).toList(),
       );
       final communityFuture = _loadCommunityEventsForCity(coords);
-      final invitationsFuture = _eventService.getInvitationsForUser(viewerUserId);
+      final invitationsFuture =
+          _eventService.getInvitationsForUser(viewerUserId);
       final results = await Future.wait<dynamic>([
         aiFuture,
         communityFuture,
@@ -134,7 +133,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
     }
   }
 
-  Future<List<MeetupEvent>> _loadCommunityEventsForCity((double, double) coords) async {
+  Future<List<MeetupEvent>> _loadCommunityEventsForCity(
+      (double, double) coords) async {
     final viewerUserId = AuthService.instance.currentUser?.uid;
     if (viewerUserId == null || viewerUserId.trim().isEmpty) {
       return const <MeetupEvent>[];
@@ -144,7 +144,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
       viewerUserId: viewerUserId,
       viewerLatitude: coords.$1,
       viewerLongitude: coords.$2,
-      ageGroups: _selectedAgeGroups.isEmpty ? null : _selectedAgeGroups.toList(),
+      ageGroups:
+          _selectedAgeGroups.isEmpty ? null : _selectedAgeGroups.toList(),
     );
   }
 
@@ -176,7 +177,7 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
 
     final filtered = items
         .where((item) => _withinRadius(item, coords.$1, coords.$2, _radiusKm))
-      .where((item) => _matchesNearbyQuickFilter(item, coords.$1, coords.$2))
+        .where((item) => _matchesNearbyQuickFilter(item, coords.$1, coords.$2))
         .where((item) => _matchesSelectedAges(item))
         .where(_matchesPriceFilter)
         .where(_matchesTimeWindow)
@@ -224,17 +225,15 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
 
     final date = item.eventDate!;
     final now = DateTime.now();
-    final isToday = date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day;
+    final isToday =
+        date.year == now.year && date.month == now.month && date.day == now.day;
 
     if (_timeWindowFilter == _TimeWindowFilter.today) {
       return isToday;
     }
 
-    final withinNext7Days =
-        date.isBefore(now.add(const Duration(days: 7))) &&
-            date.isAfter(now.subtract(const Duration(days: 1)));
+    final withinNext7Days = date.isBefore(now.add(const Duration(days: 7))) &&
+        date.isAfter(now.subtract(const Duration(days: 1)));
     final isWeekend =
         date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
     return withinNext7Days && isWeekend;
@@ -247,7 +246,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
     int radiusKm,
   ) {
     if (item.latitude == null || item.longitude == null) return true;
-    final distance = _distanceKm(originLat, originLon, item.latitude!, item.longitude!);
+    final distance =
+        _distanceKm(originLat, originLon, item.latitude!, item.longitude!);
     return distance <= radiusKm;
   }
 
@@ -258,7 +258,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
   ) {
     if (!_onlyNearbyQuick) return true;
     if (item.latitude == null || item.longitude == null) return false;
-    final distance = _distanceKm(originLat, originLon, item.latitude!, item.longitude!);
+    final distance =
+        _distanceKm(originLat, originLon, item.latitude!, item.longitude!);
     return distance <= 10;
   }
 
@@ -275,11 +276,19 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
     bool matches(AgeGroup group) {
       switch (group) {
         case AgeGroup.infant:
-          return text.contains('0') || text.contains('baby') || text.contains('säug');
+          return text.contains('0') ||
+              text.contains('baby') ||
+              text.contains('säug');
         case AgeGroup.toddler:
-          return text.contains('1') || text.contains('2') || text.contains('3') || text.contains('kleinkind');
+          return text.contains('1') ||
+              text.contains('2') ||
+              text.contains('3') ||
+              text.contains('kleinkind');
         case AgeGroup.preschool:
-          return text.contains('4') || text.contains('5') || text.contains('6') || text.contains('vorschule');
+          return text.contains('4') ||
+              text.contains('5') ||
+              text.contains('6') ||
+              text.contains('vorschule');
         case AgeGroup.elementary:
           return text.contains('6') ||
               text.contains('7') ||
@@ -296,14 +305,17 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
               text.contains('16') ||
               text.contains('teen');
         case AgeGroup.mixed:
-          return text.contains('alle') || text.contains('familie') || text.contains('mixed');
+          return text.contains('alle') ||
+              text.contains('familie') ||
+              text.contains('mixed');
       }
     }
 
     return _selectedAgeGroups.any(matches);
   }
 
-  double _rankingScore(_UnifiedFeedItem item, double originLat, double originLon) {
+  double _rankingScore(
+      _UnifiedFeedItem item, double originLat, double originLon) {
     double score = 0;
 
     if (item.eventDate != null) {
@@ -313,7 +325,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
     }
 
     if (item.latitude != null && item.longitude != null) {
-      final distance = _distanceKm(originLat, originLon, item.latitude!, item.longitude!);
+      final distance =
+          _distanceKm(originLat, originLon, item.latitude!, item.longitude!);
       score += (50 - distance).clamp(0, 50);
     } else {
       score += 8;
@@ -387,7 +400,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
   List<EventInvitation> get _sortedInvitations {
     final sorted = List<EventInvitation>.from(_invitations);
     sorted.sort((a, b) {
-      final rankCompare = _statusRank(a.status).compareTo(_statusRank(b.status));
+      final rankCompare =
+          _statusRank(a.status).compareTo(_statusRank(b.status));
       if (rankCompare != 0) return rankCompare;
       return b.createdAt.compareTo(a.createdAt);
     });
@@ -456,7 +470,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
     return palette[index];
   }
 
-  Future<void> _respondInvitation(EventInvitation invitation, bool accept) async {
+  Future<void> _respondInvitation(
+      EventInvitation invitation, bool accept) async {
     setState(() => _updatingInvitationIds.add(invitation.id));
 
     try {
@@ -468,9 +483,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(accept
-              ? 'Einladung angenommen.'
-              : 'Einladung abgelehnt.'),
+          content:
+              Text(accept ? 'Einladung angenommen.' : 'Einladung abgelehnt.'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -488,47 +502,6 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
         setState(() => _updatingInvitationIds.remove(invitation.id));
       }
     }
-  }
-
-  Future<void> _openDevelopmentFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'events',
-      from: 'events_feed_error',
-      to: 'development',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
-      ),
-    );
-  }
-
-  Future<void> _openChatFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'events',
-      from: 'events_feed_error',
-      to: 'chat',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
-    );
-  }
-
-  Future<void> _openCalendarFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'events',
-      from: 'events_feed_error',
-      to: 'calendar',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CalendarScreen()),
-    );
   }
 
   @override
@@ -604,28 +577,6 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('Erneut laden'),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _openChatFallback,
-                          icon: const Icon(Icons.tips_and_updates_rounded),
-                          label: const Text('Zur KI-Beratung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openDevelopmentFallback,
-                          icon: const Icon(Icons.insights_rounded),
-                          label: const Text('Zu Entwicklung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openCalendarFallback,
-                          icon: const Icon(Icons.calendar_month_rounded),
-                          label: const Text('Zum Kalender'),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               )
@@ -646,9 +597,11 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _UnifiedEventCard(
                     item: item,
-                    distanceKm: _distanceKmForDisplay(item, coords.$1, coords.$2),
+                    distanceKm:
+                        _distanceKmForDisplay(item, coords.$1, coords.$2),
                     onTap: () {
-                      if (item.source == _FeedSource.community && item.eventId != null) {
+                      if (item.source == _FeedSource.community &&
+                          item.eventId != null) {
                         final event = _findCommunityEventById(item.eventId!);
                         if (event == null) {
                           _showAiDetails(item);
@@ -678,7 +631,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
 
     return Container(
       color: const Color(0xFFEFF3F8),
-      padding: EdgeInsets.fromLTRB(16, isCompact ? 6 : 8, 16, isCompact ? 6 : 8),
+      padding:
+          EdgeInsets.fromLTRB(16, isCompact ? 6 : 8, 16, isCompact ? 6 : 8),
       child: Container(
         padding: EdgeInsets.all(isCompact ? 6 : 8),
         decoration: BoxDecoration(
@@ -859,7 +813,8 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
         children: [
           Text(
             'Feinfilter & Ranking',
-            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -1000,104 +955,105 @@ class _EventsActivitiesScreenState extends State<EventsActivitiesScreen> {
               final statusColor = _invitationStatusColor(invitation.status);
               final isBusy = _updatingInvitationIds.contains(invitation.id);
               final hostColor = _hostColor(invitation.hostUserId);
-              final pending = invitation.status == EventInvitationStatus.pending;
+              final pending =
+                  invitation.status == EventInvitationStatus.pending;
 
               return Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundColor: hostColor.withValues(alpha: 0.16),
-                              child: Text(
-                                _hostLabel(invitation.hostUserId),
-                                style: TextStyle(
-                                  color: hostColor,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 11,
-                                ),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: hostColor.withValues(alpha: 0.16),
+                            child: Text(
+                              _hostLabel(invitation.hostUserId),
+                              style: TextStyle(
+                                color: hostColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11,
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _eventTitleForInvitation(invitation),
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                _invitationStatusLabel(invitation.status),
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Von ${invitation.hostUserId} · Eingang: ${_formatShortDate(invitation.createdAt)}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        if (pending)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: isBusy
-                                        ? null
-                                        : () => _respondInvitation(
-                                              invitation,
-                                              false,
-                                            ),
-                                    child: const Text('Ablehnen'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: isBusy
-                                        ? null
-                                        : () => _respondInvitation(
-                                              invitation,
-                                              true,
-                                            ),
-                                    child: Text(isBusy ? '...' : 'Zusagen'),
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                      ],
-                    ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _eventTitleForInvitation(invitation),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              _invitationStatusLabel(invitation.status),
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Von ${invitation.hostUserId} · Eingang: ${_formatShortDate(invitation.createdAt)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (pending)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: isBusy
+                                      ? null
+                                      : () => _respondInvitation(
+                                            invitation,
+                                            false,
+                                          ),
+                                  child: const Text('Ablehnen'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: isBusy
+                                      ? null
+                                      : () => _respondInvitation(
+                                            invitation,
+                                            true,
+                                          ),
+                                  child: Text(isBusy ? '...' : 'Zusagen'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               );
             }),
@@ -1256,7 +1212,8 @@ class _UnifiedFeedItem {
   factory _UnifiedFeedItem.fromCommunity(MeetupEvent event) {
     final age = event.ageGroups.map((e) => e.name).join(', ');
     final isFree = event.price == null || event.price == 0;
-    final priceLabel = isFree ? 'kostenlos' : '${event.price!.toStringAsFixed(0)} €';
+    final priceLabel =
+        isFree ? 'kostenlos' : '${event.price!.toStringAsFixed(0)} €';
 
     return _UnifiedFeedItem(
       source: _FeedSource.community,
@@ -1321,7 +1278,8 @@ class _UnifiedEventCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(999),
@@ -1378,7 +1336,8 @@ class _UnifiedEventCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: _distanceColor(distanceKm!).withValues(alpha: 0.15),
+                        color:
+                            _distanceColor(distanceKm!).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -1392,7 +1351,10 @@ class _UnifiedEventCard extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             '${distanceKm!.toStringAsFixed(1)} km · ${_distanceHint(distanceKm!)}',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
                                   color: _distanceColor(distanceKm!),
                                   fontWeight: FontWeight.w800,
                                 ),

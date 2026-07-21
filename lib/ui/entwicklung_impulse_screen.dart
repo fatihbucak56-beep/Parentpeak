@@ -5,12 +5,9 @@ import 'dart:io';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
-import 'package:parentpeak/logic/product_metrics_service.dart';
 import 'package:parentpeak/logic/weekly_impulse_service.dart';
 import 'package:parentpeak/models_and_widgets/weekly_impulse_feature.dart';
 import 'package:parentpeak/models_and_widgets/development_schema_feature.dart';
-import 'package:parentpeak/ui/calendar_screen.dart';
-import 'package:parentpeak/ui/chat_screen.dart';
 
 class EntwicklungImpulseScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -39,8 +36,11 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
   String? _nonBlockingNotice;
 
   bool get _showModerationTools {
-    final email = AuthService.instance.currentUser?.email.toLowerCase().trim() ?? '';
-    return kDebugMode || email.endsWith('@parentpeak.de') || email.endsWith('@parentpeak.com');
+    final email =
+        AuthService.instance.currentUser?.email.toLowerCase().trim() ?? '';
+    return kDebugMode ||
+        email.endsWith('@parentpeak.de') ||
+        email.endsWith('@parentpeak.com');
   }
 
   String get _viewerUserId =>
@@ -184,7 +184,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
 
       WeeklyImpulseVerificationStatus? verificationStatus;
       try {
-        verificationStatus = await _weeklyImpulseService.fetchVerificationStatus(
+        verificationStatus =
+            await _weeklyImpulseService.fetchVerificationStatus(
           userId: _viewerUserId,
           email: _viewerEmail,
         );
@@ -231,30 +232,6 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
       return 'Der Dienst ist gerade eingeschraenkt verfuegbar. Bitte spaeter erneut versuchen.';
     }
     return 'Wochenimpuls ist aktuell nicht verfuegbar. Bitte spaeter erneut versuchen.';
-  }
-
-  Future<void> _openChatFallback() async {
-    await ProductMetricsService.instance.recordWeeklyImpulseFallbackRouteTap(
-      from: 'weekly_impulse',
-      to: 'chat',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
-    );
-  }
-
-  Future<void> _openCalendarFallback() async {
-    await ProductMetricsService.instance.recordWeeklyImpulseFallbackRouteTap(
-      from: 'weekly_impulse',
-      to: 'calendar',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CalendarScreen()),
-    );
   }
 
   Future<void> _createCommunityPost(
@@ -456,7 +433,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                   maxLines: 5,
                   decoration: const InputDecoration(
                     labelText: 'Kurzinfo',
-                    hintText: 'Welche Erfahrung oder Ausbildung bringst du mit?',
+                    hintText:
+                        'Welche Erfahrung oder Ausbildung bringst du mit?',
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -608,7 +586,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                       ?.copyWith(fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 6),
-                                Text('${request.roleTitle}  •  ${request.organization}'),
+                                Text(
+                                    '${request.roleTitle}  •  ${request.organization}'),
                                 if (request.note.isNotEmpty) ...[
                                   const SizedBox(height: 8),
                                   Text(request.note),
@@ -618,18 +597,21 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                   onPressed: () async {
                                     final note = await _askModerationNote(
                                       title: 'Fachprofil freigeben',
-                                      hintText: 'Zum Beispiel: Ausbildung geprueft, Fachbadge freigegeben.',
+                                      hintText:
+                                          'Zum Beispiel: Ausbildung geprueft, Fachbadge freigegeben.',
                                       initialValue: request.reviewNote,
                                     );
                                     if (note == null) {
                                       return;
                                     }
-                                    await _weeklyImpulseService.approveVerificationRequest(
+                                    await _weeklyImpulseService
+                                        .approveVerificationRequest(
                                       requestId: request.id,
                                       reviewerName: _viewerDisplayName,
                                       reviewerEmail: _viewerEmail,
                                       reviewNote: note,
-                                      verificationLabel: 'Verifizierte Fachstimme',
+                                      verificationLabel:
+                                          'Verifizierte Fachstimme',
                                     );
                                     if (!mounted) {
                                       return;
@@ -664,7 +646,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
       return;
     }
 
-    List<WeeklyImpulseModerationReport> reports = const <WeeklyImpulseModerationReport>[];
+    List<WeeklyImpulseModerationReport> reports =
+        const <WeeklyImpulseModerationReport>[];
     var isLoadingReports = true;
     String? errorMessage;
     String selectedFilter = 'offen';
@@ -784,7 +767,9 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(errorMessage!),
@@ -794,7 +779,9 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
@@ -817,7 +804,9 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                           return Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Column(
@@ -831,18 +820,21 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                         style: Theme.of(context)
                                             .textTheme
                                             .titleSmall
-                                            ?.copyWith(fontWeight: FontWeight.w700),
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.w700),
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
                                         color: report.hiddenByModeration
                                             ? const Color(0xFFFECACA)
                                             : report.isResolved
                                                 ? const Color(0xFFD1FAE5)
                                                 : const Color(0xFFFDE68A),
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
                                       ),
                                       child: Text(report.hiddenByModeration
                                           ? 'Ausgeblendet'
@@ -870,35 +862,43 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                 const SizedBox(height: 6),
                                 Text(
                                   'Gemeldet am ${_formatModerationDate(report.createdAt)}',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
                                 ),
                                 if (report.moderatorNote.isNotEmpty) ...[
                                   const SizedBox(height: 8),
                                   Text(
                                     'Moderationsnotiz: ${report.moderatorNote}',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
                                   ),
                                 ],
                                 if (report.hiddenByModeration) ...[
                                   const SizedBox(height: 6),
                                   Text(
                                     'Global ausgeblendet${report.hiddenBy.isNotEmpty ? ' von ${report.hiddenBy}' : ''} am ${_formatModerationDate(report.hiddenAt)}',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
                                   ),
                                 ],
                                 if (report.isResolved) ...[
                                   const SizedBox(height: 6),
                                   Text(
                                     'Bearbeitet${report.resolvedBy.isNotEmpty ? ' von ${report.resolvedBy}' : ''} am ${_formatModerationDate(report.resolvedAt)}',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
                                   ),
                                 ],
                                 if (report.lastActionAt != null) ...[
@@ -907,9 +907,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surface,
+                                      color:
+                                          Theme.of(context).colorScheme.surface,
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
                                         color: Theme.of(context)
@@ -939,18 +938,23 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                       onPressed: report.isResolved
                                           ? null
                                           : () async {
-                                              final note = await _askModerationNote(
+                                              final note =
+                                                  await _askModerationNote(
                                                 title: 'Meldung abschliessen',
-                                                hintText: 'Zum Beispiel: Beitrag geprueft, im Ton grenzwertig, aber stehen gelassen.',
-                                                initialValue: report.moderatorNote,
+                                                hintText:
+                                                    'Zum Beispiel: Beitrag geprueft, im Ton grenzwertig, aber stehen gelassen.',
+                                                initialValue:
+                                                    report.moderatorNote,
                                               );
                                               if (note == null || !mounted) {
                                                 return;
                                               }
-                                              await _weeklyImpulseService.resolveModerationReport(
+                                              await _weeklyImpulseService
+                                                  .resolveModerationReport(
                                                 impulseId: impulse.id,
                                                 reportId: report.id,
-                                                moderatorName: _viewerDisplayName,
+                                                moderatorName:
+                                                    _viewerDisplayName,
                                                 moderatorEmail: _viewerEmail,
                                                 moderatorNote: note,
                                               );
@@ -963,7 +967,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                               }
                                               await loadReports(setModalState);
                                             },
-                                      icon: const Icon(Icons.check_circle_outline_rounded),
+                                      icon: const Icon(
+                                          Icons.check_circle_outline_rounded),
                                       label: const Text('Bearbeitet'),
                                     ),
                                     OutlinedButton.icon(
@@ -980,7 +985,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                         if (note == null || !mounted) {
                                           return;
                                         }
-                                        await _weeklyImpulseService.setCommunityPostHidden(
+                                        await _weeklyImpulseService
+                                            .setCommunityPostHidden(
                                           impulseId: impulse.id,
                                           postId: report.postId,
                                           moderatorName: _viewerDisplayName,
@@ -1037,7 +1043,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
       final languageCode = Localizations.localeOf(context).languageCode;
       await _tts.setLanguage(_resolveTtsLocale(languageCode));
     } catch (e) {
-      debugPrint('EntwicklungImpulseScreen._playAudio(): locale setup failed: $e');
+      debugPrint(
+          'EntwicklungImpulseScreen._playAudio(): locale setup failed: $e');
       await _tts.setLanguage('de-DE');
     }
     await _tts.setPitch(1.0);
@@ -1266,24 +1273,6 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                 },
                 icon: const Icon(Icons.insights_rounded),
                 label: const Text('Mit Entwicklung weitermachen'),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _openChatFallback,
-                    icon: const Icon(Icons.tips_and_updates_rounded),
-                    label: const Text('Zur KI-Beratung'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _openCalendarFallback,
-                    icon: const Icon(Icons.calendar_month_rounded),
-                    label: const Text('Zum Kalender'),
-                  ),
-                ],
               ),
             ],
           ),

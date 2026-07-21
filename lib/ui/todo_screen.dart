@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parentpeak/config/api_config.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
 import 'package:parentpeak/logic/todo_backend_service.dart';
 
@@ -61,7 +62,9 @@ class _TodoScreenState extends State<TodoScreen> {
         _syncError = _todoService.lastSyncError;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_syncError ?? 'Todo konnte nicht gespeichert werden.')),
+        SnackBar(
+            content:
+                Text(_syncError ?? 'Todo konnte nicht gespeichert werden.')),
       );
     }
   }
@@ -84,7 +87,9 @@ class _TodoScreenState extends State<TodoScreen> {
         _syncError = _todoService.lastSyncError;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_syncError ?? 'Todo-Status konnte nicht gespeichert werden.')),
+        SnackBar(
+            content: Text(
+                _syncError ?? 'Todo-Status konnte nicht gespeichert werden.')),
       );
     }
   }
@@ -108,7 +113,8 @@ class _TodoScreenState extends State<TodoScreen> {
         _syncError = _todoService.lastSyncError;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_syncError ?? 'Todo konnte nicht geloescht werden.')),
+        SnackBar(
+            content: Text(_syncError ?? 'Todo konnte nicht geloescht werden.')),
       );
     }
   }
@@ -133,11 +139,12 @@ class _TodoScreenState extends State<TodoScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_syncError != null)
+          if (_syncError != null && APIConfig.isBackendConfigured())
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Material(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+                color:
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(12),
                 child: ListTile(
                   leading: Icon(

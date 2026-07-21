@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parentpeak/config/api_config.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
 import 'package:parentpeak/logic/shopping_backend_service.dart';
 import 'package:parentpeak/widgets/language_change_mixin.dart';
@@ -43,7 +44,8 @@ class _ShoppingScreenState extends State<ShoppingScreen>
     });
   }
 
-  Future<void> _toggleItemChecked(Map<String, dynamic> item, bool checked) async {
+  Future<void> _toggleItemChecked(
+      Map<String, dynamic> item, bool checked) async {
     final previous = item['checked'] as bool;
     setState(() => item['checked'] = checked);
     final id = item['id']?.toString();
@@ -57,7 +59,9 @@ class _ShoppingScreenState extends State<ShoppingScreen>
           _syncError = _shoppingService.lastSyncError;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_syncError ?? 'Status konnte nicht gespeichert werden.')),
+          SnackBar(
+              content: Text(
+                  _syncError ?? 'Status konnte nicht gespeichert werden.')),
         );
         return;
       }
@@ -95,7 +99,9 @@ class _ShoppingScreenState extends State<ShoppingScreen>
         _syncError = _shoppingService.lastSyncError;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_syncError ?? 'Eintrag konnte nicht gespeichert werden.')),
+        SnackBar(
+            content:
+                Text(_syncError ?? 'Eintrag konnte nicht gespeichert werden.')),
       );
     }
   }
@@ -114,7 +120,9 @@ class _ShoppingScreenState extends State<ShoppingScreen>
           _syncError = _shoppingService.lastSyncError;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_syncError ?? 'Eintrag konnte nicht geloescht werden.')),
+          SnackBar(
+              content:
+                  Text(_syncError ?? 'Eintrag konnte nicht geloescht werden.')),
         );
         return;
       }
@@ -162,11 +170,12 @@ class _ShoppingScreenState extends State<ShoppingScreen>
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_syncError != null)
+          if (_syncError != null && APIConfig.isBackendConfigured())
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Material(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+                color:
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(12),
                 child: ListTile(
                   leading: Icon(

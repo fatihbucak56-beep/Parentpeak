@@ -3,12 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:parentpeak/config/api_config.dart';
-import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/gemini_ai_service.dart';
 import 'package:parentpeak/logic/pedagogical_chat_backend.dart';
-import 'package:parentpeak/logic/product_metrics_service.dart';
-import 'package:parentpeak/ui/calendar_screen.dart';
-import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -20,15 +16,67 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   static const String _insightsStorageKey = 'ki_chat.topic_counts.v1';
   static const Map<String, List<String>> _topicKeywords = {
-    'Autonomiephase': ['trotz', 'wutanfall', 'grenze', 'nein', 'auto nomi', 'rebellion', 'eigensinn'],
-    'Schlaf': ['schlaf', 'einschlafen', 'durchschlafen', 'nacht', 'muede', 'müde'],
-    'Konflikte': ['streit', 'konflikt', 'hauen', 'beissen', 'beißen', 'schlag', 'aggression'],
-    'Schule/Kita': ['kita', 'schule', 'lehrer', 'lehrerin', 'hausaufgaben', 'lernblockade'],
-    'Medien': ['handy', 'tablet', 'medien', 'bildschirm', 'youtube', 'handy sucht'],
-    'Bindung & Gefühle': ['bindung', 'angst', 'trauer', 'wut', 'frustration', 'emotion', 'gefühl'],
+    'Autonomiephase': [
+      'trotz',
+      'wutanfall',
+      'grenze',
+      'nein',
+      'auto nomi',
+      'rebellion',
+      'eigensinn'
+    ],
+    'Schlaf': [
+      'schlaf',
+      'einschlafen',
+      'durchschlafen',
+      'nacht',
+      'muede',
+      'müde'
+    ],
+    'Konflikte': [
+      'streit',
+      'konflikt',
+      'hauen',
+      'beissen',
+      'beißen',
+      'schlag',
+      'aggression'
+    ],
+    'Schule/Kita': [
+      'kita',
+      'schule',
+      'lehrer',
+      'lehrerin',
+      'hausaufgaben',
+      'lernblockade'
+    ],
+    'Medien': [
+      'handy',
+      'tablet',
+      'medien',
+      'bildschirm',
+      'youtube',
+      'handy sucht'
+    ],
+    'Bindung & Gefühle': [
+      'bindung',
+      'angst',
+      'trauer',
+      'wut',
+      'frustration',
+      'emotion',
+      'gefühl'
+    ],
     'Geschwister': ['geschwister', 'eifersucht', 'bruder', 'schwester', 'baby'],
     'Ernährung': ['essen', 'essstörung', 'picky', 'appetit', 'übergewicht'],
-    'Krise': ['ich kann nicht mehr', 'notfall', 'gewalt', 'kontrolle verlieren', 'suizid', 'depressiv']
+    'Krise': [
+      'ich kann nicht mehr',
+      'notfall',
+      'gewalt',
+      'kontrolle verlieren',
+      'suizid',
+      'depressiv'
+    ]
   };
 
   GeminiAIService? _geminiService;
@@ -64,7 +112,8 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
-      debugPrint('ChatScreen._loadTopicInsights(): ignoring corrupted local analytics data: $e');
+      debugPrint(
+          'ChatScreen._loadTopicInsights(): ignoring corrupted local analytics data: $e');
       // Ignore corrupted local analytics data.
     }
   }
@@ -110,7 +159,8 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _initError = null;
       });
-      debugPrint('✅ Gemini AI initialized with ${APIConfig.getGeminiModelName()}');
+      debugPrint(
+          '✅ Gemini AI initialized with ${APIConfig.getGeminiModelName()}');
     } catch (e) {
       setState(() {
         _initError = 'Fehler: $e';
@@ -285,32 +335,6 @@ class _ChatScreenState extends State<ChatScreen> {
     await _sendMessage(previousQuestion);
   }
 
-  Future<void> _openDevelopmentFallback() async {
-    await ProductMetricsService.instance.recordChatFallbackRouteTap(
-      from: 'chat',
-      to: 'development',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
-      ),
-    );
-  }
-
-  Future<void> _openCalendarFallback() async {
-    await ProductMetricsService.instance.recordChatFallbackRouteTap(
-      from: 'chat',
-      to: 'calendar',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CalendarScreen()),
-    );
-  }
-
   void _showTopicInsights() {
     final sorted = _topicCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -459,21 +483,10 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           if (showRetry)
             OutlinedButton.icon(
-              onPressed: _isStreaming ? null : () => _retryAssistantFailure(index),
+              onPressed:
+                  _isStreaming ? null : () => _retryAssistantFailure(index),
               icon: const Icon(Icons.refresh_rounded, size: 16),
               label: const Text('Erneut versuchen'),
-            ),
-          if (showRetry)
-            OutlinedButton.icon(
-              onPressed: _isStreaming ? null : _openDevelopmentFallback,
-              icon: const Icon(Icons.insights_rounded, size: 16),
-              label: const Text('Zu Entwicklung'),
-            ),
-          if (showRetry)
-            OutlinedButton.icon(
-              onPressed: _isStreaming ? null : _openCalendarFallback,
-              icon: const Icon(Icons.calendar_month_rounded, size: 16),
-              label: const Text('Zum Kalender'),
             ),
           chip('hilfreich', Icons.thumb_up_alt_outlined),
           chip('nicht hilfreich', Icons.thumb_down_alt_outlined),
@@ -547,9 +560,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, 
-                    color: Color(0xFFE8543A), 
-                    size: 18),
+                  Icon(Icons.info_outline_rounded,
+                      color: Color(0xFFE8543A), size: 18),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -582,8 +594,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _buildSuggestionChip('Autonomiephase Tipps'),
                 _buildSuggestionChip('Konflikt gewaltfrei lösen'),
                 _buildSuggestionChip('Schlaftipps'),
-                _buildSuggestionChip(
-                    'Ich bin überfordert'),
+                _buildSuggestionChip('Ich bin überfordert'),
               ],
             ),
             const SizedBox(height: 32),
@@ -609,10 +620,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       Expanded(
                         child: Text(
                           'Pädagogik-KI mit Rosenberg-Fokus',
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1A2A3A),
-                              ),
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1A2A3A),
+                                  ),
                         ),
                       ),
                     ],
@@ -692,9 +704,8 @@ class _ChatScreenState extends State<ChatScreen> {
               margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: isUser
-                    ? const Color(0xFF0284C7)
-                    : const Color(0xFFF0F7FF),
+                color:
+                    isUser ? const Color(0xFF0284C7) : const Color(0xFFF0F7FF),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(22),
                   topRight: const Radius.circular(22),
@@ -789,27 +800,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Du kannst trotzdem ohne Druck weitermachen:',
+                  'Du kannst es später erneut versuchen.',
                   style: Theme.of(context).textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _openDevelopmentFallback,
-                      icon: const Icon(Icons.insights_rounded),
-                      label: const Text('Zu Entwicklung'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _openCalendarFallback,
-                      icon: const Icon(Icons.calendar_month_rounded),
-                      label: const Text('Zum Kalender'),
-                    ),
-                  ],
+                FilledButton.tonalIcon(
+                  onPressed: _initializeGemini,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Erneut versuchen'),
                 ),
               ],
             ),
@@ -885,176 +884,177 @@ class _ChatScreenState extends State<ChatScreen> {
               child: _messages.isEmpty && !_isStreaming
                   ? _buildEmptyState()
                   : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length + (_isStreaming ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index < _messages.length) {
-                        final message = _messages[index];
-                        final isAssistant = message['role'] == 'assistant';
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildMessageBubble(message),
-                            if (isAssistant) _buildAssistantFeedbackRow(index),
-                          ],
-                        );
-                      } else {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length + (_isStreaming ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index < _messages.length) {
+                          final message = _messages[index];
+                          final isAssistant = message['role'] == 'assistant';
+                          return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
+                              _buildMessageBubble(message),
+                              if (isAssistant)
+                                _buildAssistantFeedbackRow(index),
+                            ],
+                          );
+                        } else {
+                          return Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: Theme.of(context)
+                                          .primaryColor
+                                          .withValues(alpha: 0.2),
+                                      child: Icon(
+                                        Icons.psychology,
+                                        size: 18,
+                                        color: Theme.of(context).primaryColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Schreibt...',
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: LinearProgressIndicator(
+                                    minHeight: 4,
                                     backgroundColor: Theme.of(context)
                                         .primaryColor
-                                        .withValues(alpha: 0.2),
-                                    child: Icon(
-                                      Icons.psychology,
-                                      size: 18,
-                                      color: Theme.of(context).primaryColor,
+                                        .withValues(alpha: 0.1),
+                                    valueColor: AlwaysStoppedAnimation(
+                                      Theme.of(context).primaryColor,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Schreibt...',
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: LinearProgressIndicator(
-                                  minHeight: 4,
-                                  backgroundColor: Theme.of(context)
-                                      .primaryColor
-                                      .withValues(alpha: 0.1),
-                                  valueColor: AlwaysStoppedAnimation(
-                                    Theme.of(context).primaryColor,
-                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                    },
-                  ),
+                              ],
+                            ),
+                          );
+                        }
+                      },
+                    ),
             ),
             Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                top: BorderSide(
-                  color: Color(0xFFE0E6ED),
-                  width: 1,
-                ),
-              ),
-            ),
-            padding: EdgeInsets.only(
-              left: 12,
-              right: 12,
-              top: 10,
-              bottom: 10 + MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    enabled: !_isStreaming && _chatBackend != null,
-                    decoration: InputDecoration(
-                      hintText: 'Erzähle mir, was dich bewegt...',
-                      hintStyle: const TextStyle(
-                        color: Color(0xFF8A9AB0),
-                        fontSize: 15,
-                        letterSpacing: 0.2,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(left: 12),
-                        child: Icon(
-                          Icons.edit_rounded,
-                          color: Color(0xFF0284C7),
-                          size: 20,
-                        ),
-                      ),
-                      prefixIconConstraints: const BoxConstraints(
-                        minWidth: 0,
-                        minHeight: 0,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFE0E6ED),
-                          width: 1.5,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFE0E6ED),
-                          width: 1.5,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF0284C7),
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 13,
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFD),
-                    ),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.35,
-                      letterSpacing: 0.15,
-                      color: Color(0xFF1A2A3A),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    onSubmitted: (value) {
-                      _sendMessage(value);
-                    },
-                    onChanged: (_) => setState(() {}),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: Color(0xFFE0E6ED),
+                    width: 1,
                   ),
                 ),
-                const SizedBox(width: 8),
-                FloatingActionButton.small(
-                  backgroundColor: _isStreaming || _controller.text.isEmpty
-                      ? const Color(0xFFE0E6ED)
-                      : const Color(0xFF0284C7),
-                  foregroundColor: _isStreaming || _controller.text.isEmpty
-                      ? const Color(0xFF8A9AB0)
-                      : Colors.white,
-                  onPressed: _isStreaming || _controller.text.isEmpty
-                      ? null
-                      : () => _sendMessage(_controller.text),
-                  child: _isStreaming
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Color(0xFF0284C7),
-                            ),
+              ),
+              padding: EdgeInsets.only(
+                left: 12,
+                right: 12,
+                top: 10,
+                bottom: 10 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      enabled: !_isStreaming && _chatBackend != null,
+                      decoration: InputDecoration(
+                        hintText: 'Erzähle mir, was dich bewegt...',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF8A9AB0),
+                          fontSize: 15,
+                          letterSpacing: 0.2,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(left: 12),
+                          child: Icon(
+                            Icons.edit_rounded,
+                            color: Color(0xFF0284C7),
+                            size: 20,
                           ),
-                        )
-                      : const Icon(Icons.send_rounded, size: 18),
-                ),
-              ],
-            ),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 0,
+                          minHeight: 0,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE0E6ED),
+                            width: 1.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE0E6ED),
+                            width: 1.5,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF0284C7),
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 13,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFD),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.35,
+                        letterSpacing: 0.15,
+                        color: Color(0xFF1A2A3A),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      onSubmitted: (value) {
+                        _sendMessage(value);
+                      },
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FloatingActionButton.small(
+                    backgroundColor: _isStreaming || _controller.text.isEmpty
+                        ? const Color(0xFFE0E6ED)
+                        : const Color(0xFF0284C7),
+                    foregroundColor: _isStreaming || _controller.text.isEmpty
+                        ? const Color(0xFF8A9AB0)
+                        : Colors.white,
+                    onPressed: _isStreaming || _controller.text.isEmpty
+                        ? null
+                        : () => _sendMessage(_controller.text),
+                    child: _isStreaming
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF0284C7),
+                              ),
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded, size: 18),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

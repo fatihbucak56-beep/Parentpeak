@@ -22,8 +22,18 @@ class BackendServiceFactory {
 
     return BackendApiClient(
       baseUrl: baseUrl,
-      authTokenProvider: () async =>
-          FirebaseAuth.instance.currentUser?.getIdToken(),
+      authTokenProvider: () async {
+        // Versuche zuerst Firebase ID-Token (eingeloggter User)
+        try {
+          final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+          if (idToken != null && idToken.isNotEmpty) {
+            return idToken;
+          }
+        } catch (_) {}
+
+        // Fallback: Backend API-Token aus .env / dart-define
+        return APIConfig.getBackendApiToken();
+      },
     );
   }
 

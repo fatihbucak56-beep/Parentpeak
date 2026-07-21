@@ -1,14 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/config/api_config.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
-import 'package:parentpeak/logic/product_metrics_service.dart';
 import 'package:parentpeak/logic/shopping_backend_service.dart';
 import 'package:parentpeak/logic/todo_backend_service.dart';
-import 'package:parentpeak/ui/calendar_screen.dart';
-import 'package:parentpeak/ui/chat_screen.dart';
-import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
 
 enum _OrganizationMode { todos, shopping }
 
@@ -68,7 +64,8 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
 
   void _scheduleAutoSyncRetry() {
     _autoSyncRetryTimer?.cancel();
-    final hasSyncError = (_todoSyncError != null && _todoSyncError!.trim().isNotEmpty) ||
+    final hasSyncError = (_todoSyncError != null &&
+            _todoSyncError!.trim().isNotEmpty) ||
         (_shoppingSyncError != null && _shoppingSyncError!.trim().isNotEmpty);
     if (!hasSyncError) return;
 
@@ -76,47 +73,6 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
       if (!mounted) return;
       _loadData();
     });
-  }
-
-  Future<void> _openDevelopmentFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'organization',
-      from: 'organization_sync_error',
-      to: 'development',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
-      ),
-    );
-  }
-
-  Future<void> _openChatFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'organization',
-      from: 'organization_sync_error',
-      to: 'chat',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
-    );
-  }
-
-  Future<void> _openCalendarFallback() async {
-    await ProductMetricsService.instance.recordUtilityFallbackRouteTap(
-      surface: 'organization',
-      from: 'organization_sync_error',
-      to: 'calendar',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CalendarScreen()),
-    );
   }
 
   Future<void> _addEntry() async {
@@ -230,7 +186,9 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
         .toList();
 
     final syncError = isTodos ? _todoSyncError : _shoppingSyncError;
-    final hasSyncNotice = syncError != null && syncError.trim().isNotEmpty;
+    final hasSyncNotice = syncError != null &&
+        syncError.trim().isNotEmpty &&
+        APIConfig.isBackendConfigured();
 
     return Scaffold(
       appBar: AppBar(
@@ -269,7 +227,8 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Material(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+                color:
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(12),
                 child: ListTile(
                   leading: Icon(
@@ -292,40 +251,20 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Aenderungen bleiben lokal gespeichert und werden beim naechsten Sync automatisch nachgesendet.',
+                      'Offline-Modus — Änderungen werden lokal gespeichert und beim nächsten Sync nachgesendet.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _openChatFallback,
-                          icon: const Icon(Icons.tips_and_updates_rounded),
-                          label: const Text('Zur KI-Beratung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openDevelopmentFallback,
-                          icon: const Icon(Icons.insights_rounded),
-                          label: const Text('Zu Entwicklung'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _openCalendarFallback,
-                          icon: const Icon(Icons.calendar_month_rounded),
-                          label: const Text('Zum Kalender'),
-                        ),
-                      ],
                     ),
                   ],
                 ),

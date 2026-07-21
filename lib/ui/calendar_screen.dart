@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/config/api_config.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
 import 'package:parentpeak/logic/calendar_backend_service.dart';
 import 'package:parentpeak/logic/notification_service.dart';
-import 'package:parentpeak/logic/product_metrics_service.dart';
-import 'package:parentpeak/ui/chat_screen.dart';
-import 'package:parentpeak/ui/entwicklung_impulse_screen.dart';
 import 'package:parentpeak/widgets/language_change_mixin.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -196,11 +193,13 @@ class _CalendarScreenState extends State<CalendarScreen>
         final viewInsets = MediaQuery.of(ctx).viewInsets;
         return Padding(
           padding: EdgeInsets.only(bottom: viewInsets.bottom),
-          child: Padding(
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
@@ -217,113 +216,135 @@ class _CalendarScreenState extends State<CalendarScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Titel',
-                    hintText: 'z.B. Elternabend',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: person,
-                  decoration: const InputDecoration(labelText: 'Für wen?'),
-                  items: _personColors.keys
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) person = v;
-                  },
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _TimeButton(
-                        label: 'Start',
-                        initial: start,
-                        onPicked: (t) => start = t,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _TimeButton(
-                        label: 'Ende',
-                        initial: end,
-                        onPicked: (t) => end = t,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: recurrence,
-                  decoration: const InputDecoration(labelText: 'Wiederholung'),
-                  items: _recurrenceOptions
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) recurrence = v;
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  initialValue: reminder,
-                  decoration: const InputDecoration(labelText: 'Erinnerung'),
-                  items: _reminderOptions
-                      .map((m) => DropdownMenuItem(
-                            value: m,
-                            child: Text(
-                              m == _smartReminderValue
-                                  ? 'Smart: 1 Woche, 1 Tag, am Termin'
-                                  : m == 0
-                                      ? 'Keine'
-                                      : '$m Min vorher',
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _titleController,
+                          decoration: const InputDecoration(
+                            labelText: 'Titel',
+                            hintText: 'z.B. Elternabend',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: person,
+                          decoration:
+                              const InputDecoration(labelText: 'Für wen?'),
+                          isExpanded: true,
+                          items: _personColors.keys
+                              .map((p) =>
+                                  DropdownMenuItem(value: p, child: Text(p)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) person = v;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _TimeButton(
+                                label: 'Start',
+                                initial: start,
+                                onPicked: (t) => start = t,
+                              ),
                             ),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) reminder = v;
-                  },
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _TimeButton(
+                                label: 'Ende',
+                                initial: end,
+                                onPicked: (t) => end = t,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: recurrence,
+                          decoration:
+                              const InputDecoration(labelText: 'Wiederholung'),
+                          isExpanded: true,
+                          items: _recurrenceOptions
+                              .map((p) =>
+                                  DropdownMenuItem(value: p, child: Text(p)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) recurrence = v;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int>(
+                          initialValue: reminder,
+                          decoration:
+                              const InputDecoration(labelText: 'Erinnerung'),
+                          isExpanded: true,
+                          items: _reminderOptions
+                              .map((m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(
+                                      m == _smartReminderValue
+                                          ? 'Smart (1W, 1T, am Tag)'
+                                          : m == 0
+                                              ? 'Keine'
+                                              : '$m Min vorher',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) reminder = v;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: endMode,
+                          decoration: const InputDecoration(labelText: 'Endet'),
+                          isExpanded: true,
+                          items: _recurrenceEndOptions
+                              .map((p) =>
+                                  DropdownMenuItem(value: p, child: Text(p)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) endMode = v;
+                            if (endMode == '5 Termine') endCount = 5;
+                            if (endMode == '10 Termine') endCount = 10;
+                          },
+                        ),
+                        if (endMode == 'Datum wählen') ...[
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                initialDate: endDate ?? _selectedDay,
+                                firstDate: DateTime.now()
+                                    .subtract(const Duration(days: 1)),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 365 * 2)),
+                              );
+                              if (picked != null) {
+                                endDate = picked;
+                                // ignore: use_build_context_synchronously
+                                (ctx as Element).markNeedsBuild();
+                              }
+                            },
+                            icon: const Icon(Icons.event_available_rounded),
+                            label: Text(endDate == null
+                                ? 'Enddatum wählen'
+                                : 'Endet am ${DateFormat.yMMMd('de').format(endDate!)}'),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: endMode,
-                  decoration: const InputDecoration(labelText: 'Endet'),
-                  items: _recurrenceEndOptions
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) endMode = v;
-                    if (endMode == '5 Termine') endCount = 5;
-                    if (endMode == '10 Termine') endCount = 10;
-                  },
-                ),
-                if (endMode == 'Datum wählen') ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: endDate ?? _selectedDay,
-                        firstDate:
-                            DateTime.now().subtract(const Duration(days: 1)),
-                        lastDate:
-                            DateTime.now().add(const Duration(days: 365 * 2)),
-                      );
-                      if (picked != null) {
-                        endDate = picked;
-                        // ignore: use_build_context_synchronously
-                        (ctx as Element).markNeedsBuild();
-                      }
-                    },
-                    icon: const Icon(Icons.event_available_rounded),
-                    label: Text(endDate == null
-                        ? 'Enddatum wählen'
-                        : 'Endet am ${DateFormat.yMMMd('de').format(endDate!)}'),
-                  ),
-                ],
-                const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -376,7 +397,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              _syncError ?? 'Termin konnte nicht gespeichert werden.',
+                              _syncError ??
+                                  'Termin konnte nicht gespeichert werden.',
                             ),
                           ),
                         );
@@ -398,32 +420,6 @@ class _CalendarScreenState extends State<CalendarScreen>
           ),
         );
       },
-    );
-  }
-
-  Future<void> _openDevelopmentFallback() async {
-    await ProductMetricsService.instance.recordCalendarFallbackRouteTap(
-      from: 'calendar',
-      to: 'development',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EntwicklungImpulseScreen(initialTabIndex: 1),
-      ),
-    );
-  }
-
-  Future<void> _openChatFallback() async {
-    await ProductMetricsService.instance.recordCalendarFallbackRouteTap(
-      from: 'calendar',
-      to: 'chat',
-      userId: AuthService.instance.currentUser?.uid,
-    );
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
     );
   }
 
@@ -469,56 +465,41 @@ class _CalendarScreenState extends State<CalendarScreen>
                         ),
                       ],
                     ),
-                    if (_syncError != null)
+                    if (_syncError != null && APIConfig.isBackendConfigured())
                       Padding(
                         padding: const EdgeInsets.only(top: 8, bottom: 8),
                         child: Material(
                           color: Colors.amber[100],
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            child: Row(
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.cloud_off_rounded),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                      child: Text(
-                                        'Server-Sync fehlgeschlagen',
-                                        style: TextStyle(fontWeight: FontWeight.w700),
-                                      ),
+                                Icon(Icons.cloud_off_rounded,
+                                    size: 18, color: Colors.amber[800]),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Offline-Modus — Termine werden lokal gespeichert',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.amber[900],
                                     ),
-                                    TextButton(
-                                      onPressed: _loadEvents,
-                                      child: const Text('Retry'),
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(_syncError!),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Du kannst ohne Wartezeit weitermachen:',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    OutlinedButton.icon(
-                                      onPressed: _openDevelopmentFallback,
-                                      icon: const Icon(Icons.insights_rounded),
-                                      label: const Text('Zu Entwicklung'),
-                                    ),
-                                    OutlinedButton.icon(
-                                      onPressed: _openChatFallback,
-                                      icon: const Icon(Icons.tips_and_updates_rounded),
-                                      label: const Text('Zur KI-Beratung'),
-                                    ),
-                                  ],
+                                TextButton(
+                                  onPressed: _loadEvents,
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Sync',
+                                      style: TextStyle(fontSize: 12)),
                                 ),
                               ],
                             ),
@@ -607,36 +588,84 @@ class _CalendarScreenState extends State<CalendarScreen>
                         color: _personColors[e.person] ??
                             theme.colorScheme.primary)),
                     if (_eventsForSelectedDay.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+                      GestureDetector(
+                        onTap: _openAddSheet,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.2),
+                              style: BorderStyle.solid,
                             ),
-                          ],
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Keine Termine an diesem Tag',
-                              style: TextStyle(
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Icon(
+                                  Icons.calendar_month_rounded,
+                                  color: theme.colorScheme.primary,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Noch keine Termine',
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,
-                                  color: Color(0xFF2D3748)),
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Tippe hier um einen Termin hinzuzufügen',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (_eventsForSelectedDay.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _openAddSheet,
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('Neuen Termin hinzufügen'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              side: BorderSide(
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.3),
+                              ),
                             ),
-                            SizedBox(height: 6),
-                            Text(
-                              'Füge einen neuen Termin hinzu und teile ihn mit deiner Familie.',
-                              style: TextStyle(color: Color(0xFF718096)),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                   ],
@@ -645,12 +674,6 @@ class _CalendarScreenState extends State<CalendarScreen>
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddSheet,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Termin'),
-        backgroundColor: theme.colorScheme.primary,
       ),
     );
   }
@@ -936,7 +959,8 @@ class _EventCard extends StatelessWidget {
                             color: color,
                             icon: Icons.loop_rounded,
                           ),
-                        if (event.reminderMinutes == _CalendarScreenState._smartReminderValue)
+                        if (event.reminderMinutes ==
+                            _CalendarScreenState._smartReminderValue)
                           const _Badge(
                             label: 'Smart: 1W • 1T • Heute',
                             color: Color(0xFF5B7FFF),
@@ -1091,11 +1115,11 @@ class _CalendarEvent {
 
   factory _CalendarEvent.fromJson(Map<String, dynamic> json) {
     final start =
-      DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now();
+        DateTime.tryParse(json['start']?.toString() ?? '') ?? DateTime.now();
     final person = json['person']?.toString() ?? 'Eltern';
     final title = json['title']?.toString() ?? '';
     final fallbackId =
-      'legacy_${start.millisecondsSinceEpoch}_${title.hashCode}_${person.hashCode}';
+        'legacy_${start.millisecondsSinceEpoch}_${title.hashCode}_${person.hashCode}';
 
     return _CalendarEvent(
       id: json['id']?.toString() ?? fallbackId,
@@ -1107,8 +1131,8 @@ class _CalendarEvent {
       location: json['location']?.toString(),
       allDay: json['allDay'] == true,
       recurrence: json['recurrence']?.toString() ?? 'Einmalig',
-      reminderMinutes:
-        (json['reminderMinutes'] as num?)?.toInt() ?? _CalendarScreenState._smartReminderValue,
+      reminderMinutes: (json['reminderMinutes'] as num?)?.toInt() ??
+          _CalendarScreenState._smartReminderValue,
       recurrenceEndMode: json['recurrenceEndMode']?.toString() ?? 'Kein Ende',
       recurrenceEndDate: json['recurrenceEndDate'] != null
           ? DateTime.tryParse(json['recurrenceEndDate'].toString())
@@ -1138,7 +1162,8 @@ class _CalendarEvent {
 extension on _CalendarScreenState {
   Future<void> _scheduleRemindersFor(List<_CalendarEvent> events) async {
     for (final event in events) {
-      final body = '${event.person}: ${DateFormat.Hm('de').format(event.start)}';
+      final body =
+          '${event.person}: ${DateFormat.Hm('de').format(event.start)}';
 
       if (event.reminderMinutes == _CalendarScreenState._smartReminderValue) {
         await NotificationService.instance.scheduleStandardCalendarReminders(
@@ -1151,7 +1176,8 @@ extension on _CalendarScreenState {
       }
 
       if (event.reminderMinutes > 0) {
-        final when = event.start.subtract(Duration(minutes: event.reminderMinutes));
+        final when =
+            event.start.subtract(Duration(minutes: event.reminderMinutes));
         await NotificationService.instance.scheduleEventReminder(
           eventId: event.id,
           when: when,

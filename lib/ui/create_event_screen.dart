@@ -68,7 +68,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       });
       return;
     }
-    final contacts = await _familyCircleService.getConnectedContacts(userId: userId);
+    final contacts =
+        await _familyCircleService.getConnectedContacts(userId: userId);
     if (!mounted) return;
     setState(() {
       _familyContacts = contacts;
@@ -152,7 +153,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final currentUserId = AuthService.instance.currentUser?.uid;
     if (currentUserId == null || currentUserId.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte melde dich an, um ein Event zu erstellen.')),
+        const SnackBar(
+            content: Text('Bitte melde dich an, um ein Event zu erstellen.')),
       );
       return;
     }
@@ -166,7 +168,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return;
     }
 
-    if (_visibility == EventVisibility.inviteOnly && _selectedInvitees.isEmpty) {
+    if (_visibility == EventVisibility.inviteOnly &&
+        _selectedInvitees.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Bitte lade mindestens einen Kontakt ein.'),
@@ -208,11 +211,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         visibility: _visibility,
         shareRadiusKm:
             _visibility == EventVisibility.publicNearby ? _shareRadiusKm : null,
-        invitedUserIds:
-          _visibility == EventVisibility.inviteOnly ? _selectedInvitees.toList() : const [],
+        invitedUserIds: _visibility == EventVisibility.inviteOnly
+            ? _selectedInvitees.toList()
+            : const [],
         inviteCodeExpiresAt: _visibility == EventVisibility.inviteOnly
-          ? DateTime.now().add(Duration(days: _inviteCodeExpiryDays))
-          : null,
+            ? DateTime.now().add(Duration(days: _inviteCodeExpiryDays))
+            : null,
       );
 
       await _eventService.createEvent(event);
@@ -251,8 +255,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     Text(
                       'Gültig bis: ${expiresAt.day.toString().padLeft(2, '0')}.${expiresAt.month.toString().padLeft(2, '0')}.${expiresAt.year}',
                     ),
-                  if (expiresAt != null)
-                    const SizedBox(height: 8),
+                  if (expiresAt != null) const SizedBox(height: 8),
                   if (expiresAt != null)
                     const Text(
                       'Bereits akzeptierte Einladungen bleiben aktiv.',
@@ -398,7 +401,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 const SizedBox(height: 8),
                 _VisibilityOptionTile(
                   title: 'Öffentlich (in deiner Nähe sichtbar)',
-                  subtitle: 'Andere Eltern sehen dein Event im Standort-Radius.',
+                  subtitle:
+                      'Andere Eltern sehen dein Event im Standort-Radius.',
                   selected: _visibility == EventVisibility.publicNearby,
                   onTap: () => setState(
                     () => _visibility = EventVisibility.publicNearby,
@@ -480,12 +484,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         contentPadding: EdgeInsets.zero,
                         value: _selectedInvitees.contains(contact.userId),
                         title: Text(contact.displayName),
-                        subtitle:
-                            Text('${contact.city} · ${contact.childrenSummary}'),
+                        subtitle: Text(
+                            '${contact.city} · ${contact.childrenSummary}'),
                         onChanged: (_) => _toggleInvitee(contact.userId),
                       ),
                     ),
-
                   const SizedBox(height: 8),
                   DropdownButtonFormField<int>(
                     initialValue: _inviteCodeExpiryDays,
@@ -493,6 +496,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       labelText: 'Einladungscode gültig für',
                       prefixIcon: Icon(Icons.timelapse_rounded),
                     ),
+                    isExpanded: true,
                     items: const [
                       DropdownMenuItem(value: 3, child: Text('3 Tage')),
                       DropdownMenuItem(value: 7, child: Text('7 Tage')),
@@ -515,6 +519,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     labelText: 'Kategorie',
                     prefixIcon: Icon(Icons.category),
                   ),
+                  isExpanded: true,
                   items: EventCategory.values
                       .map(
                         (category) => DropdownMenuItem(

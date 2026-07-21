@@ -156,7 +156,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                   final visibleExpenses = _expenseCategoryFilter == null
                       ? _provider.filteredExpenses
                       : _provider.filteredExpenses
-                          .where((item) => item.category == _expenseCategoryFilter)
+                          .where(
+                              (item) => item.category == _expenseCategoryFilter)
                           .toList();
                   final groupedExpenses = _groupExpensesByDate(visibleExpenses);
                   final groupedCareActivities =
@@ -191,21 +192,26 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                           _MonthSelector(
                             selectedMonth: _provider.selectedMonth,
                             options: _lastMonths(8),
-                            onChanged: (month) => _provider.setSelectedMonth(month),
+                            onChanged: (month) =>
+                                _provider.setSelectedMonth(month),
                           ),
                           const SizedBox(height: 10),
                           _BalanceStrip(
-                            monthlyExpenses: _provider.monthlyNetHouseholdExpenses,
+                            monthlyExpenses:
+                                _provider.monthlyNetHouseholdExpenses,
                             careCredits: _provider.monthlyCareCredits,
-                            savingsPotential: _provider.secondHandSavingsPotential,
+                            savingsPotential:
+                                _provider.secondHandSavingsPotential,
                           ),
                           const SizedBox(height: 10),
                           _MonthlyCategoryOverview(
                             familyCost: _sumCategory(ExpenseCategory.groceries),
                             babyCost: _sumCategory(ExpenseCategory.baby),
-                            personalCost: _sumCategory(ExpenseCategory.personal),
+                            personalCost:
+                                _sumCategory(ExpenseCategory.personal),
                             depositValue: _sumCategory(ExpenseCategory.deposit),
-                            savingsPotential: _provider.secondHandSavingsPotential,
+                            savingsPotential:
+                                _provider.secondHandSavingsPotential,
                             formatter: _currency,
                           ),
                           const SizedBox(height: 10),
@@ -213,7 +219,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                             mamaNet: mamaNet,
                             papaNet: papaNet,
                             formatter: _currency,
-                            explanation: _buildSettlementExplanation(mamaNet, papaNet),
+                            explanation:
+                                _buildSettlementExplanation(mamaNet, papaNet),
                             insights: _buildSettlementInsights(),
                           ),
                           const SizedBox(height: 12),
@@ -229,24 +236,32 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                             runSpacing: 8,
                             children: [
                               ActionChip(
-                                avatar: const Icon(Icons.camera_alt_rounded, size: 18),
+                                avatar: const Icon(Icons.camera_alt_rounded,
+                                    size: 18),
                                 label: Text(
-                                  _importingReceipt ? 'Scan laeuft...' : 'Bon scannen',
+                                  _importingReceipt
+                                      ? 'Scan laeuft...'
+                                      : 'Bon scannen',
                                 ),
-                                onPressed: _importingReceipt ? null : _startReceiptImport,
+                                onPressed: _importingReceipt
+                                    ? null
+                                    : _startReceiptImport,
                               ),
                               ActionChip(
-                                avatar: const Icon(Icons.favorite_rounded, size: 18),
+                                avatar: const Icon(Icons.favorite_rounded,
+                                    size: 18),
                                 label: const Text('Care-Eintrag erfassen'),
                                 onPressed: _addManualCareActivity,
                               ),
                               ActionChip(
-                                avatar: const Icon(Icons.sell_rounded, size: 18),
+                                avatar:
+                                    const Icon(Icons.sell_rounded, size: 18),
                                 label: const Text('Sparchance erfassen'),
                                 onPressed: _addManualSavingsOpportunity,
                               ),
                               ActionChip(
-                                avatar: const Icon(Icons.add_card_rounded, size: 18),
+                                avatar: const Icon(Icons.add_card_rounded,
+                                    size: 18),
                                 label: const Text('Position manuell'),
                                 onPressed: _addManualExpense,
                               ),
@@ -271,25 +286,30 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                           ),
                           const SizedBox(height: 8),
                           if (visibleExpenses.isEmpty)
-                            const _EmptyHint(text: 'Keine Belege fuer den gewaehlten Monat.')
+                            const _EmptyHint(
+                                text: 'Keine Belege fuer den gewaehlten Monat.')
                           else
                             ...groupedExpenses.entries.take(6).expand(
-                              (entry) => [
-                                _DateGroupHeader(label: _formatExpenseDate(entry.key)),
-                                ...entry.value.map(
-                                  (expense) => _ListItemCard(
-                                    leadingIcon: Icons.receipt_rounded,
-                                    title: expense.title,
-                                    subtitle:
-                                        '${_splitTypeLabel(expense.splitType.name)} · bezahlt von ${_parentLabel(expense.paidById)}',
-                                    badgeText: _categoryLabel(expense.category),
-                                    badgeColor: _categoryColor(expense.category),
-                                    trailing: _currency(expense.amount),
-                                    onTap: () => _openExpenseActions(expense),
-                                  ),
+                                  (entry) => [
+                                    _DateGroupHeader(
+                                        label: _formatExpenseDate(entry.key)),
+                                    ...entry.value.map(
+                                      (expense) => _ListItemCard(
+                                        leadingIcon: Icons.receipt_rounded,
+                                        title: expense.title,
+                                        subtitle:
+                                            '${_splitTypeLabel(expense.splitType.name)} · bezahlt von ${_parentLabel(expense.paidById)}',
+                                        badgeText:
+                                            _categoryLabel(expense.category),
+                                        badgeColor:
+                                            _categoryColor(expense.category),
+                                        trailing: _currency(expense.amount),
+                                        onTap: () =>
+                                            _openExpenseActions(expense),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
                           const SizedBox(height: 12),
                           _SectionTitle(
                             title: 'Care-Aktivitaeten',
@@ -299,19 +319,24 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                           const SizedBox(height: 8),
                           if (_provider.filteredCareActivities.isEmpty)
                             const _EmptyHint(
-                              text: 'Keine Care-Aktivitaeten fuer den gewaehlten Monat.',
+                              text:
+                                  'Keine Care-Aktivitaeten fuer den gewaehlten Monat.',
                             )
                           else
                             ...groupedCareActivities.entries.expand(
                               (entry) => [
-                                _DateGroupHeader(label: _formatExpenseDate(entry.key)),
+                                _DateGroupHeader(
+                                    label: _formatExpenseDate(entry.key)),
                                 ...entry.value.map(
                                   (activity) => _ListItemCard(
-                                    leadingIcon: Icons.volunteer_activism_rounded,
-                                    title: _careTypeLabel(activity.activityType),
+                                    leadingIcon:
+                                        Icons.volunteer_activism_rounded,
+                                    title:
+                                        _careTypeLabel(activity.activityType),
                                     subtitle:
                                         '${_parentLabel(activity.parentId)} · ${activity.durationHours.toStringAsFixed(1)} h',
-                                    trailing: '+ ${_currency(activity.financialCreditValue)}',
+                                    trailing:
+                                        '+ ${_currency(activity.financialCreditValue)}',
                                     onTap: () => _openCareActions(activity),
                                   ),
                                 ),
@@ -364,7 +389,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
       final drafts = _buildDraftsFromOcr(lines);
       if (drafts.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Keine verarbeitbaren Positionen erkannt.')),
+          const SnackBar(
+              content: Text('Keine verarbeitbaren Positionen erkannt.')),
         );
         return;
       }
@@ -403,7 +429,9 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
       debugPrint('FinanceBudgetScreen._importReceiptFromPhoto(): failed: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OCR-Import fehlgeschlagen. Bitte erneut versuchen.')),
+        const SnackBar(
+            content:
+                Text('OCR-Import fehlgeschlagen. Bitte erneut versuchen.')),
       );
     } finally {
       if (mounted) {
@@ -419,7 +447,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
     final firstOfCurrentMonth = DateTime(now.year, now.month, 1);
     return List<DateTime>.generate(
       count,
-      (index) => DateTime(firstOfCurrentMonth.year, firstOfCurrentMonth.month - index, 1),
+      (index) => DateTime(
+          firstOfCurrentMonth.year, firstOfCurrentMonth.month - index, 1),
     );
   }
 
@@ -486,11 +515,24 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
       if (firstAmount != null && firstAmount != rawAmount) {
         title = title.replaceFirst(firstAmount, '').trim();
       }
-      title = title.replaceFirst(RegExp(r'^\d+\s*(stk|st|x)\b', caseSensitive: false), '').trim();
+      title = title
+          .replaceFirst(
+              RegExp(r'^\d+\s*(stk|st|x)\b', caseSensitive: false), '')
+          .trim();
       title = title.replaceFirst(RegExp(r'^\d+\s*[xX]\s*'), '').trim();
-      title = title.replaceFirst(RegExp(r'^\d+[\.,]\d{2}\s*[xX]\s*'), '').trim();
-      title = title.replaceFirst(RegExp(r'^\d+[\.,]?\d*\s*(kg|g|ml|l)\b', caseSensitive: false), '').trim();
-      title = title.replaceAll(RegExp(r'\b\d+[\.,]?\d*\s*(kg|g|ml|l|stk|st)\b', caseSensitive: false), '').trim();
+      title =
+          title.replaceFirst(RegExp(r'^\d+[\.,]\d{2}\s*[xX]\s*'), '').trim();
+      title = title
+          .replaceFirst(
+              RegExp(r'^\d+[\.,]?\d*\s*(kg|g|ml|l)\b', caseSensitive: false),
+              '')
+          .trim();
+      title = title
+          .replaceAll(
+              RegExp(r'\b\d+[\.,]?\d*\s*(kg|g|ml|l|stk|st)\b',
+                  caseSensitive: false),
+              '')
+          .trim();
       title = title.replaceFirst(RegExp(r'^\d+\s+'), '').trim();
       title = title.replaceFirst(RegExp(r'^[A-Z0-9]{5,}\s+'), '').trim();
       title = title.replaceAll(RegExp(r'\b[A-Z0-9]{6,}\b'), '').trim();
@@ -524,8 +566,9 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
           amount: amount,
           category: category,
           paidById: _mamaId,
-          splitType:
-              isPersonal ? ExpenseSplitType.individual : ExpenseSplitType.intelligentOcrSplit,
+          splitType: isPersonal
+              ? ExpenseSplitType.individual
+              : ExpenseSplitType.intelligentOcrSplit,
           customSplit: isPersonal
               ? {_mamaId: 1}
               : {
@@ -585,14 +628,17 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
     if (expenses.isEmpty) return;
     _provider.addExpenses(expenses);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${expenses.length} manuelle Positionen hinzugefuegt.')),
+      SnackBar(
+          content:
+              Text('${expenses.length} manuelle Positionen hinzugefuegt.')),
     );
   }
 
   Map<DateTime, List<Expense>> _groupExpensesByDate(List<Expense> expenses) {
     final grouped = <DateTime, List<Expense>>{};
     for (final expense in expenses) {
-      final key = DateTime(expense.date.year, expense.date.month, expense.date.day);
+      final key =
+          DateTime(expense.date.year, expense.date.month, expense.date.day);
       grouped.putIfAbsent(key, () => <Expense>[]).add(expense);
     }
 
@@ -602,10 +648,12 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
     return {for (final entry in entries) entry.key: entry.value};
   }
 
-  Map<DateTime, List<CareActivity>> _groupCareByDate(List<CareActivity> activities) {
+  Map<DateTime, List<CareActivity>> _groupCareByDate(
+      List<CareActivity> activities) {
     final grouped = <DateTime, List<CareActivity>>{};
     for (final activity in activities) {
-      final key = DateTime(activity.date.year, activity.date.month, activity.date.day);
+      final key =
+          DateTime(activity.date.year, activity.date.month, activity.date.day);
       grouped.putIfAbsent(key, () => <CareActivity>[]).add(activity);
     }
 
@@ -639,27 +687,33 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
     final total = _provider.monthlyNetHouseholdExpenses;
 
     if (total > 0 && babyTotal > 0 && babyTotal / total >= 0.25) {
-      insights.add('Babykosten praegen diesen Monat den groessten Teil eurer Alltagsausgaben.');
+      insights.add(
+          'Babykosten praegen diesen Monat den groessten Teil eurer Alltagsausgaben.');
     }
 
     if (_provider.monthlyCareCredits >= 40) {
-      insights.add('Der Care-Bonus reduziert den Ausgleich spuerbar und macht unsichtbare Arbeit sichtbar.');
+      insights.add(
+          'Der Care-Bonus reduziert den Ausgleich spuerbar und macht unsichtbare Arbeit sichtbar.');
     }
 
     if (_provider.secondHandSavingsPotential >= 50) {
-      insights.add('Second-Hand-Treffer zeigen gerade spuerbares Sparpotenzial fuer diesen Monat.');
+      insights.add(
+          'Second-Hand-Treffer zeigen gerade spuerbares Sparpotenzial fuer diesen Monat.');
     }
 
     if (depositTotal > 0) {
-      insights.add('Pfand wurde separat erkannt und verfaelscht eure Familienkosten dadurch nicht mehr so stark.');
+      insights.add(
+          'Pfand wurde separat erkannt und verfaelscht eure Familienkosten dadurch nicht mehr so stark.');
     }
 
     if (personalTotal > groceriesTotal && personalTotal > 0) {
-      insights.add('Persoenliche Ausgaben liegen aktuell ueber den Familien-Lebensmitteln. Ein kurzer Beleg-Check lohnt sich.');
+      insights.add(
+          'Persoenliche Ausgaben liegen aktuell ueber den Familien-Lebensmitteln. Ein kurzer Beleg-Check lohnt sich.');
     }
 
     if (insights.isEmpty) {
-      insights.add('Familienkosten und Ausgleich wirken diesen Monat insgesamt recht ausgewogen.');
+      insights.add(
+          'Familienkosten und Ausgleich wirken diesen Monat insgesamt recht ausgewogen.');
     }
 
     return insights.take(2).toList();
@@ -692,7 +746,10 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                         Expanded(
                           child: Text(
                             'Split-Korrektur vor Uebernahme',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
@@ -749,7 +806,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                           style: Theme.of(context)
                                               .textTheme
                                               .titleSmall
-                                              ?.copyWith(fontWeight: FontWeight.w600),
+                                              ?.copyWith(
+                                                  fontWeight: FontWeight.w600),
                                         ),
                                       ),
                                       _InlineBadge(
@@ -777,9 +835,11 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   TextFormField(
-                                    initialValue: item.amount.toStringAsFixed(2),
+                                    initialValue:
+                                        item.amount.toStringAsFixed(2),
                                     keyboardType:
-                                        const TextInputType.numberWithOptions(decimal: true),
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
                                     decoration: const InputDecoration(
                                       labelText: 'Betrag',
                                       suffixText: 'EUR',
@@ -791,7 +851,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                       );
                                       if (parsed == null || parsed <= 0) return;
                                       setModalState(() {
-                                        editable[index] = item.copyWith(amount: parsed);
+                                        editable[index] =
+                                            item.copyWith(amount: parsed);
                                       });
                                     },
                                   ),
@@ -817,7 +878,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                       setModalState(() {
                                         editable[index] = item.copyWith(
                                           paidById: value,
-                                          customSplit: item.splitType == ExpenseSplitType.individual
+                                          customSplit: item.splitType ==
+                                                  ExpenseSplitType.individual
                                               ? {value: 1}
                                               : item.customSplit,
                                         );
@@ -835,14 +897,16 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                         .map(
                                           (category) => DropdownMenuItem(
                                             value: category,
-                                            child: Text(_categoryLabel(category)),
+                                            child:
+                                                Text(_categoryLabel(category)),
                                           ),
                                         )
                                         .toList(),
                                     onChanged: (value) {
                                       if (value == null) return;
                                       setModalState(() {
-                                        editable[index] = item.copyWith(category: value);
+                                        editable[index] =
+                                            item.copyWith(category: value);
                                       });
                                     },
                                   ),
@@ -853,9 +917,11 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                       labelText: 'Split-Typ',
                                       isDense: true,
                                     ),
+                                    isExpanded: true,
                                     items: const [
                                       DropdownMenuItem(
-                                        value: ExpenseSplitType.intelligentOcrSplit,
+                                        value: ExpenseSplitType
+                                            .intelligentOcrSplit,
                                         child: Text('OCR-Split (60/40)'),
                                       ),
                                       DropdownMenuItem(
@@ -872,7 +938,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                       setModalState(() {
                                         editable[index] = item.copyWith(
                                           splitType: value,
-                                          customSplit: value == ExpenseSplitType.individual
+                                          customSplit: value ==
+                                                  ExpenseSplitType.individual
                                               ? {item.paidById: 1}
                                               : {
                                                   _mamaId: 0.6,
@@ -882,17 +949,22 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                       });
                                     },
                                   ),
-                                  if (item.splitType != ExpenseSplitType.individual) ...[
+                                  if (item.splitType !=
+                                      ExpenseSplitType.individual) ...[
                                     const SizedBox(height: 10),
                                     Text(
                                       'Familien-Split feinjustieren',
-                                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
                                     const SizedBox(height: 4),
                                     Slider(
-                                      value: (item.customSplit?[_mamaId] ?? 0.6).clamp(0.0, 1.0),
+                                      value: (item.customSplit?[_mamaId] ?? 0.6)
+                                          .clamp(0.0, 1.0),
                                       min: 0,
                                       max: 1,
                                       divisions: 20,
@@ -911,7 +983,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                                     ),
                                     Text(
                                       'Mama ${((item.customSplit?[_mamaId] ?? 0.6) * 100).round()}% · Papa ${((1 - (item.customSplit?[_mamaId] ?? 0.6)) * 100).round()}%',
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
                                     ),
                                   ],
                                 ],
@@ -977,22 +1050,28 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
               children: [
                 TextField(
                   controller: goalController,
-                  decoration: const InputDecoration(labelText: 'Produkt / Ziel'),
+                  decoration:
+                      const InputDecoration(labelText: 'Produkt / Ziel'),
                 ),
                 TextField(
                   controller: retailController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'Neupreis (€)'),
                 ),
                 TextField(
                   controller: secondHandController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Second-Hand Preis (€)'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration:
+                      const InputDecoration(labelText: 'Second-Hand Preis (€)'),
                 ),
                 TextField(
                   controller: distanceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Entfernung (km)'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration:
+                      const InputDecoration(labelText: 'Entfernung (km)'),
                 ),
                 TextField(
                   controller: marketplaceController,
@@ -1009,12 +1088,12 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
             FilledButton(
               onPressed: () {
                 final goal = goalController.text.trim();
-                final retail =
-                    double.tryParse(retailController.text.trim().replaceAll(',', '.'));
-                final secondHand =
-                    double.tryParse(secondHandController.text.trim().replaceAll(',', '.'));
-                final distance =
-                    double.tryParse(distanceController.text.trim().replaceAll(',', '.'));
+                final retail = double.tryParse(
+                    retailController.text.trim().replaceAll(',', '.'));
+                final secondHand = double.tryParse(
+                    secondHandController.text.trim().replaceAll(',', '.'));
+                final distance = double.tryParse(
+                    distanceController.text.trim().replaceAll(',', '.'));
                 final marketplace = marketplaceController.text.trim();
 
                 if (goal.isEmpty ||
@@ -1083,7 +1162,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
   }
 
   Future<void> _exportPdf() async {
-    final month = DateFormat('MMMM yyyy', 'de_DE').format(_provider.selectedMonth);
+    final month =
+        DateFormat('MMMM yyyy', 'de_DE').format(_provider.selectedMonth);
     final settlement = _provider.finalSettlementByParent;
     final mamaNet = settlement[_mamaId] ?? 0;
     final papaNet = settlement[_papaId] ?? 0;
@@ -1100,12 +1180,15 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
           pw.SizedBox(height: 12),
           pw.Text('Monatskosten: ${_currency(_provider.monthlyTotalExpenses)}'),
           pw.Text('Care-Bonus: ${_currency(_provider.monthlyCareCredits)}'),
-          pw.Text('Sparpotenzial: ${_currency(_provider.secondHandSavingsPotential)}'),
+          pw.Text(
+              'Sparpotenzial: ${_currency(_provider.secondHandSavingsPotential)}'),
           pw.SizedBox(height: 10),
           pw.Text('Monatsausgleich',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text('Mama: ${mamaNet >= 0 ? '+' : '-'} ${_currency(mamaNet.abs())}'),
-          pw.Text('Papa: ${papaNet >= 0 ? '+' : '-'} ${_currency(papaNet.abs())}'),
+          pw.Text(
+              'Mama: ${mamaNet >= 0 ? '+' : '-'} ${_currency(mamaNet.abs())}'),
+          pw.Text(
+              'Papa: ${papaNet >= 0 ? '+' : '-'} ${_currency(papaNet.abs())}'),
         ],
       ),
     );
@@ -1304,7 +1387,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       initialValue: parentId,
-                      decoration: const InputDecoration(labelText: 'Elternteil'),
+                      decoration:
+                          const InputDecoration(labelText: 'Elternteil'),
                       items: const [
                         DropdownMenuItem(value: _mamaId, child: Text('Mama')),
                         DropdownMenuItem(value: _papaId, child: Text('Papa')),
@@ -1371,7 +1455,10 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                           final credit = double.tryParse(
                             creditController.text.replaceAll(',', '.'),
                           );
-                          if (hours == null || hours <= 0 || credit == null || credit < 0) {
+                          if (hours == null ||
+                              hours <= 0 ||
+                              credit == null ||
+                              credit < 0) {
                             return;
                           }
 
@@ -1415,7 +1502,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
     ExpenseCategory category = expense.category;
     String paidById = expense.paidById;
     ExpenseSplitType splitType = expense.splitType;
-    var mamaShare = (expense.customSplitByParent?[_mamaId] ?? 0.6).clamp(0.0, 1.0);
+    var mamaShare =
+        (expense.customSplitByParent?[_mamaId] ?? 0.6).clamp(0.0, 1.0);
 
     final result = await showModalBottomSheet<Expense>(
       context: context,
@@ -1459,7 +1547,8 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: paidById,
-                      decoration: const InputDecoration(labelText: 'Bezahlt von'),
+                      decoration:
+                          const InputDecoration(labelText: 'Bezahlt von'),
                       items: const [
                         DropdownMenuItem(value: _mamaId, child: Text('Mama')),
                         DropdownMenuItem(value: _papaId, child: Text('Papa')),
@@ -1550,12 +1639,13 @@ class _FinanceBudgetScreenState extends State<FinanceBudgetScreen> {
                               paidById: paidById,
                               category: category,
                               splitType: splitType,
-                              customSplitByParent: splitType == ExpenseSplitType.individual
-                                  ? {paidById: 1}
-                                  : {
-                                      _mamaId: mamaShare,
-                                      _papaId: 1 - mamaShare,
-                                    },
+                              customSplitByParent:
+                                  splitType == ExpenseSplitType.individual
+                                      ? {paidById: 1}
+                                      : {
+                                          _mamaId: mamaShare,
+                                          _papaId: 1 - mamaShare,
+                                        },
                             ),
                           );
                         },
@@ -2090,7 +2180,8 @@ class _SettlementCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         item,
-                        style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+                        style:
+                            theme.textTheme.bodySmall?.copyWith(height: 1.35),
                       ),
                     ),
                   ],
@@ -2108,7 +2199,8 @@ class _SettlementCard extends StatelessWidget {
   }
 
   Widget _settlementRow(BuildContext context, String name, double value) {
-    final color = value >= 0 ? const Color(0xFF0F766E) : const Color(0xFFB91C1C);
+    final color =
+        value >= 0 ? const Color(0xFF0F766E) : const Color(0xFFB91C1C);
     final prefix = value >= 0 ? '+' : '-';
 
     return Row(

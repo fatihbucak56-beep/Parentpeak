@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/l10n/app_localizations_all.dart';
+import 'package:parentpeak/main.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
 import 'package:parentpeak/logic/calendar_backend_service.dart';
 import 'package:parentpeak/logic/notification_service.dart';
@@ -203,8 +205,8 @@ class _CalendarScreenState extends State<CalendarScreen>
               children: [
                 Row(
                   children: [
-                    const Text(
-                      'Neuer Termin',
+                    Text(
+                      AppStringsManager.getString(languageService.currentLanguage, 'new_event'),
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                     ),
@@ -431,7 +433,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF5EFE7),
       appBar: AppBar(
-        title: const Text('Kalender'),
+        title: Text(AppStringsManager.getString(languageService.currentLanguage, 'calendar')),
         backgroundColor: const Color(0xFFF5EFE7),
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -627,7 +629,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'Noch keine Termine',
+                                AppStringsManager.getString(languageService.currentLanguage, 'no_events'),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,

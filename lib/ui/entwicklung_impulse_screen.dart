@@ -45,7 +45,11 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
   bool _isLoading = true;
   String? _error;
   bool _isPlayingAudio = false;
-  int _expandedFormat = -1; // welches Mini-Format aufgeklappt ist
+  int _expandedFormat = -1;
+
+  String _t(String key) => AppStringsManager.getString(
+      languageService.currentLanguage,
+      key); // welches Mini-Format aufgeklappt ist
 
   // Entwicklung Check-in State — managed in TAB 2 section below
 
@@ -236,7 +240,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Thema der Woche',
+                          _t('topic_of_week'),
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: Colors.white.withValues(alpha: 0.8),
                           ),
@@ -376,7 +380,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Mehr erfahren',
+                          Text(_t('learn_more'),
                               style: theme.textTheme.bodyMedium
                                   ?.copyWith(fontWeight: FontWeight.w700)),
                           Text('Die KI erklärt dir das Thema persönlich',
@@ -539,7 +543,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Zum Lesen',
+                  _t('read_content'),
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -594,7 +598,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
               child: Row(
                 children: [
                   Text(
-                    _contentExpanded ? 'Weniger zeigen' : 'Weiterlesen',
+                    _contentExpanded ? _t('show_less') : _t('read_more'),
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w700,
@@ -818,7 +822,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
               size: 18, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 10),
           Expanded(
-              child: Text('Fruehere Berichte',
+              child: Text(_t('previous_reports'),
                   style: theme.textTheme.bodySmall
                       ?.copyWith(fontWeight: FontWeight.w600))),
           Icon(Icons.chevron_right_rounded,
@@ -851,7 +855,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
               child: Row(children: [
                 const Text('\u{1F4C5}', style: TextStyle(fontSize: 20)),
                 const SizedBox(width: 10),
-                Text('Bericht-Verlauf',
+                Text(_t('report_history'),
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.w800)),
                 const Spacer(),
@@ -864,7 +868,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
           if (historyRaw.isEmpty)
             Padding(
                 padding: const EdgeInsets.all(32),
-                child: Text('Noch keine Berichte vorhanden.',
+                child: Text(_t('no_reports_yet'),
                     style: theme.textTheme.bodyMedium
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant)))
           else
@@ -904,7 +908,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                                       color: theme.colorScheme.primary
                                           .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(6)),
-                                  child: Text('Aktuell',
+                                  child: Text(_t('current'),
                                       style: TextStyle(
                                           fontSize: 9,
                                           fontWeight: FontWeight.w700,
@@ -973,19 +977,19 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                     child: FilledButton.icon(
                         onPressed: _generateAIReport,
                         icon: const Icon(Icons.auto_awesome_rounded),
-                        label: const Text('Bericht erstellen lassen'),
+                        label: Text(_t('generate_report')),
                         style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)))))),
           if (_generatingReport)
-            const Padding(
+            Padding(
                 padding: EdgeInsets.all(32),
                 child: Center(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 12),
-                  Text('Bericht wird erstellt...')
+                  Text(_t('generating_report'))
                 ]))),
           if (_aiReport != null) ...[
             const SizedBox(height: 20),
@@ -998,7 +1002,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                 child: OutlinedButton.icon(
                     onPressed: _downloadPDF,
                     icon: const Icon(Icons.download_rounded, size: 18),
-                    label: const Text('Als PDF speichern'),
+                    label: Text(_t('save_as_pdf')),
                     style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -1010,7 +1014,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                 child: TextButton.icon(
                     onPressed: _resetDev,
                     icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: const Text('Nochmal machen'))),
+                    label: Text(_t('do_again')))),
           Center(
               child: TextButton(
                   onPressed: () async {
@@ -1024,7 +1028,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                       _aiReport = null;
                     });
                   },
-                  child: const Text('Anderes Kind'))),
+                  child: Text(_t('other_child')))),
         ]));
   }
 
@@ -1050,7 +1054,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                       child:
                           Text('\u{1F9D2}', style: TextStyle(fontSize: 34)))),
               const SizedBox(height: 20),
-              Text('Ueber euer Kind',
+              Text(_t('about_your_child'),
                   style: theme.textTheme.headlineSmall
                       ?.copyWith(fontWeight: FontWeight.w800),
                   textAlign: TextAlign.center),
@@ -1122,7 +1126,7 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14))),
-                      child: const Text('Weiter'))),
+                      child: Text(_t('next')))),
             ])));
   }
 

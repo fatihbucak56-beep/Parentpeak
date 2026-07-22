@@ -18,6 +18,7 @@ import 'package:parentpeak/ui/finance_budget_screen.dart';
 import 'package:parentpeak/ui/gemeinsam_satt_screen.dart';
 import 'package:parentpeak/ui/treasure_handover_screen.dart';
 import 'package:parentpeak/ui/auth/paywall_screen.dart';
+import 'package:parentpeak/l10n/app_localizations_all.dart';
 import 'package:parentpeak/ui/widgets/home/daily_tip_card.dart';
 import 'package:parentpeak/ui/widgets/home/next_event_widget.dart';
 import 'package:parentpeak/ui/widgets/home/quick_activity_card.dart';
@@ -551,6 +552,17 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  String _getTimeGreeting(String lang) {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return AppStringsManager.getString(lang, 'greeting_morning');
+    } else if (hour < 18) {
+      return AppStringsManager.getString(lang, 'greeting_afternoon');
+    } else {
+      return AppStringsManager.getString(lang, 'greeting_evening');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -669,9 +681,11 @@ class _HomeScreenState extends State<HomeScreen>
 
     final displayName =
         AuthService.instance.currentUser?.displayName.trim() ?? '';
+    final lang = languageService.currentLanguage;
+    final greetingTime = _getTimeGreeting(lang);
     final familyGreeting = displayName.isEmpty
-        ? 'Hallo Familie 👋'
-        : 'Hallo Familie $displayName 👋';
+        ? '$greetingTime${AppStringsManager.getString(lang, 'greeting_family')} \u{1F44B}'
+        : '$greetingTime $displayName \u{1F44B}';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -770,7 +784,8 @@ class _HomeScreenState extends State<HomeScreen>
                     padding: EdgeInsets.fromLTRB(
                         horizontalPadding, 2, horizontalPadding, 10),
                     child: Text(
-                      'Alle Bereiche',
+                      AppStringsManager.getString(
+                          languageService.currentLanguage, 'all_features'),
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),

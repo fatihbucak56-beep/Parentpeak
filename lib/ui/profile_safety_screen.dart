@@ -7,6 +7,7 @@ import 'package:parentpeak/main.dart';
 import 'package:parentpeak/models/trusted_device.dart';
 import 'package:parentpeak/ui/auth/paywall_screen.dart';
 import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/l10n/app_localizations_all.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:parentpeak/widgets/ala_rengin_flag_painter.dart';
 
@@ -29,6 +30,9 @@ class ProfileSafetyScreen extends StatefulWidget {
 
 class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
   List<_ChildInfo> _children = [];
+
+  String _t(String key) =>
+      AppStringsManager.getString(languageService.currentLanguage, key);
 
   @override
   void initState() {
@@ -259,7 +263,7 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
               const SizedBox(height: 28),
 
               // ─── Kinder ────────────────────────────────────────────
-              _buildSectionHeader(theme, '\u{1F9D2}', 'Eure Kinder',
+              _buildSectionHeader(theme, '\u{1F9D2}', _t('children_title'),
                   action: GestureDetector(
                     onTap: _addChild,
                     child: Container(
@@ -423,11 +427,11 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
               ],
 
               // ─── Einstellungen ─────────────────────────────────────
-              _buildSectionHeader(theme, '\u{2699}\u{FE0F}', 'Einstellungen'),
+              _buildSectionHeader(theme, '\u{2699}\u{FE0F}', _t('settings')),
               const SizedBox(height: 10),
               _buildTile(theme,
                   icon: Icons.dark_mode_rounded,
-                  title: 'Dark Mode',
+                  title: _t('dark_mode'),
                   trailing: Switch.adaptive(
                     value: themeService.isDarkMode,
                     onChanged: (v) {
@@ -439,26 +443,26 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
                   )),
               _buildTile(theme,
                   icon: Icons.language_rounded,
-                  title: 'Sprache',
+                  title: _t('language'),
                   value: _getLanguageLabel(languageService.currentLanguage),
                   onTap: _showLanguagePicker),
               _buildTile(theme,
                   icon: Icons.notifications_rounded,
-                  title: 'Benachrichtigungen',
+                  title: _t('notifications'),
                   value: 'Aktiv',
                   onTap: () {}),
               const SizedBox(height: 28),
 
               // ─── Rechtliches ───────────────────────────────────────
-              _buildSectionHeader(theme, '\u{1F4C4}', 'Rechtliches'),
+              _buildSectionHeader(theme, '\u{1F4C4}', _t('legal')),
               const SizedBox(height: 10),
               _buildTile(theme,
                   icon: Icons.shield_rounded,
-                  title: 'Datenschutz',
+                  title: _t('privacy'),
                   onTap: () => _openUrl(APIConfig.getPrivacyPolicyUrl())),
               _buildTile(theme,
                   icon: Icons.gavel_rounded,
-                  title: 'Nutzungsbedingungen',
+                  title: _t('terms'),
                   onTap: () => _openUrl(APIConfig.getTermsOfServiceUrl())),
               _buildTile(theme,
                   icon: Icons.mail_rounded,
@@ -472,7 +476,7 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _logout,
                   icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text('Abmelden'),
+                  label: Text(_t('logout')),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -484,7 +488,7 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
               Center(
                 child: TextButton(
                   onPressed: _showDeleteDialog,
-                  child: Text('Account löschen',
+                  child: Text(_t('delete_account'),
                       style: TextStyle(
                           color: theme.colorScheme.error, fontSize: 13)),
                 ),

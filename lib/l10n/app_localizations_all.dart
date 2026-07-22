@@ -80,6 +80,9 @@ class AppStringsManager {
       'to_do': 'Zu erledigen',
       'completed': 'Erledigt',
       'edit': 'Bearbeiten',
+      'children_title': 'Eure Kinder',
+      'upgrade': 'Upgrade',
+      'add': 'Hinzufügen',
     },
     // English
     'en': {
@@ -156,6 +159,9 @@ class AppStringsManager {
       'to_do': 'To Do',
       'completed': 'Completed',
       'edit': 'Edit',
+      'children_title': 'Your Children',
+      'upgrade': 'Upgrade',
+      'add': 'Add',
     },
     // Français
     'fr': {

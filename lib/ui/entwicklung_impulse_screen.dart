@@ -284,6 +284,17 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  Text(
+                    impulse.heroDescription ??
+                        impulse.contentBody.split('\n').first,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      height: 1.4,
+                    ),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),

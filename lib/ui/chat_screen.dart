@@ -7,7 +7,9 @@ import 'package:parentpeak/logic/gemini_ai_service.dart';
 import 'package:parentpeak/logic/pedagogical_chat_backend.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? initialMessage;
+
+  const ChatScreen({super.key, this.initialMessage});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -98,6 +100,15 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadTopicInsights();
     _checkTermsAcceptance();
     _initializeGemini();
+    // Wenn mit initialMessage geöffnet, automatisch senden
+    if (widget.initialMessage != null &&
+        widget.initialMessage!.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_termsAccepted && _chatBackend != null) {
+          _sendMessage(widget.initialMessage!);
+        }
+      });
+    }
   }
 
   Future<void> _checkTermsAcceptance() async {

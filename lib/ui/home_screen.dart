@@ -713,11 +713,16 @@ class _HomeScreenState extends State<HomeScreen>
                     padding: EdgeInsets.fromLTRB(
                         horizontalPadding, 4, horizontalPadding, 8),
                     child: DailyTipCard(
-                      onAskAI: () {
-                        final chatAction = visibleGridActions
-                            .where((a) => a.featureId == 'ki_elternberatung')
-                            .firstOrNull;
-                        if (chatAction != null) _openFeature(chatAction);
+                      onExpandTip: (tipText) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              initialMessage:
+                                  'Erkläre mir diesen Eltern-Tipp genauer und gib mir konkrete Beispiele wie ich das heute umsetzen kann: "$tipText"',
+                            ),
+                          ),
+                        );
                       },
                     ),
                   ),

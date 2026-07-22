@@ -6,9 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Wechselt täglich, passend zur Altersphase aus dem Onboarding.
 /// Tap öffnet optional den KI-Chat für mehr Details.
 class DailyTipCard extends StatefulWidget {
-  final VoidCallback? onAskAI;
+  final void Function(String tipText)? onExpandTip;
 
-  const DailyTipCard({super.key, this.onAskAI});
+  const DailyTipCard({super.key, this.onExpandTip});
 
   @override
   State<DailyTipCard> createState() => _DailyTipCardState();
@@ -313,24 +313,35 @@ class _DailyTipCardState extends State<DailyTipCard> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          if (widget.onAskAI != null) ...[
+          if (widget.onExpandTip != null) ...[
             const SizedBox(height: 12),
             GestureDetector(
-              onTap: widget.onAskAI,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.chat_bubble_outline_rounded,
-                      size: 14, color: theme.colorScheme.primary),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Mehr dazu fragen',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
+              onTap: () => widget.onExpandTip?.call(_tip),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome_rounded,
+                        size: 15, color: theme.colorScheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Erkläre mir das genauer',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_rounded,
+                        size: 14, color: theme.colorScheme.primary),
+                  ],
+                ),
               ),
             ),
           ],

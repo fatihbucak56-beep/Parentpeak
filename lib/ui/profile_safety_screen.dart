@@ -668,6 +668,17 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
     _LanguageOption('zh', '\u{4E2D}\u{6587}', '\u{1F1E8}\u{1F1F3}'),
     _LanguageOption('hi', '\u{0939}\u{093F}\u{0928}\u{094D}\u{0926}\u{0940}',
         '\u{1F1EE}\u{1F1F3}'),
+    _LanguageOption(
+        'el',
+        '\u{0395}\u{03BB}\u{03BB}\u{03B7}\u{03BD}\u{03B9}\u{03BA}\u{03AC}',
+        '\u{1F1EC}\u{1F1F7}'),
+    _LanguageOption('sw', 'Kiswahili', '\u{1F1F0}\u{1F1EA}'),
+    _LanguageOption(
+        'am', '\u{12A0}\u{121B}\u{122D}\u{129B}', '\u{1F1EA}\u{1F1F9}'),
+    _LanguageOption('ha', 'Hausa', '\u{1F1F3}\u{1F1EC}'),
+    _LanguageOption('so', 'Soomaali', '\u{1F1F8}\u{1F1F4}'),
+    _LanguageOption(
+        'ti', '\u{1275}\u{130D}\u{122D}\u{129B}', '\u{1F1EA}\u{1F1F7}'),
   ];
 
   String _getLanguageLabel(String code) {

@@ -439,14 +439,8 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
               _buildTile(theme,
                   icon: Icons.language_rounded,
                   title: 'Sprache',
-                  value: languageService.currentLanguage == 'de'
-                      ? 'Deutsch'
-                      : 'English', onTap: () async {
-                final lang =
-                    languageService.currentLanguage == 'de' ? 'en' : 'de';
-                await languageService.setLanguage(lang);
-                if (mounted) setState(() {});
-              }),
+                  value: _getLanguageLabel(languageService.currentLanguage),
+                  onTap: _showLanguagePicker),
               _buildTile(theme,
                   icon: Icons.notifications_rounded,
                   title: 'Benachrichtigungen',
@@ -460,15 +454,15 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
               _buildTile(theme,
                   icon: Icons.shield_rounded,
                   title: 'Datenschutz',
-                  onTap: () {}),
+                  onTap: () => _openUrl(APIConfig.getPrivacyPolicyUrl())),
               _buildTile(theme,
                   icon: Icons.gavel_rounded,
                   title: 'Nutzungsbedingungen',
-                  onTap: () {}),
+                  onTap: () => _openUrl(APIConfig.getTermsOfServiceUrl())),
               _buildTile(theme,
                   icon: Icons.mail_rounded,
                   title: 'Kontakt & Support',
-                  onTap: () {}),
+                  onTap: () => _openUrl(APIConfig.getContactSupportUrl())),
               const SizedBox(height: 20),
 
               // ─── Logout & Delete ───────────────────────────────────
@@ -636,6 +630,129 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
       ),
     );
   }
+
+  // ─── Sprach-Auswahl ─────────────────────────────────────────────────────────
+
+  static const List<_LanguageOption> _allLanguages = [
+    _LanguageOption('de', 'Deutsch', '\u{1F1E9}\u{1F1EA}'),
+    _LanguageOption('en', 'English', '\u{1F1EC}\u{1F1E7}'),
+    _LanguageOption('tr', 'Türkçe', '\u{1F1F9}\u{1F1F7}'),
+    _LanguageOption(
+        'ar',
+        '\u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064A}\u{0629}',
+        '\u{1F1F8}\u{1F1E6}'),
+    _LanguageOption('fr', 'Français', '\u{1F1EB}\u{1F1F7}'),
+    _LanguageOption('es', 'Español', '\u{1F1EA}\u{1F1F8}'),
+    _LanguageOption('it', 'Italiano', '\u{1F1EE}\u{1F1F9}'),
+    _LanguageOption('pt', 'Português', '\u{1F1F5}\u{1F1F9}'),
+    _LanguageOption('nl', 'Nederlands', '\u{1F1F3}\u{1F1F1}'),
+    _LanguageOption('pl', 'Polski', '\u{1F1F5}\u{1F1F1}'),
+    _LanguageOption(
+        'fa', '\u{0641}\u{0627}\u{0631}\u{0633}\u{06CC}', '\u{1F1EE}\u{1F1F7}'),
+    _LanguageOption('ku', 'Kurdî', '\u{1F3F3}\u{FE0F}'),
+    _LanguageOption('ja', '\u{65E5}\u{672C}\u{8A9E}', '\u{1F1EF}\u{1F1F5}'),
+    _LanguageOption('zh', '\u{4E2D}\u{6587}', '\u{1F1E8}\u{1F1F3}'),
+    _LanguageOption('hi', '\u{0939}\u{093F}\u{0928}\u{094D}\u{0926}\u{0940}',
+        '\u{1F1EE}\u{1F1F3}'),
+  ];
+
+  String _getLanguageLabel(String code) {
+    final match = _allLanguages.where((l) => l.code == code).firstOrNull;
+    return match?.label ?? code;
+  }
+
+  void _showLanguagePicker() {
+    final theme = Theme.of(context);
+    final current = languageService.currentLanguage;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+              child: Row(
+                children: [
+                  const Text('\u{1F310}', style: TextStyle(fontSize: 22)),
+                  const SizedBox(width: 10),
+                  Text('Sprache wählen',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Icon(Icons.close_rounded,
+                        color: theme.colorScheme.outline),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _allLanguages.length,
+                itemBuilder: (_, i) {
+                  final lang = _allLanguages[i];
+                  final isActive = lang.code == current;
+                  return ListTile(
+                    leading:
+                        Text(lang.flag, style: const TextStyle(fontSize: 22)),
+                    title: Text(
+                      lang.label,
+                      style: TextStyle(
+                        fontWeight:
+                            isActive ? FontWeight.w800 : FontWeight.w500,
+                        color: isActive ? theme.colorScheme.primary : null,
+                      ),
+                    ),
+                    trailing: isActive
+                        ? Icon(Icons.check_circle_rounded,
+                            color: theme.colorScheme.primary, size: 22)
+                        : null,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    onTap: () async {
+                      await languageService.setLanguage(lang.code);
+                      if (mounted) setState(() {});
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openUrl(String? url) {
+    if (url == null || url.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(url),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+}
+
+class _LanguageOption {
+  final String code;
+  final String label;
+  final String flag;
+  const _LanguageOption(this.code, this.label, this.flag);
 }
 
 class _ChildInfo {

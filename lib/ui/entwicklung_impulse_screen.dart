@@ -715,6 +715,12 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
       final text = response.text ?? 'Bericht konnte nicht erstellt werden.';
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('dev.ai_report.v3', text);
+      // Bericht-Historie speichern
+      final historyRaw = prefs.getStringList('dev.report_history') ?? [];
+      final entry = '${DateTime.now().toIso8601String()}|||$text';
+      historyRaw.insert(0, entry);
+      if (historyRaw.length > 12) historyRaw.removeRange(12, historyRaw.length);
+      await prefs.setStringList('dev.report_history', historyRaw);
       if (mounted)
         setState(() {
           _aiReport = text;
@@ -789,6 +795,131 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
     await Printing.layoutPdf(onLayout: (f) => doc.save());
   }
 
+  Widget _buildHistoryButton(ThemeData theme) {
+    return GestureDetector(
+      onTap: _showReportHistory,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        child: Row(children: [
+          Icon(Icons.history_rounded,
+              size: 18, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text('Fruehere Berichte',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(fontWeight: FontWeight.w600))),
+          Icon(Icons.chevron_right_rounded,
+              size: 18, color: theme.colorScheme.outline),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _showReportHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyRaw = prefs.getStringList('dev.report_history') ?? [];
+    if (!mounted) return;
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+        decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              child: Row(children: [
+                const Text('\u{1F4C5}', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
+                Text('Bericht-Verlauf',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                const Spacer(),
+                GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Icon(Icons.close_rounded,
+                        color: theme.colorScheme.outline)),
+              ])),
+          const Divider(height: 1),
+          if (historyRaw.isEmpty)
+            Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text('Noch keine Berichte vorhanden.',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)))
+          else
+            Flexible(
+                child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: historyRaw.length,
+              itemBuilder: (_, i) {
+                final parts = historyRaw[i].split('|||');
+                final date = DateTime.tryParse(parts[0]) ?? DateTime.now();
+                final text = parts.length > 1 ? parts[1] : '';
+                final dateLabel = '${date.day}.${date.month}.${date.year}';
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(14)),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Icon(Icons.description_rounded,
+                                size: 16, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text(dateLabel,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.colorScheme.primary)),
+                            if (i == 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6)),
+                                  child: Text('Aktuell',
+                                      style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: theme.colorScheme.primary)))
+                            ],
+                          ]),
+                          const SizedBox(height: 8),
+                          Text(text,
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(height: 1.4),
+                              maxLines: 6,
+                              overflow: TextOverflow.ellipsis),
+                        ]),
+                  ),
+                );
+              },
+            )),
+        ]),
+      ),
+    );
+  }
+
   void _resetDev() {
     HapticFeedback.mediumImpact();
     setState(() {
@@ -852,6 +983,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
           if (_aiReport != null) ...[
             const SizedBox(height: 20),
             _buildReportCard(theme),
+            const SizedBox(height: 10),
+            _buildHistoryButton(theme),
             const SizedBox(height: 14),
             SizedBox(
                 width: double.infinity,

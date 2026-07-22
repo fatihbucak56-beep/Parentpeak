@@ -833,16 +833,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ],
               ),
-              child: Text(
-                message['content'] as String,
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.45,
-                  letterSpacing: 0.15,
-                  color: isUser ? Colors.white : const Color(0xFF1A2A3A),
-                  fontWeight: isUser ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
+              child: isUser
+                  ? Text(
+                      message['content'] as String,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.45,
+                        letterSpacing: 0.15,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  : _buildFormattedText(message['content'] as String),
             ),
           ),
           if (isUser) ...[
@@ -859,6 +861,44 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildFormattedText(String text) {
+    // Konvertiert **bold** zu echtem Bold-Text und rendert sauber
+    final spans = <InlineSpan>[];
+    final parts = text.split('**');
+
+    for (int i = 0; i < parts.length; i++) {
+      final part = parts[i];
+      if (part.isEmpty) continue;
+
+      if (i % 2 == 1) {
+        // Bold-Teil (zwischen **)
+        spans.add(TextSpan(
+          text: part,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            height: 1.5,
+            color: Color(0xFF0F172A),
+          ),
+        ));
+      } else {
+        spans.add(TextSpan(
+          text: part,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            height: 1.5,
+            color: Color(0xFF1A2A3A),
+          ),
+        ));
+      }
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
     );
   }
 

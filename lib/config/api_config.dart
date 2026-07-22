@@ -27,8 +27,8 @@ class APIConfig {
   static const String _contactSupportUrlDefine =
       String.fromEnvironment('CONTACT_SUPPORT_URL', defaultValue: '');
 
-  // Gemini API Configuration - Gemini 2.5 Flash for best balance of quality + speed.
-  static const String geminiModelName = 'gemini-2.5-flash-preview-05-20';
+  // Gemini API Configuration - Gemini 3.1 Pro for highest quality conversations.
+  static const String geminiModelName = 'gemini-3.1-pro-preview';
 
   static String getGeminiModelName() {
     final modelName = _readEnvOrDefine('GEMINI_MODEL_NAME');

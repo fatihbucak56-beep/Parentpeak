@@ -1707,7 +1707,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
     return Stack(
       children: [
         Container(
-          height: 252,
+          constraints: const BoxConstraints(minHeight: 252),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -1722,42 +1722,46 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
               bottomRight: Radius.circular(25),
             ),
           ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.family_restroom,
-                    size: 64, color: Colors.white),
-                const SizedBox(height: 12),
-                Text(
-                  _t('family_profile_title'),
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 10),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 28),
-                  child: Text(
-                    'Euer geschuetzter Raum fuer Rollen, Familienprofile, Datenschutz und vertrauensvolle Organisation.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, height: 1.35),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.family_restroom,
+                      size: 64, color: Colors.white),
+                  const SizedBox(height: 12),
+                  Text(
+                    _t('family_profile_title'),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _buildHeaderStat(
-                        'Mitglieder', _familyMembers.length.toString()),
-                    _buildHeaderStat('Kinder', childrenCount.toString()),
-                    _buildHeaderStat('Erwachsene', adultCount.toString()),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 28),
+                    child: Text(
+                      'Euer geschuetzter Raum fuer Rollen, Familienprofile, Datenschutz und vertrauensvolle Organisation.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, height: 1.35),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _buildHeaderStat(
+                          'Mitglieder', _familyMembers.length.toString()),
+                      _buildHeaderStat('Kinder', childrenCount.toString()),
+                      _buildHeaderStat('Erwachsene', adultCount.toString()),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2255,21 +2259,25 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen> {
                               ),
                             ),
                             const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _memberStatusColor(member),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                _memberStatusLabel(member),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: _memberStatusTextColor(member),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _memberStatusColor(member),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  _memberStatusLabel(member),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: _memberStatusTextColor(member),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
                             ),

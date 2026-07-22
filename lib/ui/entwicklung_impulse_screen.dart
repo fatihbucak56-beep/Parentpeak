@@ -298,6 +298,10 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                 ],
               ),
             ),
+            const SizedBox(height: 14),
+
+            // Schriftlicher Inhalt — aufklappbar
+            _buildContentSection(theme, impulse),
             const SizedBox(height: 20),
 
             // 3 Mini-Formate
@@ -513,6 +517,114 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  // ─── Schriftlicher Inhalt des Wochenimpulses ─────────────────────────────────
+
+  bool _contentExpanded = false;
+
+  Widget _buildContentSection(ThemeData theme, WeeklyImpulse impulse) {
+    final content = impulse.contentBody;
+    final lines =
+        content.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    final preview = lines.take(3).join('\n');
+    final hasMore = lines.length > 3;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('\u{1F4DD}', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Zum Lesen',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (impulse.audioScript != null)
+                GestureDetector(
+                  onTap: () => _playAudio(impulse.audioScript ?? content),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isPlayingAudio
+                              ? Icons.stop_rounded
+                              : Icons.volume_up_rounded,
+                          size: 14,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _isPlayingAudio ? 'Stop' : 'Vorlesen',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _contentExpanded ? content : preview,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              height: 1.6,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          if (hasMore) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () => setState(() => _contentExpanded = !_contentExpanded),
+              child: Row(
+                children: [
+                  Text(
+                    _contentExpanded ? 'Weniger zeigen' : 'Weiterlesen',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _contentExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -695,7 +695,16 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
       sb.writeln('');
     }
     final prompt =
-        'Du bist ein erfahrener Kinderpaedagoge. Schreibe einen kurzen, warmherzigen Entwicklungsbericht fuer die Eltern basierend auf den folgenden Antworten. Struktur: 1) Staerken (was das Kind schon gut kann), 2) In Entwicklung (woran es gerade waechst), 3) Foerderempfehlungen (2-3 konkrete Alltags-Tipps). Sei ermutigend, nicht wertend. Maximal 200 Woerter.\n\n$sb';
+        'Du schreibst eine paedagogische Entwicklungseinschaetzung fuer Eltern. '
+        'WICHTIGE REGELN:\n'
+        '- Schreibe AUS DER PERSPEKTIVE DER APP (nicht Kita, nicht Erzieher).\n'
+        '- Erster Satz: "Basierend auf euren Angaben zeigt [Name] folgendes Entwicklungsprofil:"\n'
+        '- KEINE Bewertungswoerter wie "toll", "super", "gut", "wunderbar", "schlecht", "sehr gut".\n'
+        '- Stattdessen: fachlich, objektiv, wertschaetzend. Beschreibe WAS das Kind zeigt, nicht WIE GUT.\n'
+        '- Benutze Formulierungen wie: "zeigt sich sicher in...", "befindet sich im typischen Entwicklungsfenster fuer...", "beginnt zunehmend...", "uebt aktuell..."\n'
+        '- Struktur: 1) Sichtbare Kompetenzen (was das Kind bereits zeigt), 2) Aktuelle Entwicklungsfelder (woran es gerade waechst), 3) Impulse fuer den Alltag (2-3 konkrete Ideen)\n'
+        '- Maximal 180 Woerter. Keine Emojis. Keine Sterne-Formatierung.\n'
+        '- Kein "Liebe Eltern" am Anfang.\n\n$sb';
 
     try {
       final apiKey = APIConfig.getGeminiApiKey();

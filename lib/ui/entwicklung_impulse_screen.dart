@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
 import 'package:parentpeak/logic/weekly_impulse_service.dart';
@@ -630,381 +632,492 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // TAB 2: ENTWICKLUNGS-CHECK-IN — Simple 5-Domain Fragen
+  // TAB 2: ENTWICKLUNGS-CHECK-IN — 15 Fragen + Bericht + PDF
   // ═══════════════════════════════════════════════════════════════════════════
 
   static const List<_DevDomain> _domains = [
     _DevDomain(
-      id: 'motorik',
-      title: 'Bewegung & Motorik',
-      emoji: '\u{1F3C3}',
-      question: 'Bewegt sich dein Kind sicher und probiert Neues aus?',
-      tipWhenLow: 'Wie fördere ich die Motorik meines Kindes spielerisch?',
-      color: Color(0xFF0EA5E9),
-    ),
+        id: 'motorik',
+        title: 'Bewegung & Motorik',
+        emoji: '\u{1F3C3}',
+        color: Color(0xFF0EA5E9),
+        tipWhenLow: 'Wie foerdere ich die Motorik meines Kindes spielerisch?',
+        questions: [
+          'Bewegt sich dein Kind sicher (laufen, klettern, balancieren)?',
+          'Probiert dein Kind neue Bewegungen mutig aus?',
+          'Gelingen feinmotorische Aufgaben (malen, schneiden, greifen)?'
+        ]),
     _DevDomain(
-      id: 'sprache',
-      title: 'Sprache & Ausdruck',
-      emoji: '\u{1F4AC}',
-      question: 'Kann dein Kind sich gut ausdrücken und versteht dich?',
-      tipWhenLow: 'Wie kann ich die Sprache meines Kindes im Alltag fördern?',
-      color: Color(0xFF16A34A),
-    ),
+        id: 'sprache',
+        title: 'Sprache & Ausdruck',
+        emoji: '\u{1F4AC}',
+        color: Color(0xFF16A34A),
+        tipWhenLow:
+            'Wie kann ich die Sprache meines Kindes im Alltag foerdern?',
+        questions: [
+          'Kann dein Kind Beduerfnisse klar ausdruecken?',
+          'Versteht dein Kind alltaegliche Anweisungen gut?',
+          'Erzaehlt dein Kind von Erlebnissen in eigenen Worten?'
+        ]),
     _DevDomain(
-      id: 'denken',
-      title: 'Denken & Neugier',
-      emoji: '\u{1F4A1}',
-      question: 'Stellt dein Kind Fragen und bleibt bei Aufgaben dran?',
-      tipWhenLow: 'Wie fördere ich die Neugier und das Denken meines Kindes?',
-      color: Color(0xFFF59E0B),
-    ),
+        id: 'denken',
+        title: 'Denken & Neugier',
+        emoji: '\u{1F4A1}',
+        color: Color(0xFFF59E0B),
+        tipWhenLow:
+            'Wie foerdere ich die Neugier und das Denken meines Kindes?',
+        questions: [
+          'Stellt dein Kind Fragen und will Dinge verstehen?',
+          'Bleibt dein Kind bei interessanten Aufgaben dran?',
+          'Probiert dein Kind verschiedene Loesungswege aus?'
+        ]),
     _DevDomain(
-      id: 'sozial',
-      title: 'Gefühle & Soziales',
-      emoji: '\u{1F49C}',
-      question: 'Kann dein Kind Gefühle zeigen und mit anderen umgehen?',
-      tipWhenLow:
-          'Wie unterstütze ich die emotionale Entwicklung meines Kindes?',
-      color: Color(0xFFEC4899),
-    ),
+        id: 'sozial',
+        title: 'Gefuehle & Soziales',
+        emoji: '\u{1F49C}',
+        color: Color(0xFFEC4899),
+        tipWhenLow:
+            'Wie unterstuetze ich die emotionale Entwicklung meines Kindes?',
+        questions: [
+          'Kann dein Kind Gefuehle benennen oder zeigen?',
+          'Findet dein Kind nach Frust wieder zur Ruhe?',
+          'Sucht dein Kind Kontakt zu anderen Kindern?'
+        ]),
     _DevDomain(
-      id: 'selbst',
-      title: 'Selbstständigkeit',
-      emoji: '\u{1F31F}',
-      question: 'Macht dein Kind Dinge zunehmend alleine?',
-      tipWhenLow:
-          'Wie fördere ich die Selbstständigkeit meines Kindes altersgerecht?',
-      color: Color(0xFF8B5CF6),
-    ),
+        id: 'selbst',
+        title: 'Selbststaendigkeit',
+        emoji: '\u{1F31F}',
+        color: Color(0xFF8B5CF6),
+        tipWhenLow:
+            'Wie foerdere ich die Selbststaendigkeit meines Kindes altersgerecht?',
+        questions: [
+          'Uebernimmt dein Kind kleine Alltagsaufgaben?',
+          'Versucht dein Kind Probleme erst selbst zu loesen?',
+          'Kann dein Kind einfache Ablaeufe alleine umsetzen?'
+        ]),
   ];
 
   Widget _buildDevelopmentTab(ThemeData theme) {
+    final totalQ = _domains.fold(0, (int s, d) => s + d.questions.length);
+    final answered = _checkInAnswers.length;
+    final allDone = answered >= totalQ;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Text(
-            'Wie geht\u{0027}s deinem Kind?',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Ein kurzer Check-in — kein Test, kein Urteil. Nur ein Blick auf 5 Bereiche.',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Entwicklungs-Check-in',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(
+            '15 kurze Fragen zu 5 Bereichen. Kein Test — ein liebevoller Blick auf dein Kind.',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              height: 1.4,
-            ),
-          ),
+                color: theme.colorScheme.onSurfaceVariant, height: 1.4)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+              child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                      value: totalQ > 0 ? answered / totalQ : 0,
+                      minHeight: 5,
+                      backgroundColor: theme.colorScheme.outlineVariant
+                          .withValues(alpha: 0.3),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          theme.colorScheme.primary)))),
+          const SizedBox(width: 10),
+          Text('$answered/$totalQ',
+              style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.primary)),
+        ]),
+        const SizedBox(height: 20),
+        ..._domains.map((d) => _buildDomainSection(theme, d)),
+        if (allDone) ...[
+          const SizedBox(height: 24),
+          _buildRadarChart(theme),
+          const SizedBox(height: 16),
+          _buildReport(theme),
+          const SizedBox(height: 16),
+          _buildDownloadButton(theme),
+          const SizedBox(height: 16),
+          _buildFocusTip(theme),
           const SizedBox(height: 20),
-
-          // 5 Domain-Fragen
-          ..._domains.map((domain) => _buildDomainQuestion(theme, domain)),
-
-          // Radar Chart (wenn Check-in fertig)
-          if (_checkInDone) ...[
-            const SizedBox(height: 24),
-            _buildRadarChart(theme),
-            const SizedBox(height: 16),
-            _buildFocusTip(theme),
-          ],
-
-          // Reset Button
-          if (_checkInDone) ...[
-            const SizedBox(height: 20),
-            Center(
+          Center(
               child: TextButton.icon(
-                onPressed: _resetCheckIn,
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Nochmal machen'),
-              ),
-            ),
-          ],
+                  onPressed: _resetCheckIn,
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Nochmal machen')))
         ],
-      ),
+      ]),
     );
   }
 
-  Widget _buildDomainQuestion(ThemeData theme, _DevDomain domain) {
-    final answer = _checkInAnswers[domain.id]; // null, 0, 1, 2
-
+  Widget _buildDomainSection(ThemeData theme, _DevDomain domain) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: answer != null
-              ? domain.color.withValues(alpha: 0.04)
-              : theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: answer != null
-                ? domain.color.withValues(alpha: 0.15)
-                : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(domain.emoji, style: const TextStyle(fontSize: 20)),
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(18),
+                border:
+                    Border.all(color: domain.color.withValues(alpha: 0.12))),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(domain.emoji, style: const TextStyle(fontSize: 22)),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    domain.title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              domain.question,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                height: 1.3,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // 3 Antwort-Buttons: Ja / Manchmal / Noch nicht
-            Row(
-              children: [
-                _buildAnswerChip(
-                    theme, domain, 2, 'Ja', const Color(0xFF16A34A)),
-                const SizedBox(width: 8),
-                _buildAnswerChip(
-                    theme, domain, 1, 'Manchmal', const Color(0xFFF59E0B)),
-                const SizedBox(width: 8),
-                _buildAnswerChip(
-                    theme, domain, 0, 'Noch nicht', const Color(0xFFEF4444)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+                Text(domain.title,
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w800))
+              ]),
+              const SizedBox(height: 14),
+              ...domain.questions.asMap().entries.map((e) {
+                final key = '${domain.id}_${e.key}';
+                return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(e.value,
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(height: 1.3)),
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            _buildChip(
+                                theme, key, 2, 'Ja', const Color(0xFF16A34A)),
+                            const SizedBox(width: 6),
+                            _buildChip(theme, key, 1, 'Manchmal',
+                                const Color(0xFFF59E0B)),
+                            const SizedBox(width: 6),
+                            _buildChip(theme, key, 0, 'Noch nicht',
+                                const Color(0xFFEF4444))
+                          ]),
+                        ]));
+              }),
+            ])));
   }
 
-  Widget _buildAnswerChip(ThemeData theme, _DevDomain domain, int value,
-      String label, Color color) {
-    final isSelected = _checkInAnswers[domain.id] == value;
-
+  Widget _buildChip(
+      ThemeData theme, String key, int val, String label, Color color) {
+    final sel = _checkInAnswers[key] == val;
     return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          setState(() {
-            _checkInAnswers[domain.id] = value;
-            _checkInDone = _checkInAnswers.length >= 5;
-          });
-          _saveCheckIn();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color:
-                isSelected ? color.withValues(alpha: 0.12) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? color : theme.colorScheme.outlineVariant,
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+        child: GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _checkInAnswers[key] = val;
+                _checkInDone = _checkInAnswers.length >= 15;
+              });
+              _saveCheckIn();
+            },
+            child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                    color: sel
+                        ? color.withValues(alpha: 0.12)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: sel ? color : theme.colorScheme.outlineVariant,
+                        width: sel ? 2 : 1)),
+                child: Center(
+                    child: Text(label,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                            color: sel
+                                ? color
+                                : theme.colorScheme.onSurfaceVariant))))));
   }
 
-  // ─── Radar Chart ────────────────────────────────────────────────────────────
+  Widget _buildReport(ThemeData theme) {
+    return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color:
+                    theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Text('\u{1F4CB}', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 10),
+            Text('Entwicklungsbericht',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w800))
+          ]),
+          const SizedBox(height: 14),
+          ..._domains.map((d) {
+            final scores = d.questions
+                .asMap()
+                .entries
+                .map((e) => _checkInAnswers['${d.id}_${e.key}'] ?? 0)
+                .toList();
+            final avg = scores.fold(0, (int a, b) => a + b) / scores.length;
+            final level = avg >= 1.7
+                ? 'Stark'
+                : avg >= 0.8
+                    ? 'In Entwicklung'
+                    : 'Foerderbedarf';
+            final lc = avg >= 1.7
+                ? const Color(0xFF16A34A)
+                : avg >= 0.8
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFFEF4444);
+            return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(children: [
+                  Text(d.emoji, style: const TextStyle(fontSize: 16)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text(d.title,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600))),
+                  Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: lc.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text(level,
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: lc)))
+                ]));
+          }),
+          const SizedBox(height: 12),
+          Text(_reportText(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                  height: 1.5, color: theme.colorScheme.onSurfaceVariant)),
+        ]));
+  }
+
+  String _reportText() {
+    final strong = <String>[];
+    final dev = <String>[];
+    final need = <String>[];
+    for (final d in _domains) {
+      final scores = d.questions
+          .asMap()
+          .entries
+          .map((e) => _checkInAnswers['${d.id}_${e.key}'] ?? 0)
+          .toList();
+      final avg = scores.fold(0, (int a, b) => a + b) / scores.length;
+      if (avg >= 1.7)
+        strong.add(d.title);
+      else if (avg >= 0.8)
+        dev.add(d.title);
+      else
+        need.add(d.title);
+    }
+    final p = <String>[];
+    if (strong.isNotEmpty)
+      p.add(
+          'Stark: ${strong.join(", ")}. Hier zeigt euer Kind sichere Kompetenz.');
+    if (dev.isNotEmpty)
+      p.add(
+          'In Entwicklung: ${dev.join(", ")}. Mit eurer Begleitung waechst das gut.');
+    if (need.isNotEmpty)
+      p.add(
+          'Foerderbedarf: ${need.join(", ")}. Kleine spielerische Impulse koennen viel bewirken.');
+    return p.isEmpty ? '' : p.join('\n\n');
+  }
+
+  Widget _buildDownloadButton(ThemeData theme) {
+    return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+            onPressed: _downloadReport,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('Bericht als PDF speichern'),
+            style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)))));
+  }
+
+  Future<void> _downloadReport() async {
+    HapticFeedback.mediumImpact();
+    final date = DateTime.now();
+    final dateStr = '${date.day}.${date.month}.${date.year}';
+    final doc = pw.Document();
+    doc.addPage(pw.Page(
+        build: (ctx) => pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('ParentPeak Entwicklungsbericht',
+                      style: pw.TextStyle(
+                          fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Erstellt am $dateStr',
+                      style: const pw.TextStyle(fontSize: 12)),
+                  pw.SizedBox(height: 20),
+                  ..._domains.map((d) {
+                    final scores = d.questions
+                        .asMap()
+                        .entries
+                        .map((e) => _checkInAnswers['${d.id}_${e.key}'] ?? 0)
+                        .toList();
+                    final avg =
+                        scores.fold(0, (int a, b) => a + b) / scores.length;
+                    final level = avg >= 1.7
+                        ? 'Stark'
+                        : avg >= 0.8
+                            ? 'In Entwicklung'
+                            : 'Foerderbedarf';
+                    return pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('${d.title}: $level',
+                              style: pw.TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: pw.FontWeight.bold)),
+                          ...d.questions.asMap().entries.map((e) {
+                            final a = _checkInAnswers['${d.id}_${e.key}'] ?? 0;
+                            return pw.Text(
+                                '  ${e.value} - ${a == 2 ? "Ja" : a == 1 ? "Manchmal" : "Noch nicht"}',
+                                style: const pw.TextStyle(fontSize: 11));
+                          }),
+                          pw.SizedBox(height: 10)
+                        ]);
+                  }),
+                  pw.SizedBox(height: 16),
+                  pw.Text('Zusammenfassung:',
+                      style: pw.TextStyle(
+                          fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 6),
+                  pw.Text(_reportText(),
+                      style: const pw.TextStyle(fontSize: 11)),
+                  pw.SizedBox(height: 20),
+                  pw.Text(
+                      'Hinweis: Dieser Bericht ist eine Orientierung, keine professionelle Diagnostik.',
+                      style: const pw.TextStyle(fontSize: 9)),
+                ])));
+    await Printing.layoutPdf(onLayout: (format) => doc.save());
+  }
 
   Widget _buildRadarChart(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Euer Überblick',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color:
+                    theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+        child: Column(children: [
+          Text('Euer Ueberblick',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
           SizedBox(
-            width: 200,
-            height: 200,
-            child: CustomPaint(
-              painter: _SimpleRadarPainter(
-                values: _domains.map((d) {
-                  final answer = _checkInAnswers[d.id] ?? 0;
-                  return answer / 2.0; // 0.0 - 1.0
-                }).toList(),
-                colors: _domains.map((d) => d.color).toList(),
-              ),
-            ),
-          ),
+              width: 200,
+              height: 200,
+              child: CustomPaint(
+                  painter: _SimpleRadarPainter(
+                      values: _domains.map((d) {
+                        final s = d.questions
+                            .asMap()
+                            .entries
+                            .map(
+                                (e) => _checkInAnswers['${d.id}_${e.key}'] ?? 0)
+                            .toList();
+                        return s.fold(0, (int a, b) => a + b) / (s.length * 2);
+                      }).toList(),
+                      colors: _domains.map((d) => d.color).toList()))),
           const SizedBox(height: 16),
-          // Legende
           Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: _domains.map((d) {
-              final answer = _checkInAnswers[d.id] ?? 0;
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: d.color,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    d.title.split(' ').first,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: _domains
+                  .map((d) => Row(mainAxisSize: MainAxisSize.min, children: [
+                        Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                                color: d.color,
+                                borderRadius: BorderRadius.circular(3))),
+                        const SizedBox(width: 4),
+                        Text(d.title.split(' ').first,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 10))
+                      ]))
+                  .toList()),
+        ]));
   }
 
-  // ─── Focus-Tipp (KI-Link für schwächsten Bereich) ──────────────────────────
-
   Widget _buildFocusTip(ThemeData theme) {
-    // Finde den Bereich mit niedrigster Bewertung
-    _DevDomain? weakest;
-    int lowestScore = 3;
-    for (final domain in _domains) {
-      final score = _checkInAnswers[domain.id] ?? 2;
-      if (score < lowestScore) {
-        lowestScore = score;
-        weakest = domain;
+    _DevDomain? w;
+    double low = 3;
+    for (final d in _domains) {
+      final s = d.questions
+          .asMap()
+          .entries
+          .map((e) => _checkInAnswers['${d.id}_${e.key}'] ?? 0)
+          .toList();
+      final a = s.fold(0, (int x, y) => x + y) / s.length;
+      if (a < low) {
+        low = a;
+        w = d;
       }
     }
-
-    if (weakest == null || lowestScore >= 2) {
-      // Alles gut!
+    if (w == null || low >= 1.7)
       return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF16A34A).withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFF16A34A).withValues(alpha: 0.15),
-          ),
-        ),
-        child: Row(
-          children: [
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: const Color(0xFF16A34A).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(16)),
+          child: Row(children: [
             const Text('\u{2728}', style: TextStyle(fontSize: 24)),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                'Super! Euer Kind entwickelt sich toll in allen Bereichen.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF16A34A),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              initialMessage: '___TIP_EXPAND___${weakest!.tipWhenLow}',
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: weakest.color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: weakest.color.withValues(alpha: 0.15),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: weakest.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child:
-                  Icon(Icons.lightbulb_rounded, color: weakest.color, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${weakest.title} fördern',
+                child: Text('Super! Euer Kind entwickelt sich toll.',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    'Tipps von der KI: ${weakest.tipWhenLow}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios_rounded,
-                size: 14, color: weakest.color),
-          ],
-        ),
-      ),
-    );
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF16A34A))))
+          ]));
+    return GestureDetector(
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                    initialMessage: '___TIP_EXPAND___${w!.tipWhenLow}'))),
+        child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: w.color.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: w.color.withValues(alpha: 0.15))),
+            child: Row(children: [
+              Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: w.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12)),
+                  child:
+                      Icon(Icons.lightbulb_rounded, color: w.color, size: 22)),
+              const SizedBox(width: 14),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text('${w.title} foerdern',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    Text('KI-Tipps holen',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant))
+                  ])),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: w.color)
+            ])));
   }
 
   void _resetCheckIn() {
@@ -1017,72 +1130,57 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
   }
 }
 
-// ─── Radar Painter ────────────────────────────────────────────────────────────
-
 class _SimpleRadarPainter extends CustomPainter {
-  final List<double> values; // 0.0 - 1.0
+  final List<double> values;
   final List<Color> colors;
-
   const _SimpleRadarPainter({required this.values, required this.colors});
-
   @override
   void paint(Canvas canvas, Size size) {
     if (values.isEmpty) return;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.shortestSide / 2) - 12;
-    final count = values.length;
-
-    // Grid rings
-    final gridPaint = Paint()
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = (size.shortestSide / 2) - 12;
+    final n = values.length;
+    final gp = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
       ..color = const Color(0xFFE2E8F0);
     for (int ring = 1; ring <= 3; ring++) {
-      final r = radius * ring / 3;
-      final path = Path();
-      for (int i = 0; i < count; i++) {
-        final angle = (-90 + 360 / count * i) * math.pi / 180;
-        final p = Offset(
-            center.dx + r * math.cos(angle), center.dy + r * math.sin(angle));
-        i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+      final rr = r * ring / 3;
+      final p = Path();
+      for (int i = 0; i < n; i++) {
+        final a = (-90 + 360 / n * i) * math.pi / 180;
+        final pt = Offset(c.dx + rr * math.cos(a), c.dy + rr * math.sin(a));
+        i == 0 ? p.moveTo(pt.dx, pt.dy) : p.lineTo(pt.dx, pt.dy);
       }
-      path.close();
-      canvas.drawPath(path, gridPaint);
+      p.close();
+      canvas.drawPath(p, gp);
     }
-
-    // Value polygon
-    final valuePath = Path();
-    for (int i = 0; i < count; i++) {
+    final vp = Path();
+    for (int i = 0; i < n; i++) {
       final v = values[i].clamp(0.0, 1.0);
-      final angle = (-90 + 360 / count * i) * math.pi / 180;
-      final p = Offset(
-        center.dx + radius * v * math.cos(angle),
-        center.dy + radius * v * math.sin(angle),
-      );
-      i == 0 ? valuePath.moveTo(p.dx, p.dy) : valuePath.lineTo(p.dx, p.dy);
+      final a = (-90 + 360 / n * i) * math.pi / 180;
+      final pt = Offset(c.dx + r * v * math.cos(a), c.dy + r * v * math.sin(a));
+      i == 0 ? vp.moveTo(pt.dx, pt.dy) : vp.lineTo(pt.dx, pt.dy);
     }
-    valuePath.close();
-
-    final fillPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = const Color(0xFF0EA5E9).withValues(alpha: 0.2);
-    canvas.drawPath(valuePath, fillPaint);
-
-    final strokePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..color = const Color(0xFF0EA5E9);
-    canvas.drawPath(valuePath, strokePaint);
-
-    // Dots
-    for (int i = 0; i < count; i++) {
+    vp.close();
+    canvas.drawPath(
+        vp,
+        Paint()
+          ..style = PaintingStyle.fill
+          ..color = const Color(0xFF0EA5E9).withValues(alpha: 0.2));
+    canvas.drawPath(
+        vp,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..color = const Color(0xFF0EA5E9));
+    for (int i = 0; i < n; i++) {
       final v = values[i].clamp(0.0, 1.0);
-      final angle = (-90 + 360 / count * i) * math.pi / 180;
-      final p = Offset(
-        center.dx + radius * v * math.cos(angle),
-        center.dy + radius * v * math.sin(angle),
-      );
-      canvas.drawCircle(p, 4, Paint()..color = colors[i]);
+      final a = (-90 + 360 / n * i) * math.pi / 180;
+      canvas.drawCircle(
+          Offset(c.dx + r * v * math.cos(a), c.dy + r * v * math.sin(a)),
+          4,
+          Paint()..color = colors[i]);
     }
   }
 
@@ -1090,22 +1188,18 @@ class _SimpleRadarPainter extends CustomPainter {
   bool shouldRepaint(covariant _SimpleRadarPainter old) => old.values != values;
 }
 
-// ─── Data Model ───────────────────────────────────────────────────────────────
-
 class _DevDomain {
   final String id;
   final String title;
   final String emoji;
-  final String question;
-  final String tipWhenLow;
   final Color color;
-
-  const _DevDomain({
-    required this.id,
-    required this.title,
-    required this.emoji,
-    required this.question,
-    required this.tipWhenLow,
-    required this.color,
-  });
+  final String tipWhenLow;
+  final List<String> questions;
+  const _DevDomain(
+      {required this.id,
+      required this.title,
+      required this.emoji,
+      required this.color,
+      required this.tipWhenLow,
+      required this.questions});
 }

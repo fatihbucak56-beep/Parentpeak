@@ -649,6 +649,19 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
     _LanguageOption('nl', 'Nederlands', '\u{1F1F3}\u{1F1F1}'),
     _LanguageOption('pl', 'Polski', '\u{1F1F5}\u{1F1F1}'),
     _LanguageOption(
+        'ru',
+        '\u{0420}\u{0443}\u{0441}\u{0441}\u{043A}\u{0438}\u{0439}',
+        '\u{1F1F7}\u{1F1FA}'),
+    _LanguageOption(
+        'uk',
+        '\u{0423}\u{043A}\u{0440}\u{0430}\u{0457}\u{043D}\u{0441}\u{044C}\u{043A}\u{0430}',
+        '\u{1F1FA}\u{1F1E6}'),
+    _LanguageOption('hr', 'Hrvatski', '\u{1F1ED}\u{1F1F7}'),
+    _LanguageOption('sr', '\u{0421}\u{0440}\u{043F}\u{0441}\u{043A}\u{0438}',
+        '\u{1F1F7}\u{1F1F8}'),
+    _LanguageOption('fi', 'Suomi', '\u{1F1EB}\u{1F1EE}'),
+    _LanguageOption('da', 'Dansk', '\u{1F1E9}\u{1F1F0}'),
+    _LanguageOption(
         'fa', '\u{0641}\u{0627}\u{0631}\u{0633}\u{06CC}', '\u{1F1EE}\u{1F1F7}'),
     _LanguageOption('ku', 'Kurdî', '\u{1F3F3}\u{FE0F}'),
     _LanguageOption('ja', '\u{65E5}\u{672C}\u{8A9E}', '\u{1F1EF}\u{1F1F5}'),

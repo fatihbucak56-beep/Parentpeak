@@ -105,7 +105,7 @@ class _ChatScreenState extends State<ChatScreen> {
         widget.initialMessage!.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_termsAccepted && _chatBackend != null) {
-          _sendMessage(widget.initialMessage!);
+          _handleInitialMessage(widget.initialMessage!);
         }
       });
     }
@@ -207,6 +207,77 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Behandelt eine initiale Nachricht (z.B. vom Tages-Tipp).
+  /// Bei ___TIP_EXPAND___ wird die User-Bubble durch eine freundliche
+  /// Kontext-Nachricht ersetzt und der KI ein spezieller Prompt gesendet.
+  Future<void> _handleInitialMessage(String raw) async {
+    if (_isStreaming || _chatBackend == null) return;
+
+    const tipPrefix = '___TIP_EXPAND___';
+    if (raw.startsWith(tipPrefix)) {
+      final tipText = raw.substring(tipPrefix.length).trim();
+
+      // Zeige eine freundliche System-Nachricht statt dem technischen Prompt
+      setState(() {
+        _messages.add({
+          'role': 'user',
+          'content': '\u{1F4A1} Tipp: "$tipText"',
+          'timestamp': DateTime.now(),
+        });
+        _isStreaming = true;
+        _currentResponse = '';
+      });
+
+      _scrollToBottom();
+
+      // Sende einen smarten Prompt an die KI
+      final smartPrompt =
+          'Ein Elternteil hat folgenden Tages-Tipp in der App gelesen und möchte mehr darüber wissen:\n\n'
+          '"$tipText"\n\n'
+          'Erkläre den Tipp kurz und praxisnah. Gib 2-3 konkrete Beispiele wie man das heute umsetzen kann. '
+          'Frage am Ende: "Möchtest du wissen wie das bei einem bestimmten Alter funktioniert?" oder eine ähnliche weiterführende Frage.';
+
+      try {
+        final stream = _chatBackend!.streamReply(
+          history: _messages,
+          userMessage: smartPrompt,
+        );
+
+        await for (final chunk in stream) {
+          if (mounted) {
+            setState(() {
+              _currentResponse += chunk;
+            });
+            _scrollToBottom();
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            if (_currentResponse.isNotEmpty) {
+              _messages.add({
+                'role': 'assistant',
+                'content': _currentResponse,
+                'timestamp': DateTime.now(),
+              });
+            }
+            _isStreaming = false;
+            _currentResponse = '';
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isStreaming = false);
+        }
+      }
+      _scrollToBottom();
+      return;
+    }
+
+    // Normale Nachricht
+    _sendMessage(raw);
   }
 
   Future<void> _sendMessage(String text) async {

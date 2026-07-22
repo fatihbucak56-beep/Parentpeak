@@ -718,8 +718,7 @@ class _HomeScreenState extends State<HomeScreen>
                           context,
                           MaterialPageRoute(
                             builder: (_) => ChatScreen(
-                              initialMessage:
-                                  'Erkläre mir diesen Eltern-Tipp genauer und gib mir konkrete Beispiele wie ich das heute umsetzen kann: "$tipText"',
+                              initialMessage: '___TIP_EXPAND___$tipText',
                             ),
                           ),
                         );

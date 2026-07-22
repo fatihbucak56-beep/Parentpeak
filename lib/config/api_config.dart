@@ -27,8 +27,8 @@ class APIConfig {
   static const String _contactSupportUrlDefine =
       String.fromEnvironment('CONTACT_SUPPORT_URL', defaultValue: '');
 
-  // Gemini API Configuration - default to Gemini 2.5 Flash, overridable via env.
-  static const String geminiModelName = 'gemini-2.5-flash-preview-05-20';
+  // Gemini API Configuration - default to Gemini 3.5 Flash, overridable via env.
+  static const String geminiModelName = 'gemini-3.5-flash';
 
   static String getGeminiModelName() {
     final modelName = _readEnvOrDefine('GEMINI_MODEL_NAME');

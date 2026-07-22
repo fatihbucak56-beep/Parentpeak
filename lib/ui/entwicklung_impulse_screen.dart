@@ -8,11 +8,13 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
+import 'package:parentpeak/main.dart';
 import 'package:parentpeak/logic/weekly_impulse_service.dart';
 import 'package:parentpeak/models_and_widgets/weekly_impulse_feature.dart';
 import 'package:parentpeak/ui/chat_screen.dart';
 import 'package:parentpeak/models/child_development_data.dart';
 import 'package:parentpeak/config/api_config.dart';
+import 'package:parentpeak/l10n/app_localizations_all.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 /// Impulse & Entwicklung — vereinfacht, elternfreundlich, modern.
@@ -110,7 +112,8 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Impulse & Entwicklung'),
+        title: Text(AppStringsManager.getString(
+            languageService.currentLanguage, 'impulse_title')),
         elevation: 0,
       ),
       body: Column(
@@ -134,9 +137,13 @@ class _EntwicklungImpulseScreenState extends State<EntwicklungImpulseScreen>
                 ),
                 labelColor: theme.colorScheme.onPrimaryContainer,
                 unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-                tabs: const [
-                  Tab(text: 'Wochenimpuls'),
-                  Tab(text: 'Entwicklung'),
+                tabs: [
+                  Tab(
+                      text: AppStringsManager.getString(
+                          languageService.currentLanguage, 'weekly_impulse')),
+                  Tab(
+                      text: AppStringsManager.getString(
+                          languageService.currentLanguage, 'development')),
                 ],
               ),
             ),

@@ -8,6 +8,7 @@ import 'package:parentpeak/models/trusted_device.dart';
 import 'package:parentpeak/ui/auth/paywall_screen.dart';
 import 'package:parentpeak/config/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:parentpeak/widgets/ala_rengin_flag_painter.dart';
 
 /// Profil-Screen — modern, warm, spielerisch-elternfreundlich.
 class ProfileSafetyScreen extends StatefulWidget {
@@ -705,8 +706,9 @@ class _ProfileSafetyScreenState extends State<ProfileSafetyScreen> {
                   final lang = _allLanguages[i];
                   final isActive = lang.code == current;
                   return ListTile(
-                    leading:
-                        Text(lang.flag, style: const TextStyle(fontSize: 22)),
+                    leading: (lang.code == 'ku' || lang.code == 'ckb')
+                        ? const AlaRenginFlag(width: 30, height: 20)
+                        : Text(lang.flag, style: const TextStyle(fontSize: 22)),
                     title: Text(
                       lang.label,
                       style: TextStyle(

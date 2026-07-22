@@ -234,10 +234,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // Sende einen smarten Prompt an die KI
       final smartPrompt =
-          'Ein Elternteil hat folgenden Tages-Tipp in der App gelesen und möchte mehr darüber wissen:\n\n'
-          '"$tipText"\n\n'
-          'Erkläre den Tipp kurz und praxisnah. Gib 2-3 konkrete Beispiele wie man das heute umsetzen kann. '
-          'Frage am Ende: "Möchtest du wissen wie das bei einem bestimmten Alter funktioniert?" oder eine ähnliche weiterführende Frage.';
+          'WICHTIG: Das ist eine PRAKTISCHE FRAGE (Typ A). Antworte KURZ und DIREKT. '
+          'Keine Empathie-Einleitung, kein "Ein Blick auf euren Alltag", kein "Was dahintersteckt". '
+          'Einfach: Was ist es, warum ist es gut, 3 konkrete Ideen zum sofort Umsetzen.\n\n'
+          'Die Frage: "$tipText"\n\n'
+          'Antworte in maximal 8 Zeilen. Bullet Points. Fertig.';
+      'Frage am Ende: "Möchtest du wissen wie das bei einem bestimmten Alter funktioniert?" oder eine ähnliche weiterführende Frage.';
 
       try {
         final stream = _chatBackend!.streamReply(

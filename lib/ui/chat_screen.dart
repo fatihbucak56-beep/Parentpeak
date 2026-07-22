@@ -89,12 +89,34 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isStreaming = false;
   String? _initError;
   String _currentResponse = '';
+  bool _termsAccepted = true; // wird in initState geladen
+  bool _termsLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadTopicInsights();
+    _checkTermsAcceptance();
     _initializeGemini();
+  }
+
+  Future<void> _checkTermsAcceptance() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accepted = prefs.getBool('chat.terms_accepted') ?? false;
+    if (mounted) {
+      setState(() {
+        _termsAccepted = accepted;
+        _termsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _acceptTerms() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('chat.terms_accepted', true);
+    if (mounted) {
+      setState(() => _termsAccepted = true);
+    }
   }
 
   Future<void> _loadTopicInsights() async {
@@ -758,8 +780,171 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildTermsScreen(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              // Icon
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0284C7), Color(0xFF0EA5E9)],
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.psychology_rounded,
+                    color: Colors.white, size: 36),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'KI-Elternberatung',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Bevor du startest, lies bitte kurz durch:',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+              // Bedingungen
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color:
+                        theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTermsItem(
+                      theme,
+                      '\u{1F9E0}',
+                      'GfK-basierte Orientierung',
+                      'Die KI gibt Impulse basierend auf Gewaltfreier Kommunikation nach Rosenberg. Sie ersetzt keine Therapie oder Fachberatung.',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTermsItem(
+                      theme,
+                      '\u{1F6E1}\u{FE0F}',
+                      'Keine Diagnosen',
+                      'Die KI stellt keine medizinischen oder psychologischen Diagnosen. Bei ernsthaften Sorgen wende dich an Fachpersonal.',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTermsItem(
+                      theme,
+                      '\u{1F512}',
+                      'Deine Daten bleiben privat',
+                      'Gespräche werden lokal auf deinem Gerät gespeichert. Wir teilen keine Inhalte mit Dritten.',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTermsItem(
+                      theme,
+                      '\u{1F49C}',
+                      'Respektvoll & wertschätzend',
+                      'Die KI urteilt nie über dich oder dein Kind. Sie begleitet — ohne Schuldzuweisung, ohne Druck.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Akzeptieren Button
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _acceptTerms,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Verstanden, los geht\u{0027}s',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Zurück',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTermsItem(
+      ThemeData theme, String emoji, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 20)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Nutzungsbedingungen beim ersten Mal zeigen
+    if (!_termsLoading && !_termsAccepted) {
+      return _buildTermsScreen(context);
+    }
+
     if (_initError != null) {
       return Scaffold(
         appBar: AppBar(

@@ -522,6 +522,6 @@ SICHERHEITSREGELN:
 - Keine Diagnosen stellen (ADHS, Autismus etc.).
 - Keine medizinischen Empfehlungen.
 - Bei Hinweisen auf akute Gefahr (Gewalt, Suizid, Kindesmisshandlung): Sofort Notruf 112, Telefonseelsorge 0800-1110111, Jugendamt empfehlen.
-- Hinweis: "Ich bin eine unterstützende KI und kein Ersatz für professionelle Beratung."
+- Füge NIEMALS einen Disclaimer oder Hinweis am Ende deiner Antworten hinzu. Kein "Ich bin eine KI", kein "kein Ersatz für professionelle Beratung". Das wird separat in der App geregelt.
 ''';
 }

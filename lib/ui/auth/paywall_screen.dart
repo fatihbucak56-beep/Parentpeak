@@ -148,13 +148,13 @@ class PaywallScreen extends StatelessWidget {
         icon: Icons.auto_awesome_rounded,
         label: 'Wochenimpulse',
         freeValue: 'Basis',
-        premiumValue: 'Voll + Details',
+        premiumValue: 'Voll',
       ),
       const _CompareRow(
         icon: Icons.chat_rounded,
         label: 'KI-Elternberatung',
         freeValue: '3\u00D7 / Tag',
-        premiumValue: 'Unbegrenzt',
+        premiumValue: 'Unlimitiert',
       ),
       const _CompareRow(
         icon: Icons.calendar_month_rounded,
@@ -325,11 +325,15 @@ class PaywallScreen extends StatelessWidget {
                           color: theme.colorScheme.primary,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          row.premiumValue,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            row.premiumValue,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],

@@ -128,6 +128,18 @@ class SpielfreundeBackendService {
     return ReferralStatus(code: code, coins: 0, invites: 0);
   }
 
+  /// Profil vom Server loeschen.
+  Future<bool> deleteProfile(String userId) async {
+    if (_api == null) return false;
+    try {
+      await _api!.delete('/api/spielfreunde/profiles/$userId');
+      return true;
+    } catch (e) {
+      debugPrint('SpielfreundeBackendService.deleteProfile failed: $e');
+      return false;
+    }
+  }
+
   /// Coins einloesen.
   Future<bool> redeemCoins(String referralCode, int amount) async {
     if (_api == null) return false;

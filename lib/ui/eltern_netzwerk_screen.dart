@@ -316,17 +316,27 @@ class _ScreenState extends State<ElternNetzwerkScreen>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis)
                     ])),
-                GestureDetector(
-                    onTap: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.remove('spielfreunde.profile');
-                      setState(() => _profile = null);
-                    },
-                    child: Text('Bearbeiten',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.primary)))
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  GestureDetector(
+                      onTap: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.remove('spielfreunde.profile');
+                        setState(() => _profile = null);
+                      },
+                      child: Text('Bearbeiten',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary))),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                      onTap: () => _confirmDeleteProfile(theme),
+                      child: Text('Loeschen',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.error))),
+                ])
               ])),
           const SizedBox(height: 20),
           Container(
@@ -557,6 +567,37 @@ class _ScreenState extends State<ElternNetzwerkScreen>
               Icon(Icons.arrow_forward_ios_rounded,
                   size: 14, color: theme.colorScheme.outline)
             ])));
+  }
+
+  Future<void> _confirmDeleteProfile(ThemeData theme) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Profil loeschen?'),
+        content:
+            const Text('Dein Spielfreunde-Profil wird dauerhaft geloescht. '
+                'Du kannst jederzeit ein neues erstellen.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Abbrechen')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.error),
+              child: const Text('Loeschen')),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('spielfreunde.profile');
+      // Server-seitig loeschen
+      final uid = AuthService.instance.currentUser?.uid ?? 'guest';
+      await _backend.deleteProfile(uid);
+      if (mounted) setState(() => _profile = null);
+    }
   }
 
   void _showQR(ThemeData theme, ParentCoinService coins) {

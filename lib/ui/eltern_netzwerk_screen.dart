@@ -542,46 +542,39 @@ class _ScreenState extends State<ElternNetzwerkScreen>
 
   Widget _inviteRow(ThemeData theme, IconData icon, Color color, String title,
       String sub, VoidCallback onTap) {
-    return Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+                color:
+                    theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+        color: theme.colorScheme.surfaceContainerLow,
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
             onTap: () {
               HapticFeedback.lightImpact();
               onTap();
             },
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-                padding: const EdgeInsets.all(14),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            leading: Container(
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: theme.colorScheme.outlineVariant
-                            .withValues(alpha: 0.5))),
-                child: Row(children: [
-                  Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Icon(icon, color: color, size: 20)),
-                  const SizedBox(width: 14),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text(title,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w700)),
-                        Text(sub,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant),
-                            overflow: TextOverflow.ellipsis)
-                      ])),
-                  Icon(Icons.arrow_forward_ios_rounded,
-                      size: 14, color: theme.colorScheme.outline)
-                ]))));
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: color, size: 20)),
+            title: Text(title,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            subtitle: Text(sub,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis),
+            trailing: Icon(Icons.arrow_forward_ios_rounded,
+                size: 14, color: theme.colorScheme.outline)));
   }
 
   Future<void> _confirmDeleteProfile(ThemeData theme) async {

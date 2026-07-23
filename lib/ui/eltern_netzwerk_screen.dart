@@ -717,52 +717,79 @@ class _ProfileFormState extends State<_ProfileForm> {
   }
 
   Future<void> _submit() async {
-    if (_nameCtrl.text.trim().isEmpty || _districtCtrl.text.trim().isEmpty)
+    // Validierung mit Feedback
+    if (_nameCtrl.text.trim().isEmpty) {
+      _showValidationError('Bitte gib euren Namen ein (Schritt 1)');
       return;
+    }
+    if (_districtCtrl.text.trim().isEmpty) {
+      _showValidationError('Bitte gib euren Stadtteil ein (Schritt 1)');
+      return;
+    }
     setState(() => _saving = true);
-    final children = _children
-        .map((c) => ChildEntry(
-              name: c.nameCtrl.text.trim(),
-              ageMonths: c.ageMonths,
-              gender: c.gender,
-              interests: c.interests.toList(),
-              interestsCustom: c.interestsCustomCtrl.text.trim().isEmpty
-                  ? null
-                  : c.interestsCustomCtrl.text.trim(),
-            ))
-        .toList();
+    try {
+      final children = _children
+          .map((c) => ChildEntry(
+                name: c.nameCtrl.text.trim(),
+                ageMonths: c.ageMonths,
+                gender: c.gender,
+                interests: c.interests.toList(),
+                interestsCustom: c.interestsCustomCtrl.text.trim().isEmpty
+                    ? null
+                    : c.interestsCustomCtrl.text.trim(),
+              ))
+          .toList();
 
-    final profile = FamilyMatchProfile(
-      displayName: _nameCtrl.text.trim(),
-      district: _districtCtrl.text.trim(),
-      children: children,
-      languages: _langs.toList(),
-      familyForm: _familyForm,
-      familyFormCustom: _familyFormCustomCtrl.text.trim().isEmpty
-          ? null
-          : _familyFormCustomCtrl.text.trim(),
-      values: _values.toList(),
-      valuesCustom: _valuesCustomCtrl.text.trim().isEmpty
-          ? null
-          : _valuesCustomCtrl.text.trim(),
-      lookingFor: _lookingFor.toList(),
-      lookingForCustom: _lookingForCustomCtrl.text.trim().isEmpty
-          ? null
-          : _lookingForCustomCtrl.text.trim(),
-      availDays: _availDays.toList(),
-      availTimes: _availTimes.toList(),
-      availCustom: _availCustomCtrl.text.trim().isEmpty
-          ? null
-          : _availCustomCtrl.text.trim(),
-      specials: _specials.toList(),
-      specialsCustom: _specialsCustomCtrl.text.trim().isEmpty
-          ? null
-          : _specialsCustomCtrl.text.trim(),
-      bio: _bioCtrl.text.trim(),
-      createdAt: DateTime.now(),
+      final profile = FamilyMatchProfile(
+        displayName: _nameCtrl.text.trim(),
+        district: _districtCtrl.text.trim(),
+        children: children,
+        languages: _langs.toList(),
+        familyForm: _familyForm,
+        familyFormCustom: _familyFormCustomCtrl.text.trim().isEmpty
+            ? null
+            : _familyFormCustomCtrl.text.trim(),
+        values: _values.toList(),
+        valuesCustom: _valuesCustomCtrl.text.trim().isEmpty
+            ? null
+            : _valuesCustomCtrl.text.trim(),
+        lookingFor: _lookingFor.toList(),
+        lookingForCustom: _lookingForCustomCtrl.text.trim().isEmpty
+            ? null
+            : _lookingForCustomCtrl.text.trim(),
+        availDays: _availDays.toList(),
+        availTimes: _availTimes.toList(),
+        availCustom: _availCustomCtrl.text.trim().isEmpty
+            ? null
+            : _availCustomCtrl.text.trim(),
+        specials: _specials.toList(),
+        specialsCustom: _specialsCustomCtrl.text.trim().isEmpty
+            ? null
+            : _specialsCustomCtrl.text.trim(),
+        bio: _bioCtrl.text.trim(),
+        createdAt: DateTime.now(),
+      );
+      await widget.onSave(profile);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler beim Speichern: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _showValidationError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
-    await widget.onSave(profile);
-    if (mounted) setState(() => _saving = false);
   }
 
   @override

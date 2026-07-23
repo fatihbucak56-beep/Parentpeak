@@ -7943,6 +7943,126 @@ app.delete('/api/treasures/:id', async (req, res) => {
   }
 });
 
+
+// ============================================================================
+// SPIELFREUNDE & REFERRAL ENDPOINTS
+// ============================================================================
+
+// In-memory stores (Prisma migration follows later)
+const spielfreundeProfiles = [];
+const referralTracker = new Map(); // referralCode -> { ownerId, invitedUsers: [], coins: 0 }
+
+/**
+ * POST /api/spielfreunde/profiles
+ * Create or update a family match profile
+ */
+app.post("/api/spielfreunde/profiles", (req, res) => {
+  const { userId, displayName, district, children, languages, familyForm, values, lookingFor, availability, specials, bio } = req.body;
+  if (!userId || !displayName || !district) {
+    return res.status(400).json({ error: "userId, displayName, district erforderlich" });
+  }
+  const existing = spielfreundeProfiles.findIndex(p => p.userId === userId);
+  const profile = {
+    id: existing >= 0 ? spielfreundeProfiles[existing].id : generateId("sf"),
+    userId,
+    displayName: String(displayName).slice(0, 50),
+    district: String(district).slice(0, 50),
+    children: Array.isArray(children) ? children : [],
+    languages: Array.isArray(languages) ? languages : ["de"],
+    familyForm: String(familyForm || "kernfamilie"),
+    values: Array.isArray(values) ? values : [],
+    lookingFor: Array.isArray(lookingFor) ? lookingFor : [],
+    availability: String(availability || "flexibel"),
+    specials: Array.isArray(specials) ? specials : [],
+    bio: String(bio || "").slice(0, 140),
+    createdAt: existing >= 0 ? spielfreundeProfiles[existing].createdAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  if (existing >= 0) { spielfreundeProfiles[existing] = profile; }
+  else { spielfreundeProfiles.push(profile); }
+  res.status(201).json({ item: profile });
+});
+
+/**
+ * GET /api/spielfreunde/profiles
+ * List family profiles (with optional filters)
+ */
+app.get("/api/spielfreunde/profiles", (req, res) => {
+  let results = [...spielfreundeProfiles];
+  const { district, familyForm, language, userId } = req.query;
+  if (userId) results = results.filter(p => p.userId !== userId);
+  if (district) results = results.filter(p => p.district.toLowerCase().includes(district.toLowerCase()));
+  if (familyForm) results = results.filter(p => p.familyForm === familyForm);
+  if (language) results = results.filter(p => p.languages.includes(language));
+  res.json({ items: results, total: results.length });
+});
+
+/**
+ * GET /api/spielfreunde/waitlist-count
+ * Returns how many families are in the waitlist for a district
+ */
+app.get("/api/spielfreunde/waitlist-count", (req, res) => {
+  const { district } = req.query;
+  let count = spielfreundeProfiles.length;
+  if (district) {
+    count = spielfreundeProfiles.filter(p => p.district.toLowerCase().includes(district.toLowerCase())).length;
+  }
+  const threshold = 20;
+  const remaining = Math.max(0, threshold - count);
+  res.json({ total: count, threshold, remaining, progress: Math.min(1, count / threshold) });
+});
+
+/**
+ * POST /api/referral/register
+ * Track a successful referral (called when invited user registers)
+ */
+app.post("/api/referral/register", (req, res) => {
+  const { referralCode, newUserId, newUserName } = req.body;
+  if (!referralCode || !newUserId) {
+    return res.status(400).json({ error: "referralCode und newUserId erforderlich" });
+  }
+  let tracker = referralTracker.get(referralCode);
+  if (!tracker) {
+    tracker = { ownerId: null, invitedUsers: [], coins: 0 };
+    referralTracker.set(referralCode, tracker);
+  }
+  if (tracker.invitedUsers.some(u => u.userId === newUserId)) {
+    return res.status(409).json({ error: "User bereits registriert" });
+  }
+  tracker.invitedUsers.push({ userId: newUserId, name: newUserName || "User", registeredAt: new Date().toISOString() });
+  tracker.coins += 1;
+  res.status(201).json({ item: { referralCode, totalCoins: tracker.coins, totalInvites: tracker.invitedUsers.length } });
+});
+
+/**
+ * GET /api/referral/status/:code
+ * Get referral stats for a code
+ */
+app.get("/api/referral/status/:code", (req, res) => {
+  const tracker = referralTracker.get(req.params.code);
+  if (!tracker) {
+    return res.json({ referralCode: req.params.code, totalCoins: 0, totalInvites: 0, invitedUsers: [] });
+  }
+  res.json({ referralCode: req.params.code, totalCoins: tracker.coins, totalInvites: tracker.invitedUsers.length, invitedUsers: tracker.invitedUsers });
+});
+
+/**
+ * POST /api/referral/redeem
+ * Redeem coins for premium (5 coins = 1 month)
+ */
+app.post("/api/referral/redeem", (req, res) => {
+  const { referralCode, coinsToSpend } = req.body;
+  if (!referralCode || !coinsToSpend) {
+    return res.status(400).json({ error: "referralCode und coinsToSpend erforderlich" });
+  }
+  const tracker = referralTracker.get(referralCode);
+  if (!tracker || tracker.coins < coinsToSpend) {
+    return res.status(409).json({ error: "Nicht genug Coins" });
+  }
+  tracker.coins -= coinsToSpend;
+  res.json({ success: true, remainingCoins: tracker.coins });
+});
+
 // Server starten
 app.listen(PORT, '0.0.0.0', () => {
   if (allowedOrigins.length > 0) {

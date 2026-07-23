@@ -17,6 +17,7 @@ import 'package:parentpeak/ui/chat_screen.dart';
 import 'package:parentpeak/ui/finance_budget_screen.dart';
 import 'package:parentpeak/ui/gemeinsam_satt_screen.dart';
 import 'package:parentpeak/ui/treasure_handover_screen.dart';
+import 'package:parentpeak/ui/eltern_netzwerk_screen.dart';
 import 'package:parentpeak/ui/auth/paywall_screen.dart';
 import 'package:parentpeak/l10n/app_localizations_all.dart';
 import 'package:parentpeak/ui/widgets/home/daily_tip_card.dart';
@@ -620,11 +621,11 @@ class _HomeScreenState extends State<HomeScreen>
         featureId: 'verschenkmarkt',
       ),
       _FeatureAction(
-        label: 'Eltern Match',
-        description: 'Eltern finden fuer Playdates und Austausch',
-        icon: Icons.diversity_3_rounded,
+        label: 'Eltern-Netzwerk',
+        description: 'Vernetze dich, lade Freunde ein, verdiene Coins',
+        icon: Icons.people_rounded,
         color: const Color(0xFF0EA5A4),
-        builder: (_) => const ParentMatchingScreen(),
+        builder: (_) => const ElternNetzwerkScreen(),
         featureId: 'eltern_match',
         statusHint: _newParentMatchesCount > 0
             ? (_newParentMatchesCount == 1

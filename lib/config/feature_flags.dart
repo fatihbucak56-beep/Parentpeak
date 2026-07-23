@@ -97,14 +97,14 @@ class FeatureFlagService extends ChangeNotifier {
       phase: LaunchPhase.phase1,
       availableInFreeTier: true,
     ),
-
-    // Phase 2 — Community-Features, brauchen kritische Masse
     FeatureDefinition(
       id: 'eltern_match',
-      label: 'Eltern Match',
-      phase: LaunchPhase.phase2,
-      availableInFreeTier: false,
+      label: 'Eltern-Netzwerk',
+      phase: LaunchPhase.phase1,
+      availableInFreeTier: true,
     ),
+
+    // Phase 2 — Community-Features, brauchen kritische Masse
     FeatureDefinition(
       id: 'events_aktivitaeten',
       label: 'Events & Aktivitäten',

@@ -182,7 +182,15 @@ class _ScreenState extends State<ElternNetzwerkScreen>
         const SizedBox(height: 14),
         _inviteRow(theme, Icons.share_rounded, const Color(0xFF0EA5A4),
             'Einladung teilen', 'WhatsApp, SMS, E-Mail', () async {
-          await Share.share(coins.getInviteMessage());
+          try {
+            await Share.share(coins.getInviteMessage());
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Teilen fehlgeschlagen: $e')),
+              );
+            }
+          }
         }),
         const SizedBox(height: 10),
         _inviteRow(
@@ -534,43 +542,46 @@ class _ScreenState extends State<ElternNetzwerkScreen>
 
   Widget _inviteRow(ThemeData theme, IconData icon, Color color, String title,
       String sub, VoidCallback onTap) {
-    return GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: theme.colorScheme.outlineVariant
-                        .withValues(alpha: 0.5))),
-            child: Row(children: [
-              Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Icon(icon, color: color, size: 20)),
-              const SizedBox(width: 14),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(title,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    Text(sub,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant),
-                        overflow: TextOverflow.ellipsis)
-                  ])),
-              Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: theme.colorScheme.outline)
-            ])));
+    return Material(
+        color: Colors.transparent,
+        child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onTap();
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: theme.colorScheme.outlineVariant
+                            .withValues(alpha: 0.5))),
+                child: Row(children: [
+                  Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Icon(icon, color: color, size: 20)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(title,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(sub,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant),
+                            overflow: TextOverflow.ellipsis)
+                      ])),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                      size: 14, color: theme.colorScheme.outline)
+                ]))));
   }
 
   Future<void> _confirmDeleteProfile(ThemeData theme) async {

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:parentpeak/logic/parent_coin_service.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/spielfreunde_backend_service.dart';
+import 'package:parentpeak/widgets/ala_rengin_flag_painter.dart';
 import 'package:parentpeak/models/family_profile_model.dart';
 
 class ElternNetzwerkScreen extends StatefulWidget {
@@ -1256,6 +1257,9 @@ class _ProfileFormState extends State<_ProfileForm> {
                             () => s ? _langs.add(e.key) : _langs.remove(e.key)),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16)),
+                        avatar: e.key == 'ku'
+                            ? const AlaRenginFlag(width: 20, height: 14)
+                            : null,
                       ))
                   .toList()),
           const SizedBox(height: 22),

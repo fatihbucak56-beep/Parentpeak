@@ -372,7 +372,7 @@ class MatchOptions {
     'tr': '\u{1F1F9}\u{1F1F7} Tuerkce',
     'ar':
         '\u{1F1F8}\u{1F1E6} \u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064A}\u{0629}',
-    'ku': '\u{2600}\u{FE0F} Kurdi',
+    'ku': 'Kurdi',
     'fr': '\u{1F1EB}\u{1F1F7} Francais',
     'es': '\u{1F1EA}\u{1F1F8} Espanol',
     'ru': '\u{1F1F7}\u{1F1FA} Russkij',

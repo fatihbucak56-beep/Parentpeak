@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:parentpeak/logic/parent_coin_service.dart';
 import 'package:parentpeak/logic/auth_service.dart';
 import 'package:parentpeak/logic/spielfreunde_backend_service.dart';
+import 'package:parentpeak/logic/location_autocomplete_service.dart';
 import 'package:parentpeak/widgets/ala_rengin_flag_painter.dart';
 import 'package:parentpeak/models/family_profile_model.dart';
 
@@ -897,8 +899,14 @@ class _ProfileFormState extends State<_ProfileForm> {
           _inputField(_nameCtrl, 'Euer Vorname / Spitzname',
               'z.B. Sarah, Die Muellers', Icons.person_rounded),
           const SizedBox(height: 14),
-          _inputField(_districtCtrl, 'Stadtteil oder PLZ',
-              'z.B. Kreuzberg, 10997', Icons.location_on_rounded),
+          _LocationAutocompleteField(
+            controller: _districtCtrl,
+            onSelected: (suggestion) {
+              setState(() {
+                _districtCtrl.text = suggestion.shortLabel;
+              });
+            },
+          ),
           const SizedBox(height: 20),
           _sectionTitle(theme, '\u{1F46A} Familienform'),
           const SizedBox(height: 8),
@@ -1429,5 +1437,164 @@ class _ChildData {
   void dispose() {
     nameCtrl.dispose();
     interestsCustomCtrl.dispose();
+  }
+}
+
+// ─── Location Autocomplete Widget ────────────────────────────────────────────
+
+class _LocationAutocompleteField extends StatefulWidget {
+  final TextEditingController controller;
+  final void Function(LocationSuggestion) onSelected;
+
+  const _LocationAutocompleteField({
+    required this.controller,
+    required this.onSelected,
+  });
+
+  @override
+  State<_LocationAutocompleteField> createState() =>
+      _LocationAutocompleteFieldState();
+}
+
+class _LocationAutocompleteFieldState
+    extends State<_LocationAutocompleteField> {
+  final _service = LocationAutocompleteService.instance;
+  List<LocationSuggestion> _suggestions = [];
+  bool _isLoading = false;
+  bool _showSuggestions = false;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onChanged);
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onChanged() {
+    final text = widget.controller.text.trim();
+    if (text.length < 2) {
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 450), () async {
+      if (!mounted) return;
+      setState(() => _isLoading = true);
+      final results = await _service.searchImmediate(text);
+      if (mounted) {
+        setState(() {
+          _suggestions = results;
+          _showSuggestions = results.isNotEmpty;
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      TextField(
+        controller: widget.controller,
+        decoration: InputDecoration(
+          labelText: 'Stadtteil oder PLZ',
+          hintText: 'Tippe z.B. Kreuzberg, 10997...',
+          prefixIcon: const Icon(Icons.location_on_rounded, size: 20),
+          suffixIcon: _isLoading
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2)))
+              : widget.controller.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: () {
+                        widget.controller.clear();
+                        setState(() {
+                          _suggestions = [];
+                          _showSuggestions = false;
+                        });
+                      })
+                  : null,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+          ),
+        ),
+      ),
+      if (_showSuggestions) ...[
+        const SizedBox(height: 4),
+        Container(
+          constraints: const BoxConstraints(maxHeight: 200),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4))
+            ],
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            itemCount: _suggestions.length,
+            separatorBuilder: (_, __) => Divider(
+                height: 1,
+                indent: 44,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            itemBuilder: (ctx, i) {
+              final s = _suggestions[i];
+              return ListTile(
+                dense: true,
+                leading: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.place_rounded,
+                      size: 16, color: Color(0xFF8B5CF6)),
+                ),
+                title: Text(s.shortLabel,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+                subtitle: s.postcode.isNotEmpty
+                    ? Text(s.postcode,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.outline))
+                    : null,
+                onTap: () {
+                  widget.controller.text = s.shortLabel;
+                  widget.controller.selection = TextSelection.fromPosition(
+                      TextPosition(offset: s.shortLabel.length));
+                  setState(() => _showSuggestions = false);
+                  widget.onSelected(s);
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    ]);
   }
 }

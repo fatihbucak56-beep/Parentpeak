@@ -183,7 +183,13 @@ class _ScreenState extends State<ElternNetzwerkScreen>
         _inviteRow(theme, Icons.share_rounded, const Color(0xFF0EA5A4),
             'Einladung teilen', 'WhatsApp, SMS, E-Mail', () async {
           try {
-            await Share.share(coins.getInviteMessage());
+            final box = context.findRenderObject() as RenderBox?;
+            await Share.share(
+              coins.getInviteMessage(),
+              sharePositionOrigin: box != null
+                  ? box.localToGlobal(Offset.zero) & box.size
+                  : const Rect.fromLTWH(100, 100, 200, 200),
+            );
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(

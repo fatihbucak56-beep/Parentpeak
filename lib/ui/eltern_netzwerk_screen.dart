@@ -252,38 +252,39 @@ class _ScreenState extends State<ElternNetzwerkScreen>
   }
 
   Widget _profileSetup(ThemeData theme) {
-    return SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(children: [
-          const SizedBox(height: 20),
-          Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                      colors: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
-                  borderRadius: BorderRadius.circular(24)),
-              child: const Center(
-                  child: Text('\u{1F46A}', style: TextStyle(fontSize: 36)))),
-          const SizedBox(height: 20),
-          Text('Spielfreunde finden',
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w800),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text(
-              'Erstelle euer Familien-Profil und findet Familien die so ticken wie ihr.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant, height: 1.4),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 28),
-          _ProfileForm(onSave: (p) async {
-            await p.save();
-            final uid = AuthService.instance.currentUser?.uid ?? 'guest';
-            await _backend.saveProfile(p, uid);
-            await _init();
-          }),
-        ]));
+    return Column(children: [
+      const SizedBox(height: 16),
+      Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                  colors: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
+              borderRadius: BorderRadius.circular(18)),
+          child: const Center(
+              child: Text('\u{1F46A}', style: TextStyle(fontSize: 28)))),
+      const SizedBox(height: 12),
+      Text('Spielfreunde finden',
+          style: theme.textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
+          textAlign: TextAlign.center),
+      const SizedBox(height: 4),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Text(
+            'In 5 kurzen Schritten findet ihr Familien die so ticken wie ihr.',
+            style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant, height: 1.3),
+            textAlign: TextAlign.center),
+      ),
+      const SizedBox(height: 16),
+      Expanded(child: _ProfileForm(onSave: (p) async {
+        await p.save();
+        final uid = AuthService.instance.currentUser?.uid ?? 'guest';
+        await _backend.saveProfile(p, uid);
+        await _init();
+      })),
+    ]);
   }
 
   Widget _waitlistView(ThemeData theme) {
@@ -638,7 +639,9 @@ class _ScreenState extends State<ElternNetzwerkScreen>
   }
 }
 
-// ─── Profil-Formular ──────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROFIL-WIZARD (5 Schritte)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class _ProfileForm extends StatefulWidget {
   final Future<void> Function(FamilyMatchProfile) onSave;
@@ -648,143 +651,752 @@ class _ProfileForm extends StatefulWidget {
 }
 
 class _ProfileFormState extends State<_ProfileForm> {
-  final _name = TextEditingController();
-  final _district = TextEditingController();
-  final _bio = TextEditingController();
-  String _form = 'kernfamilie';
+  final _pageCtrl = PageController();
+  int _step = 0;
+  static const _totalSteps = 5;
+  bool _saving = false;
+
+  // Schritt 1: Grundinfos
+  final _nameCtrl = TextEditingController();
+  final _districtCtrl = TextEditingController();
+  String _familyForm = 'kernfamilie';
+  final _familyFormCustomCtrl = TextEditingController();
+
+  // Schritt 2: Kinder
+  final List<_ChildData> _children = [_ChildData()];
+
+  // Schritt 3: Werte
   final Set<String> _values = {};
-  final Set<String> _looking = {};
-  String _avail = 'flexibel';
+  final _valuesCustomCtrl = TextEditingController();
+
+  // Schritt 4: Aktivitaeten + Verfuegbarkeit
+  final Set<String> _lookingFor = {};
+  final _lookingForCustomCtrl = TextEditingController();
+  final Set<String> _availDays = {};
+  final Set<String> _availTimes = {};
+  final _availCustomCtrl = TextEditingController();
+
+  // Schritt 5: Sprachen + Bio + Besonderheiten
   final Set<String> _langs = {'de'};
+  final _bioCtrl = TextEditingController();
+  final Set<String> _specials = {};
+  final _specialsCustomCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    _nameCtrl.dispose();
+    _districtCtrl.dispose();
+    _familyFormCustomCtrl.dispose();
+    _valuesCustomCtrl.dispose();
+    _lookingForCustomCtrl.dispose();
+    _availCustomCtrl.dispose();
+    _bioCtrl.dispose();
+    _specialsCustomCtrl.dispose();
+    for (final c in _children) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _next() {
+    if (_step < _totalSteps - 1) {
+      _pageCtrl.nextPage(
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+      setState(() => _step++);
+    }
+  }
+
+  void _prev() {
+    if (_step > 0) {
+      _pageCtrl.previousPage(
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+      setState(() => _step--);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_nameCtrl.text.trim().isEmpty || _districtCtrl.text.trim().isEmpty)
+      return;
+    setState(() => _saving = true);
+    final children = _children
+        .map((c) => ChildEntry(
+              name: c.nameCtrl.text.trim(),
+              ageMonths: c.ageMonths,
+              gender: c.gender,
+              interests: c.interests.toList(),
+              interestsCustom: c.interestsCustomCtrl.text.trim().isEmpty
+                  ? null
+                  : c.interestsCustomCtrl.text.trim(),
+            ))
+        .toList();
+
+    final profile = FamilyMatchProfile(
+      displayName: _nameCtrl.text.trim(),
+      district: _districtCtrl.text.trim(),
+      children: children,
+      languages: _langs.toList(),
+      familyForm: _familyForm,
+      familyFormCustom: _familyFormCustomCtrl.text.trim().isEmpty
+          ? null
+          : _familyFormCustomCtrl.text.trim(),
+      values: _values.toList(),
+      valuesCustom: _valuesCustomCtrl.text.trim().isEmpty
+          ? null
+          : _valuesCustomCtrl.text.trim(),
+      lookingFor: _lookingFor.toList(),
+      lookingForCustom: _lookingForCustomCtrl.text.trim().isEmpty
+          ? null
+          : _lookingForCustomCtrl.text.trim(),
+      availDays: _availDays.toList(),
+      availTimes: _availTimes.toList(),
+      availCustom: _availCustomCtrl.text.trim().isEmpty
+          ? null
+          : _availCustomCtrl.text.trim(),
+      specials: _specials.toList(),
+      specialsCustom: _specialsCustomCtrl.text.trim().isEmpty
+          ? null
+          : _specialsCustomCtrl.text.trim(),
+      bio: _bioCtrl.text.trim(),
+      createdAt: DateTime.now(),
+    );
+    await widget.onSave(profile);
+    if (mounted) setState(() => _saving = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      TextField(
-          controller: _name,
-          decoration: InputDecoration(
-              labelText: 'Vorname',
-              hintText: 'z.B. Sarah',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)))),
-      const SizedBox(height: 12),
-      TextField(
-          controller: _district,
-          decoration: InputDecoration(
-              labelText: 'Stadtteil / PLZ',
-              hintText: 'z.B. Kreuzberg',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)))),
+    return Column(children: [
+      // Progress dots
+      Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_totalSteps, (i) {
+              final active = i == _step;
+              final done = i < _step;
+              return Container(
+                width: active ? 28 : 10,
+                height: 10,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: done
+                      ? const Color(0xFF16A34A)
+                      : active
+                          ? const Color(0xFF8B5CF6)
+                          : theme.colorScheme.outlineVariant
+                              .withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              );
+            })),
+      ),
+      // Step label
+      Text(_stepLabels[_step],
+          style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800, color: const Color(0xFF8B5CF6))),
       const SizedBox(height: 16),
-      Text('Familienform',
-          style: theme.textTheme.labelLarge
-              ?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
-      Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: MatchOptions.familyForms
-              .map((f) => ChoiceChip(
-                  label: Text(MatchOptions.familyFormLabels[f] ?? f),
-                  selected: _form == f,
-                  onSelected: (_) => setState(() => _form = f)))
-              .toList()),
-      const SizedBox(height: 16),
-      Text('Unsere Werte',
-          style: theme.textTheme.labelLarge
-              ?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
-      Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: MatchOptions.valueOptions
-              .map((v) => FilterChip(
-                  label: Text(MatchOptions.valueLabels[v] ?? v),
-                  selected: _values.contains(v),
-                  onSelected: (s) =>
-                      setState(() => s ? _values.add(v) : _values.remove(v))))
-              .toList()),
-      const SizedBox(height: 16),
-      Text('Was suchen wir?',
-          style: theme.textTheme.labelLarge
-              ?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
-      Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: MatchOptions.lookingForOptions
-              .map((l) => FilterChip(
-                  label: Text(MatchOptions.lookingForLabels[l] ?? l),
-                  selected: _looking.contains(l),
-                  onSelected: (s) =>
-                      setState(() => s ? _looking.add(l) : _looking.remove(l))))
-              .toList()),
-      const SizedBox(height: 16),
-      Text('Verfuegbarkeit',
-          style: theme.textTheme.labelLarge
-              ?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
-      Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: MatchOptions.availOptions
-              .map((a) => ChoiceChip(
-                  label: Text(MatchOptions.availLabels[a] ?? a),
-                  selected: _avail == a,
-                  onSelected: (_) => setState(() => _avail = a)))
-              .toList()),
-      const SizedBox(height: 16),
-      Text('Sprachen',
-          style: theme.textTheme.labelLarge
-              ?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
-      Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: MatchOptions.languageLabels.entries
-              .map((e) => FilterChip(
-                  label: Text(e.value),
-                  selected: _langs.contains(e.key),
-                  onSelected: (s) => setState(
-                      () => s ? _langs.add(e.key) : _langs.remove(e.key))))
-              .toList()),
-      const SizedBox(height: 16),
-      TextField(
-          controller: _bio,
-          maxLength: 140,
-          maxLines: 2,
-          decoration: InputDecoration(
-              labelText: 'Kurze Bio',
-              hintText: 'Was sucht ihr?',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)))),
-      const SizedBox(height: 24),
-      SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-              onPressed: _save,
+      // Pages
+      Expanded(
+        child: PageView(
+          controller: _pageCtrl,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _step1(theme),
+            _step2(theme),
+            _step3(theme),
+            _step4(theme),
+            _step5(theme)
+          ],
+        ),
+      ),
+      // Navigation
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Row(children: [
+          if (_step > 0)
+            TextButton.icon(
+                onPressed: _prev,
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                label: const Text('Zurueck'))
+          else
+            const Spacer(),
+          const Spacer(),
+          if (_step < _totalSteps - 1)
+            FilledButton.icon(
+                onPressed: _next,
+                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                label: const Text('Weiter'),
+                style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))))
+          else
+            FilledButton.icon(
+              onPressed: _saving ? null : _submit,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: Text(_saving ? 'Speichern...' : 'Profil erstellen'),
               style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: const Color(0xFF16A34A),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14))),
-              child: const Text('Profil erstellen'))),
+            ),
+        ]),
+      ),
     ]);
   }
 
-  Future<void> _save() async {
-    if (_name.text.trim().isEmpty || _district.text.trim().isEmpty) return;
-    final p = FamilyMatchProfile(
-        displayName: _name.text.trim(),
-        district: _district.text.trim(),
-        children: const [],
-        languages: _langs.toList(),
-        familyForm: _form,
-        values: _values.toList(),
-        lookingFor: _looking.toList(),
-        availability: _avail,
-        bio: _bio.text.trim(),
-        createdAt: DateTime.now());
-    await widget.onSave(p);
+  static const _stepLabels = [
+    'Schritt 1: Eure Familie',
+    'Schritt 2: Eure Kinder',
+    'Schritt 3: Werte & Stil',
+    'Schritt 4: Was sucht ihr?',
+    'Schritt 5: Sprachen & Mehr',
+  ];
+
+  // ─── SCHRITT 1: Grundinfos ─────────────────────────────────────────────────
+  Widget _step1(ThemeData theme) {
+    return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          _inputField(_nameCtrl, 'Euer Vorname / Spitzname',
+              'z.B. Sarah, Die Muellers', Icons.person_rounded),
+          const SizedBox(height: 14),
+          _inputField(_districtCtrl, 'Stadtteil oder PLZ',
+              'z.B. Kreuzberg, 10997', Icons.location_on_rounded),
+          const SizedBox(height: 20),
+          _sectionTitle(theme, '\u{1F46A} Familienform'),
+          const SizedBox(height: 8),
+          Text('Waehle was am besten passt — oder schreib deine eigene:',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ...MatchOptions.familyForms.map((f) => ChoiceChip(
+                  label: Text(MatchOptions.familyFormLabels[f] ?? f,
+                      style: const TextStyle(fontSize: 12)),
+                  selected: _familyForm == f,
+                  onSelected: (_) => setState(() => _familyForm = f),
+                  avatar: null,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                )),
+            ActionChip(
+              label:
+                  const Text('\u{2795} Eigene', style: TextStyle(fontSize: 12)),
+              onPressed: () => setState(() => _familyForm = 'custom'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              side: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+            ),
+          ]),
+          if (_familyForm == 'custom') ...[
+            const SizedBox(height: 10),
+            _inputField(_familyFormCustomCtrl, 'Eure Familienform',
+                'z.B. Wahlfamilie, Mehrgenerationen...', Icons.edit_rounded),
+          ],
+        ]));
+  }
+
+  // ─── SCHRITT 2: Kinder ─────────────────────────────────────────────────────
+  Widget _step2(ThemeData theme) {
+    return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          Text('Fuer wen sucht ihr Spielfreunde?',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 14),
+          ..._children
+              .asMap()
+              .entries
+              .map((entry) => _childCard(theme, entry.key, entry.value)),
+          const SizedBox(height: 12),
+          Center(
+              child: TextButton.icon(
+            onPressed: () => setState(() => _children.add(_ChildData())),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Kind hinzufuegen'),
+          )),
+        ]));
+  }
+
+  Widget _childCard(ThemeData theme, int index, _ChildData child) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text('\u{1F476} Kind ${index + 1}',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const Spacer(),
+          if (_children.length > 1)
+            IconButton(
+                icon: Icon(Icons.close_rounded,
+                    size: 18, color: theme.colorScheme.error),
+                onPressed: () => setState(() {
+                      _children[index].dispose();
+                      _children.removeAt(index);
+                    })),
+        ]),
+        const SizedBox(height: 10),
+        TextField(
+            controller: child.nameCtrl,
+            decoration: InputDecoration(
+                labelText: 'Name / Spitzname',
+                hintText: 'z.B. Mia',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                isDense: true)),
+        const SizedBox(height: 12),
+        // Alter Slider
+        Row(children: [
+          Text('Alter:',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Slider(
+            value: child.ageMonths.toDouble(),
+            min: 0, max: 216, // 0 bis 18 Jahre
+            divisions: 216,
+            label: _ageLabel(child.ageMonths),
+            onChanged: (v) => setState(() => child.ageMonths = v.round()),
+          )),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8)),
+            child: Text(_ageLabel(child.ageMonths),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF8B5CF6))),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        // Geschlecht
+        Text('Geschlecht (optional):',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Wrap(
+            spacing: 8,
+            children: [null, ...MatchOptions.genderLabels.keys]
+                .map((g) => ChoiceChip(
+                      label: Text(
+                          g == null
+                              ? 'Keine Angabe'
+                              : MatchOptions.genderLabels[g]!,
+                          style: const TextStyle(fontSize: 11)),
+                      selected: child.gender == g,
+                      onSelected: (_) => setState(() => child.gender = g),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ))
+                .toList()),
+        const SizedBox(height: 12),
+        // Interessen
+        Text('Interessen:',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          ...MatchOptions.childInterests.map((i) => FilterChip(
+                label: Text(MatchOptions.childInterestLabels[i] ?? i,
+                    style: const TextStyle(fontSize: 10)),
+                selected: child.interests.contains(i),
+                onSelected: (s) => setState(() =>
+                    s ? child.interests.add(i) : child.interests.remove(i)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                visualDensity: VisualDensity.compact,
+              )),
+          ActionChip(
+            label:
+                const Text('\u{2795} Eigenes', style: TextStyle(fontSize: 10)),
+            onPressed: () => _showCustomInput(
+                child.interestsCustomCtrl, 'Was mag dein Kind noch?'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            side: const BorderSide(color: Color(0xFF8B5CF6)),
+            visualDensity: VisualDensity.compact,
+          ),
+        ]),
+        if (child.interestsCustomCtrl.text.isNotEmpty)
+          Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('\u{2728} ${child.interestsCustomCtrl.text}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.primary,
+                      fontStyle: FontStyle.italic))),
+      ]),
+    );
+  }
+
+  String _ageLabel(int months) {
+    if (months < 12) return '$months Mon.';
+    final y = months ~/ 12;
+    final m = months % 12;
+    return m == 0 ? '$y Jahre' : '$y J. $m M.';
+  }
+
+  // ─── SCHRITT 3: Werte & Erziehungsstil ─────────────────────────────────────
+  Widget _step3(ThemeData theme) {
+    return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: const Color(0xFF16A34A).withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: const Color(0xFF16A34A).withValues(alpha: 0.15))),
+            child: Row(children: [
+              const Text('\u{1F49A}', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(
+                      'Tipp: Familien mit aehnlichen Werten verstehen sich am besten. Waehle was euch wichtig ist.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF16A34A),
+                          fontWeight: FontWeight.w500,
+                          height: 1.3)))
+            ]),
+          ),
+          const SizedBox(height: 16),
+          _sectionTitle(theme, '\u{2728} Was lebt ihr?'),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ...MatchOptions.valueOptions.map((v) => FilterChip(
+                  label: Text(MatchOptions.valueLabels[v] ?? v,
+                      style: const TextStyle(fontSize: 11)),
+                  selected: _values.contains(v),
+                  onSelected: (s) =>
+                      setState(() => s ? _values.add(v) : _values.remove(v)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  selectedColor: v == 'gfk'
+                      ? const Color(0xFF16A34A).withValues(alpha: 0.15)
+                      : null,
+                  checkmarkColor: v == 'gfk' ? const Color(0xFF16A34A) : null,
+                )),
+            ActionChip(
+              label: const Text('\u{2795} Eigener Wert',
+                  style: TextStyle(fontSize: 11)),
+              onPressed: () => _showCustomInput(
+                  _valuesCustomCtrl, 'Was ist euch noch wichtig?'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              side: const BorderSide(color: Color(0xFF8B5CF6)),
+            ),
+          ]),
+          if (_valuesCustomCtrl.text.isNotEmpty)
+            Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Text('\u{2728} ${_valuesCustomCtrl.text}',
+                        style: TextStyle(
+                            fontSize: 12, color: theme.colorScheme.primary)))),
+        ]));
+  }
+
+  // ─── SCHRITT 4: Aktivitaeten + Verfuegbarkeit ──────────────────────────────
+  Widget _step4(ThemeData theme) {
+    return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          _sectionTitle(theme, '\u{1F3AF} Was sucht ihr?'),
+          const SizedBox(height: 6),
+          Text('Waehle Aktivitaeten die euch Spass machen:',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ...MatchOptions.lookingForOptions.map((l) => FilterChip(
+                  label: Text(MatchOptions.lookingForLabels[l] ?? l,
+                      style: const TextStyle(fontSize: 11)),
+                  selected: _lookingFor.contains(l),
+                  onSelected: (s) => setState(
+                      () => s ? _lookingFor.add(l) : _lookingFor.remove(l)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                )),
+            ActionChip(
+              label: const Text('\u{2795} Eigene Idee',
+                  style: TextStyle(fontSize: 11)),
+              onPressed: () => _showCustomInput(
+                  _lookingForCustomCtrl, 'Was wuenscht ihr euch noch?'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              side: const BorderSide(color: Color(0xFF8B5CF6)),
+            ),
+          ]),
+          if (_lookingForCustomCtrl.text.isNotEmpty)
+            Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Text('\u{2728} ${_lookingForCustomCtrl.text}',
+                        style: TextStyle(
+                            fontSize: 12, color: theme.colorScheme.primary)))),
+          const SizedBox(height: 22),
+          _sectionTitle(theme, '\u{1F4C5} Wann habt ihr Zeit?'),
+          const SizedBox(height: 10),
+          Text('Tage:',
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: MatchOptions.dayOptions
+                  .map((d) => FilterChip(
+                        label: Text(MatchOptions.dayLabels[d] ?? d,
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)),
+                        selected: _availDays.contains(d),
+                        onSelected: (s) => setState(
+                            () => s ? _availDays.add(d) : _availDays.remove(d)),
+                        shape: const CircleBorder(),
+                        showCheckmark: false,
+                        padding: const EdgeInsets.all(4),
+                      ))
+                  .toList()),
+          const SizedBox(height: 14),
+          Text('Uhrzeiten:',
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ...MatchOptions.timeOptions.map((t) => FilterChip(
+                  label: Text(MatchOptions.timeLabels[t] ?? t,
+                      style: const TextStyle(fontSize: 11)),
+                  selected: _availTimes.contains(t),
+                  onSelected: (s) => setState(
+                      () => s ? _availTimes.add(t) : _availTimes.remove(t)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                )),
+            ActionChip(
+              label: const Text('\u{2795} Andere Zeit',
+                  style: TextStyle(fontSize: 11)),
+              onPressed: () => _showCustomInput(
+                  _availCustomCtrl, 'z.B. Nur in Ferien, Nur Feiertage...'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              side: const BorderSide(color: Color(0xFF8B5CF6)),
+            ),
+          ]),
+          if (_availCustomCtrl.text.isNotEmpty)
+            Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Text('\u{2728} ${_availCustomCtrl.text}',
+                        style: TextStyle(
+                            fontSize: 12, color: theme.colorScheme.primary)))),
+        ]));
+  }
+
+  // ─── SCHRITT 5: Sprachen + Bio + Besonderheiten ────────────────────────────
+  Widget _step5(ThemeData theme) {
+    return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 8),
+          _sectionTitle(theme, '\u{1F30D} Welche Sprachen sprecht ihr?'),
+          const SizedBox(height: 6),
+          Text('Alle Sprachen eurer Familie — auch die der Kinder:',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: MatchOptions.languageLabels.entries
+                  .map((e) => FilterChip(
+                        label:
+                            Text(e.value, style: const TextStyle(fontSize: 11)),
+                        selected: _langs.contains(e.key),
+                        onSelected: (s) => setState(
+                            () => s ? _langs.add(e.key) : _langs.remove(e.key)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ))
+                  .toList()),
+          const SizedBox(height: 22),
+          _sectionTitle(theme, '\u{1F4AC} Kurze Bio'),
+          const SizedBox(height: 6),
+          TextField(
+              controller: _bioCtrl,
+              maxLength: 200,
+              maxLines: 3,
+              decoration: InputDecoration(
+                  hintText:
+                      'Erzaehlt kurz von euch: Was macht eure Familie besonders? Was wuenscht ihr euch?',
+                  hintStyle:
+                      TextStyle(fontSize: 13, color: theme.colorScheme.outline),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF8B5CF6), width: 1.5)))),
+          const SizedBox(height: 22),
+          _sectionTitle(theme, '\u{1F49C} Besonderheiten (optional)'),
+          const SizedBox(height: 6),
+          Text('Damit wir passende Familien vorschlagen koennen:',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ...MatchOptions.specialOptions.map((s) => FilterChip(
+                  label: Text(MatchOptions.specialLabels[s] ?? s,
+                      style: const TextStyle(fontSize: 11)),
+                  selected: _specials.contains(s),
+                  onSelected: (sel) => setState(
+                      () => sel ? _specials.add(s) : _specials.remove(s)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                )),
+            ActionChip(
+              label: const Text('\u{2795} Eigenes',
+                  style: TextStyle(fontSize: 11)),
+              onPressed: () => _showCustomInput(_specialsCustomCtrl,
+                  'Was sollten andere Familien noch wissen?'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              side: const BorderSide(color: Color(0xFF8B5CF6)),
+            ),
+          ]),
+          if (_specialsCustomCtrl.text.isNotEmpty)
+            Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Text('\u{2728} ${_specialsCustomCtrl.text}',
+                        style: TextStyle(
+                            fontSize: 12, color: theme.colorScheme.primary)))),
+          const SizedBox(height: 20),
+        ]));
+  }
+
+  // ─── Hilfsmethoden ─────────────────────────────────────────────────────────
+  Widget _sectionTitle(ThemeData theme, String text) {
+    return Text(text,
+        style:
+            theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800));
+  }
+
+  Widget _inputField(
+      TextEditingController ctrl, String label, String hint, IconData icon) {
+    return TextField(
+        controller: ctrl,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          prefixIcon: Icon(icon, size: 20),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: Color(0xFF8B5CF6), width: 1.5)),
+        ));
+  }
+
+  void _showCustomInput(TextEditingController ctrl, String hint) {
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          return Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.surface,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(24))),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  maxLength: 60,
+                  decoration: InputDecoration(
+                      hintText: hint,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14))),
+                  onSubmitted: (_) {
+                    Navigator.pop(ctx);
+                    setState(() {});
+                  },
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          setState(() {});
+                        },
+                        child: const Text('Fertig'))),
+              ]),
+            ),
+          );
+        });
+  }
+}
+
+// ─── Kind-Daten Helfer ───────────────────────────────────────────────────────
+class _ChildData {
+  final nameCtrl = TextEditingController();
+  final interestsCustomCtrl = TextEditingController();
+  int ageMonths = 36; // default 3 Jahre
+  String? gender;
+  final Set<String> interests = {};
+
+  void dispose() {
+    nameCtrl.dispose();
+    interestsCustomCtrl.dispose();
   }
 }

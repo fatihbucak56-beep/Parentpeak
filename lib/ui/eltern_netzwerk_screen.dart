@@ -5,42 +5,50 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:parentpeak/logic/parent_coin_service.dart';
 import 'package:parentpeak/logic/auth_service.dart';
+import 'package:parentpeak/logic/spielfreunde_backend_service.dart';
 import 'package:parentpeak/models/family_profile_model.dart';
 
 class ElternNetzwerkScreen extends StatefulWidget {
   const ElternNetzwerkScreen({super.key});
   @override
-  State<ElternNetzwerkScreen> createState() => _State();
+  State<ElternNetzwerkScreen> createState() => _ScreenState();
 }
 
-class _State extends State<ElternNetzwerkScreen>
+class _ScreenState extends State<ElternNetzwerkScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
+  final _backend = SpielfreundeBackendService();
   FamilyMatchProfile? _profile;
+  WaitlistStatus _waitlist =
+      const WaitlistStatus(total: 0, threshold: 20, remaining: 20, progress: 0);
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
     ParentCoinService.instance.initialize();
-    ParentCoinService.instance.addListener(_r);
-    _loadProfile();
+    ParentCoinService.instance.addListener(_rebuild);
+    _init();
   }
 
   @override
   void dispose() {
     _tabs.dispose();
-    ParentCoinService.instance.removeListener(_r);
+    ParentCoinService.instance.removeListener(_rebuild);
     super.dispose();
   }
 
-  void _r() {
+  void _rebuild() {
     if (mounted) setState(() {});
   }
 
-  Future<void> _loadProfile() async {
+  Future<void> _init() async {
     final p = await FamilyMatchProfile.load();
     if (mounted) setState(() => _profile = p);
+    if (p != null) {
+      final w = await _backend.getWaitlistCount(p.district);
+      if (mounted) setState(() => _waitlist = w);
+    }
   }
 
   @override
@@ -54,16 +62,13 @@ class _State extends State<ElternNetzwerkScreen>
           controller: _tabs,
           tabs: const [
             Tab(text: 'Einladen & Coins'),
-            Tab(text: 'Spielfreunde'),
+            Tab(text: 'Spielfreunde')
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabs,
-        children: [
-          _buildInviteTab(theme),
-          _buildSpielfreundeTab(theme),
-        ],
+        children: [_inviteTab(theme), _spielfreundeTab(theme)],
       ),
     );
   }
@@ -72,254 +77,178 @@ class _State extends State<ElternNetzwerkScreen>
   // TAB 1: EINLADEN & COINS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildInviteTab(ThemeData theme) {
+  Widget _inviteTab(ThemeData theme) {
     final coins = ParentCoinService.instance;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _coinCard(theme, coins),
-          const SizedBox(height: 20),
-          Text('Freunde einladen',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text('Fuer jede Registrierung: 1 ParentCoin.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 14),
-          _inviteRow(theme, Icons.share_rounded, const Color(0xFF0EA5A4),
-              'Einladung teilen', 'WhatsApp, SMS, E-Mail', () async {
-            await Share.share(coins.getInviteMessage());
-          }),
-          const SizedBox(height: 10),
-          _inviteRow(
-              theme,
-              Icons.qr_code_rounded,
-              const Color(0xFF8B5CF6),
-              'QR-Code zeigen',
-              'Am Spielplatz scannen',
-              () => _showQR(theme, coins)),
-          const SizedBox(height: 10),
-          _inviteRow(theme, Icons.link_rounded, const Color(0xFF2563EB),
-              'Link kopieren', coins.getInviteLink(), () {
-            Clipboard.setData(ClipboardData(text: coins.getInviteLink()));
-            ScaffoldMessenger.of(context)
-                .showSnackBar(const SnackBar(content: Text('Link kopiert!')));
-          }),
-          if (coins.history.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text('Verlauf',
-                style: theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 10),
-            ...coins.history.take(5).map((tx) => _txRow(theme, tx)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _coinCard(ThemeData theme, ParentCoinService c) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [Color(0xFF0EA5A4), Color(0xFF06B6D4)]),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-              color: const Color(0xFF0EA5A4).withValues(alpha: 0.2),
-              blurRadius: 16,
-              offset: const Offset(0, 6))
-        ],
-      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(14)),
-              child: const Center(
-                  child: Text('\u{1FA99}', style: TextStyle(fontSize: 24)))),
-          const SizedBox(width: 14),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text('${c.balance} ParentCoins',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                        color: Colors.white, fontWeight: FontWeight.w800)),
-                Text('${c.coinsUntilFreePremium} bis Gratis-Premium',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: Colors.white.withValues(alpha: 0.8))),
-              ])),
-          if (c.hasCommunityBadge)
-            Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8)),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                  SizedBox(width: 4),
-                  Text('Community',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white))
-                ])),
-        ]),
-        const SizedBox(height: 16),
-        ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-                value: c.progressToFreePremium.clamp(0, 1),
-                minHeight: 8,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white))),
-        const SizedBox(height: 8),
-        Text('${c.successfulInvites} Einladungen erfolgreich',
-            style: TextStyle(
-                fontSize: 11, color: Colors.white.withValues(alpha: 0.75))),
-        if (c.balance >= ParentCoinService.coinsForFreePremium) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                  onPressed: () async {
-                    await c.redeemForPremium();
-                  },
-                  style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF0EA5A4),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
-                  child: const Text('Premium einloesen'))),
-        ],
-      ]),
-    );
-  }
-
-  Widget _inviteRow(ThemeData theme, IconData icon, Color color, String title,
-      String sub, VoidCallback onTap) {
-    return GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: theme.colorScheme.outlineVariant
-                        .withValues(alpha: 0.5))),
-            child: Row(children: [
+        // Coin Card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+                colors: [Color(0xFF0EA5A4), Color(0xFF06B6D4)]),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                  color: const Color(0xFF0EA5A4).withValues(alpha: 0.2),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6))
+            ],
+          ),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
               Container(
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Icon(icon, color: color, size: 20)),
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14)),
+                  child: const Center(
+                      child:
+                          Text('\u{1FA99}', style: TextStyle(fontSize: 24)))),
               const SizedBox(width: 14),
               Expanded(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(title,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    Text(sub,
+                    Text('${coins.balance} ParentCoins',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                            color: Colors.white, fontWeight: FontWeight.w800)),
+                    Text('${coins.coinsUntilFreePremium} bis Gratis-Premium',
                         style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant),
-                        overflow: TextOverflow.ellipsis)
+                            color: Colors.white.withValues(alpha: 0.8))),
                   ])),
-              Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: theme.colorScheme.outline)
-            ])));
-  }
-
-  Widget _txRow(ThemeData theme, CoinTransaction tx) {
-    final e = tx.type != CoinTransactionType.spent;
-    return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12)),
-            child: Row(children: [
-              Icon(e ? Icons.add_circle_rounded : Icons.remove_circle_rounded,
-                  size: 18,
-                  color: e ? const Color(0xFF16A34A) : const Color(0xFFEF4444)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Text(tx.reason,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis)),
-              Text('${e ? "+" : "-"}${tx.amount}',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: e
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFFEF4444)))
-            ])));
-  }
-
-  void _showQR(ThemeData theme, ParentCoinService coins) {
-    showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24))),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('Dein Einladungs-Code',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 20),
-              Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16)),
-                  child: QrImageView(
-                      data: coins.getInviteLink(),
-                      version: QrVersions.auto,
-                      size: 200)),
-              const SizedBox(height: 14),
-              Text(coins.referralCode,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800, letterSpacing: 2)),
-              const SizedBox(height: 20),
+              if (coins.hasCommunityBadge)
+                Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                      SizedBox(width: 4),
+                      Text('Community',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white))
+                    ])),
+            ]),
+            const SizedBox(height: 16),
+            ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                    value: coins.progressToFreePremium.clamp(0, 1),
+                    minHeight: 8,
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white))),
+            const SizedBox(height: 8),
+            Text('${coins.successfulInvites} Einladungen erfolgreich',
+                style: TextStyle(
+                    fontSize: 11, color: Colors.white.withValues(alpha: 0.75))),
+            if (coins.balance >= ParentCoinService.coinsForFreePremium) ...[
+              const SizedBox(height: 12),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Fertig')))
-            ])));
+                      onPressed: () async {
+                        await coins.redeemForPremium();
+                      },
+                      style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF0EA5A4),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))),
+                      child: const Text('Premium einloesen')))
+            ],
+          ]),
+        ),
+        const SizedBox(height: 20),
+        Text('Freunde einladen',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text('Fuer jede Registrierung: 1 ParentCoin.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 14),
+        _inviteRow(theme, Icons.share_rounded, const Color(0xFF0EA5A4),
+            'Einladung teilen', 'WhatsApp, SMS, E-Mail', () async {
+          await Share.share(coins.getInviteMessage());
+        }),
+        const SizedBox(height: 10),
+        _inviteRow(
+            theme,
+            Icons.qr_code_rounded,
+            const Color(0xFF8B5CF6),
+            'QR-Code zeigen',
+            'Am Spielplatz scannen',
+            () => _showQR(theme, coins)),
+        const SizedBox(height: 10),
+        _inviteRow(theme, Icons.link_rounded, const Color(0xFF2563EB),
+            'Link kopieren', coins.getInviteLink(), () {
+          Clipboard.setData(ClipboardData(text: coins.getInviteLink()));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Link kopiert!')));
+        }),
+        if (coins.history.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text('Verlauf',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          ...coins.history.take(5).map((tx) {
+            final e = tx.type != CoinTransactionType.spent;
+            return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Row(children: [
+                      Icon(
+                          e
+                              ? Icons.add_circle_rounded
+                              : Icons.remove_circle_rounded,
+                          size: 18,
+                          color: e
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFFEF4444)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Text(tx.reason,
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis)),
+                      Text('${e ? "+" : "-"}${tx.amount}',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: e
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFFEF4444)))
+                    ])));
+          })
+        ],
+      ]),
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TAB 2: SPIELFREUNDE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildSpielfreundeTab(ThemeData theme) {
+  Widget _spielfreundeTab(ThemeData theme) {
     if (_profile == null) return _profileSetup(theme);
-    return _waitlist(theme);
+    return _waitlistView(theme);
   }
 
   Widget _profileSetup(ThemeData theme) {
@@ -350,16 +279,17 @@ class _State extends State<ElternNetzwerkScreen>
           const SizedBox(height: 28),
           _ProfileForm(onSave: (p) async {
             await p.save();
-            await _loadProfile();
+            final uid = AuthService.instance.currentUser?.uid ?? 'guest';
+            await _backend.saveProfile(p, uid);
+            await _init();
           }),
         ]));
   }
 
-  Widget _waitlist(ThemeData theme) {
+  Widget _waitlistView(ThemeData theme) {
     return SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Mein Profil
           Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -399,7 +329,6 @@ class _State extends State<ElternNetzwerkScreen>
                             color: theme.colorScheme.primary)))
               ])),
           const SizedBox(height: 20),
-          // Warteliste
           Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -428,12 +357,12 @@ class _State extends State<ElternNetzwerkScreen>
                     decoration: BoxDecoration(
                         color: const Color(0xFF8B5CF6).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12)),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.people_rounded,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.people_rounded,
                           size: 18, color: Color(0xFF8B5CF6)),
-                      SizedBox(width: 8),
-                      Text('14 Familien warten auch',
-                          style: TextStyle(
+                      const SizedBox(width: 8),
+                      Text('${_waitlist.total} Familien warten auch',
+                          style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF8B5CF6)))
@@ -441,16 +370,16 @@ class _State extends State<ElternNetzwerkScreen>
                 const SizedBox(height: 12),
                 ClipRRect(
                     borderRadius: BorderRadius.circular(6),
-                    child: const LinearProgressIndicator(
-                        value: 0.58,
+                    child: LinearProgressIndicator(
+                        value: _waitlist.progress,
                         minHeight: 6,
-                        backgroundColor: Color(0xFFE2E8F0),
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)))),
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF8B5CF6)))),
                 const SizedBox(height: 6),
-                Text('Noch 6 Familien bis Freischaltung',
+                Text('Noch ${_waitlist.remaining} Familien bis Freischaltung',
                     style: theme.textTheme.labelSmall
-                        ?.copyWith(color: theme.colorScheme.outline))
+                        ?.copyWith(color: theme.colorScheme.outline)),
               ])),
           const SizedBox(height: 20),
           Text('So wird es aussehen:',
@@ -588,9 +517,87 @@ class _State extends State<ElternNetzwerkScreen>
                   ?.copyWith(color: theme.colorScheme.outline)),
         ]));
   }
+
+  Widget _inviteRow(ThemeData theme, IconData icon, Color color, String title,
+      String sub, VoidCallback onTap) {
+    return GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: theme.colorScheme.outlineVariant
+                        .withValues(alpha: 0.5))),
+            child: Row(children: [
+              Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Icon(icon, color: color, size: 20)),
+              const SizedBox(width: 14),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(title,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(sub,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant),
+                        overflow: TextOverflow.ellipsis)
+                  ])),
+              Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: theme.colorScheme.outline)
+            ])));
+  }
+
+  void _showQR(ThemeData theme, ParentCoinService coins) {
+    showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24))),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('Dein Einladungs-Code',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 20),
+              Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16)),
+                  child: QrImageView(
+                      data: coins.getInviteLink(),
+                      version: QrVersions.auto,
+                      size: 200)),
+              const SizedBox(height: 14),
+              Text(coins.referralCode,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800, letterSpacing: 2)),
+              const SizedBox(height: 20),
+              SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Fertig')))
+            ])));
+  }
 }
 
-// ─── Profil-Formular (separate StatefulWidget) ────────────────────────────────
+// ─── Profil-Formular ──────────────────────────────────────────────────────────
 
 class _ProfileForm extends StatefulWidget {
   final Future<void> Function(FamilyMatchProfile) onSave;

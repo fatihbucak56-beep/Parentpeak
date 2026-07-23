@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:parentpeak/config/api_config.dart';
 import 'package:parentpeak/logic/backend_service_factory.dart';
 import 'package:parentpeak/logic/backend_api_client.dart';
 import 'package:parentpeak/models/family_profile_model.dart';
@@ -47,7 +46,9 @@ class SpielfreundeBackendService {
 
   /// Warteliste-Counter fuer einen Stadtteil abrufen.
   Future<WaitlistStatus> getWaitlistCount(String? district) async {
-    if (_api == null) return WaitlistStatus(total: 0, threshold: 20, remaining: 20, progress: 0);
+    if (_api == null)
+      return WaitlistStatus(
+          total: 0, threshold: 20, remaining: 20, progress: 0);
     try {
       final path = district != null && district.isNotEmpty
           ? '/api/spielfreunde/waitlist-count?district=$district'
@@ -93,7 +94,8 @@ class SpielfreundeBackendService {
   }
 
   /// Referral registrieren (wenn eingeladener User sich registriert).
-  Future<bool> registerReferral(String referralCode, String newUserId, String newUserName) async {
+  Future<bool> registerReferral(
+      String referralCode, String newUserId, String newUserName) async {
     if (_api == null) return false;
     try {
       await _api!.postJsonAny('/api/referral/register', {
@@ -147,12 +149,17 @@ class WaitlistStatus {
   final int threshold;
   final int remaining;
   final double progress;
-  const WaitlistStatus({required this.total, required this.threshold, required this.remaining, required this.progress});
+  const WaitlistStatus(
+      {required this.total,
+      required this.threshold,
+      required this.remaining,
+      required this.progress});
 }
 
 class ReferralStatus {
   final String code;
   final int coins;
   final int invites;
-  const ReferralStatus({required this.code, required this.coins, required this.invites});
+  const ReferralStatus(
+      {required this.code, required this.coins, required this.invites});
 }
